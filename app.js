@@ -11,6 +11,9 @@ const AI_API_URL =
 const RPA_API_URL =
   "https://anucqzffvxyxwdnafacr.supabase.co/functions/v1/rpa-api";
 
+const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
+const CHAT_HISTORY_STORAGE_PREFIX = "ds_chatbot_ai_history_v1_";
+
 let sessionToken = sessionStorage.getItem("sso_session_token") || "";
 let currentMode = "ai";
 let thinkingTimer = null;
@@ -18,6 +21,8 @@ let rpaLoaded = false;
 let selectedRpaItem = null;
 let selectedRpaButton = null;
 let runningRpaName = "";
+let currentLoginId = "";
+let currentEmpNo = "";
 
 const aiBtn = document.getElementById("aiBtn");
 const rpaBtn = document.getElementById("rpaBtn");
@@ -34,6 +39,8 @@ const userInfo = document.getElementById("userInfo");
 bootstrap();
 
 async function bootstrap() {
+  cleanupExpiredChatHistories();
+
   const url = new URL(location.href);
   const tokenFromUrl = url.searchParams.get("token");
 
@@ -57,7 +64,11 @@ async function bootstrap() {
       throw new Error(me.message || "인증 확인 실패");
     }
 
-    userInfo.textContent = "로그인ID: " + me.loginId;
+    currentEmpNo = String(me.empNo || "");
+    currentLoginId = String(me.loginId || "");
+
+    userInfo.textContent = "로그인ID: " + currentLoginId;
+    restoreChatHistory();
     enableApp();
   } catch (err) {
     sessionStorage.removeItem("sso_session_token");
@@ -96,17 +107,25 @@ function setMode(mode) {
   }
 }
 
-function addMessage(targetBody, type, text, debug = false) {
+function addMessage(targetBody, type, text, debug = false, options = {}) {
   const div = document.createElement("div");
   div.className = debug ? "msg bot debug" : "msg " + type;
   div.textContent = text;
   targetBody.appendChild(div);
   targetBody.scrollTop = targetBody.scrollHeight;
+
+  if (targetBody === aiBody && !debug && !options.skipSave) {
+    saveChatHistory();
+  }
+
   return div;
 }
-
 function clearBody(targetBody) {
   targetBody.innerHTML = "";
+
+  if (targetBody === aiBody) {
+    saveChatHistory();
+  }
 }
 
 function createThinkingBox() {
@@ -244,6 +263,96 @@ async function apiJson(url, options = {}) {
   }
 
   return data;
+}
+
+
+function getChatHistoryKey() {
+  const userKey = currentLoginId || currentEmpNo || "unknown";
+  return CHAT_HISTORY_STORAGE_PREFIX + userKey;
+}
+
+function getAllAiMessages() {
+  return Array.from(aiBody.querySelectorAll(".msg"))
+    .filter((el) => !el.classList.contains("debug"))
+    .map((el) => {
+      const role = el.classList.contains("user") ? "user" : "bot";
+      return {
+        role,
+        text: el.textContent || "",
+      };
+    })
+    .filter((msg) => msg.text.trim());
+}
+
+function saveChatHistory() {
+  if (!currentLoginId && !currentEmpNo) return;
+
+  const messages = getAllAiMessages();
+  const payload = {
+    savedAt: Date.now(),
+    messages,
+  };
+
+  try {
+    localStorage.setItem(getChatHistoryKey(), JSON.stringify(payload));
+  } catch (err) {
+    console.warn("AI 채팅 내역 저장 실패:", err);
+  }
+}
+
+function restoreChatHistory() {
+  if (!currentLoginId && !currentEmpNo) return;
+
+  const key = getChatHistoryKey();
+  const raw = localStorage.getItem(key);
+
+  if (!raw) return;
+
+  try {
+    const payload = JSON.parse(raw);
+    const savedAt = Number(payload.savedAt || 0);
+    const messages = Array.isArray(payload.messages) ? payload.messages : [];
+
+    if (!savedAt || Date.now() - savedAt > CHAT_HISTORY_TTL_MS) {
+      localStorage.removeItem(key);
+      return;
+    }
+
+    if (!messages.length) return;
+
+    aiBody.innerHTML = "";
+
+    messages.forEach((msg) => {
+      const role = msg.role === "user" ? "user" : "bot";
+      addMessage(aiBody, role, String(msg.text || ""), false, { skipSave: true });
+    });
+
+    aiBody.scrollTop = aiBody.scrollHeight;
+  } catch (err) {
+    console.warn("AI 채팅 내역 복원 실패:", err);
+    localStorage.removeItem(key);
+  }
+}
+
+function cleanupExpiredChatHistories() {
+  const now = Date.now();
+
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+
+    if (!key || !key.startsWith(CHAT_HISTORY_STORAGE_PREFIX)) continue;
+
+    try {
+      const payload = JSON.parse(localStorage.getItem(key) || "{}");
+      const savedAt = Number(payload.savedAt || 0);
+
+      if (!savedAt || now - savedAt > CHAT_HISTORY_TTL_MS) {
+        localStorage.removeItem(key);
+      }
+    } catch {
+      localStorage.removeItem(key);
+    }
+  }
 }
 
 async function loadRpaList() {
@@ -417,22 +526,7 @@ async function runRpaJob(item, executeBtn, cancelBtn) {
     });
 
     if (data.ok) {
-      let message = item.name + " 실행 요청이 완료되었습니다.";
-
-      const rawText = String(data.raw || "");
-
-      if (
-        rawText.includes("Pending") ||
-        rawText.includes("Queued") ||
-        rawText.includes("Running")
-      ) {
-        message =
-          "다른 작업이 실행 중입니다.\n" +
-          "작업이 대기열에 등록되었으며 완료 후 자동 실행됩니다.";
-      }
-
-      addMessage(rpaBody, "bot", message);
-
+      addMessage(rpaBody, "bot", item.name + " 실행 요청이 완료되었습니다.");
       clearSelectedRpaInline();
     } else {
       addMessage(
@@ -530,6 +624,7 @@ async function sendChat(message) {
           fullText += parsed;
           botDiv.textContent = fullText;
           aiBody.scrollTop = aiBody.scrollHeight;
+          saveChatHistory();
         }
 
         buffer = "";
@@ -545,10 +640,12 @@ async function sendChat(message) {
     if (finalParsed) {
       fullText += finalParsed;
       botDiv.textContent = fullText;
+      saveChatHistory();
     }
 
     if (!fullText.trim()) {
       botDiv.textContent = "답변 데이터는 수신했지만 화면에 표시할 텍스트를 찾지 못했습니다.";
+      saveChatHistory();
     }
   } catch (err) {
     removeThinkingBox(thinkingBox);
