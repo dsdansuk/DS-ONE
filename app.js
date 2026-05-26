@@ -54,7 +54,7 @@ async function bootstrap() {
   try {
     const me = await apiJson(AI_API_URL, { method: "GET" });
     if (!me.ok) throw new Error(me.message || "인증 확인 실패");
-    userInfo.textContent = "사번: " + me.empNo + " / 로그인ID: " + me.loginId;
+    userInfo.textContent = "로그인ID: " + me.loginId;
     enableApp();
   } catch (err) {
     sessionStorage.removeItem("sso_session_token");
