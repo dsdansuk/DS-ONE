@@ -417,7 +417,22 @@ async function runRpaJob(item, executeBtn, cancelBtn) {
     });
 
     if (data.ok) {
-      addMessage(rpaBody, "bot", item.name + " 실행 요청이 완료되었습니다.");
+      let message = item.name + " 실행 요청이 완료되었습니다.";
+
+      const rawText = String(data.raw || "");
+
+      if (
+        rawText.includes("Pending") ||
+        rawText.includes("Queued") ||
+        rawText.includes("Running")
+      ) {
+        message =
+          "다른 작업이 실행 중입니다.\n" +
+          "작업이 대기열에 등록되었으며 완료 후 자동 실행됩니다.";
+      }
+
+      addMessage(rpaBody, "bot", message);
+
       clearSelectedRpaInline();
     } else {
       addMessage(
