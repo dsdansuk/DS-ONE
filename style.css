@@ -243,75 +243,80 @@ input {
   cursor: not-allowed;
 }
 
-/* RPA 선택/실행 패널 */
+/* RPA 카드 선택 후 바로 아래 실행/취소 영역 */
 .rpa-item.selected {
   border-color: #2563eb;
-  background: #eff6ff;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+  background: #eef4ff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16);
 }
 
-.rpa-action-panel {
-  margin-top: 12px;
-  padding: 14px;
-  border: 1px solid #dbe3ef;
-  border-radius: 16px;
-  background: #ffffff;
+.rpa-inline-action {
+  margin: -2px 0 8px;
+  padding: 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  background: #f8fbff;
 }
 
-.rpa-status {
-  margin-bottom: 10px;
-}
-
-.rpa-status.running {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-}
-
-.rpa-status-label {
-  font-size: 12px;
-  color: #6b7280;
-  margin-bottom: 4px;
-  font-weight: 700;
-}
-
-.rpa-status-value {
+.rpa-inline-title {
   font-size: 14px;
+  font-weight: 800;
   color: #111827;
-  font-weight: 700;
+  margin-bottom: 10px;
   word-break: break-word;
 }
 
-.rpa-action-buttons {
+.rpa-inline-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin-top: 12px;
 }
 
-.rpa-run-btn,
+.rpa-execute-btn,
 .rpa-cancel-btn {
-  height: 42px;
+  height: 40px;
   border-radius: 12px;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
 }
 
-.rpa-run-btn {
+.rpa-execute-btn {
   border: 0;
   background: #0b3a75;
-  color: white;
+  color: #fff;
 }
 
 .rpa-cancel-btn {
   border: 1px solid #d1d5db;
-  background: white;
-  color: #374151;
+  background: #fff;
+  color: #111827;
 }
 
-.rpa-run-btn:disabled,
+.rpa-execute-btn:disabled,
 .rpa-cancel-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
 }
+
+.rpa-running-box {
+  margin-bottom: 10px;
+  padding: 11px 12px;
+  border: 1px solid #fbbf24;
+  border-radius: 14px;
+  background: #fffbeb;
+  color: #111827;
+}
+
+.rpa-state-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #92400e;
+  margin-bottom: 4px;
+}
+
+.rpa-state-name {
+  font-size: 14px;
+  font-weight: 800;
+  word-break: break-word;
+}
+
