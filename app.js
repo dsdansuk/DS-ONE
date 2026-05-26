@@ -1,6 +1,15 @@
-// 운영 배포 시 본인 Supabase Edge Function URL로 변경하세요.
-// 예: https://anucqzffvxyxwdnafacr.supabase.co/functions/v1/sso-test
-const API_BASE_URL = "https://anucqzffvxyxwdnafacr.supabase.co/functions/v1/sso-test";
+// DS Chatbot Frontend - 운영 분리 구조용 app.js
+// GitHub Pages: https://dsdansuk.github.io/DS-chatbot/
+// Edge Functions:
+// - sso-login: 그룹웨어 SSO 진입 및 토큰 발급
+// - ai-api: 사내 AI / SideTalk 호출
+// - rpa-api: UiPath RPA 호출
+
+const AI_API_URL =
+  "https://anucqzffvxyxwdnafacr.supabase.co/functions/v1/ai-api";
+
+const RPA_API_URL =
+  "https://anucqzffvxyxwdnafacr.supabase.co/functions/v1/rpa-api";
 
 let sessionToken = sessionStorage.getItem("sso_session_token") || "";
 let currentMode = "ai";
@@ -28,6 +37,7 @@ async function bootstrap() {
   if (tokenFromUrl) {
     sessionToken = tokenFromUrl;
     sessionStorage.setItem("sso_session_token", sessionToken);
+
     url.searchParams.delete("token");
     history.replaceState({}, "", url.toString());
   }
@@ -39,13 +49,28 @@ async function bootstrap() {
   }
 
   try {
-    const me = await apiJson("/api/me", { method: "GET" });
-    if (!me.ok) throw new Error(me.message || "인증 확인 실패");
+    const me = await apiJson(AI_API_URL + "/me", {
+      method: "GET",
+    });
+
+    if (!me.ok) {
+      throw new Error(me.message || "인증 확인 실패");
+    }
+
     userInfo.textContent = "사번: " + me.empNo + " / 로그인ID: " + me.loginId;
+    enableApp();
   } catch (err) {
-    userInfo.textContent = "인증 실패: " + err.message;
+    sessionStorage.removeItem("sso_session_token");
+    sessionToken = "";
+    userInfo.textContent = "인증 실패: " + getErrorMessage(err);
     disableApp();
   }
+}
+
+function enableApp() {
+  messageInput.disabled = false;
+  sendBtn.disabled = false;
+  reloadRpaBtn.disabled = false;
 }
 
 function disableApp() {
@@ -89,7 +114,7 @@ function createThinkingBox() {
     "질문을 이해하는 중",
     "관련 내용을 확인하는 중",
     "답변을 정리하는 중",
-    "곧 답변드릴게요"
+    "곧 답변드릴게요",
   ];
 
   const wrap = document.createElement("div");
@@ -106,7 +131,7 @@ function createThinkingBox() {
     const li = document.createElement("li");
     li.dataset.index = String(index);
     if (index === 0) li.className = "active";
-    li.innerHTML = '<span class="dot"></span><span>' + escapeHtml(step) + '</span>';
+    li.innerHTML = '<span class="dot"></span><span>' + escapeHtml(step) + "</span>";
     list.appendChild(li);
   });
 
@@ -122,6 +147,7 @@ function createThinkingBox() {
       li.classList.toggle("done", idx < current);
       li.classList.toggle("active", idx === current);
     });
+
     current = Math.min(current + 1, steps.length - 1);
     aiBody.scrollTop = aiBody.scrollHeight;
   }, 900);
@@ -134,7 +160,10 @@ function removeThinkingBox(box) {
     clearInterval(thinkingTimer);
     thinkingTimer = null;
   }
-  if (box) box.remove();
+
+  if (box) {
+    box.remove();
+  }
 }
 
 function escapeHtml(value) {
@@ -144,6 +173,11 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function getErrorMessage(err) {
+  if (err instanceof Error) return err.message;
+  return String(err || "알 수 없는 오류");
 }
 
 function parseStreamText(text) {
@@ -183,8 +217,8 @@ function parseStreamText(text) {
   return output;
 }
 
-async function apiJson(path, options = {}) {
-  const res = await fetch(API_BASE_URL + path, {
+async function apiJson(url, options = {}) {
+  const res = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -194,11 +228,15 @@ async function apiJson(path, options = {}) {
   });
 
   const text = await res.text();
+
   let data = {};
   try {
     data = text ? JSON.parse(text) : {};
   } catch {
-    data = { ok: false, message: text || "JSON 파싱 실패" };
+    data = {
+      ok: false,
+      message: text || "JSON 파싱 실패",
+    };
   }
 
   if (!res.ok) {
@@ -213,13 +251,18 @@ async function loadRpaList() {
   addMessage(rpaBody, "bot", "RPA 목록을 불러오는 중입니다.");
 
   try {
-    const data = await apiJson("/api/rpa/list", {
+    const data = await apiJson(RPA_API_URL + "/list", {
       method: "POST",
       body: JSON.stringify({}),
     });
 
     if (!data.ok) {
-      addMessage(rpaBody, "bot", "RPA 목록 조회 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)), true);
+      addMessage(
+        rpaBody,
+        "bot",
+        "RPA 목록 조회 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)),
+        true
+      );
       return;
     }
 
@@ -232,7 +275,7 @@ async function loadRpaList() {
     renderRpaList(data.releases || []);
     rpaLoaded = true;
   } catch (err) {
-    addMessage(rpaBody, "bot", "RPA 목록 조회 중 오류 발생: " + err.message);
+    addMessage(rpaBody, "bot", "RPA 목록 조회 중 오류 발생: " + getErrorMessage(err));
   }
 }
 
@@ -256,16 +299,26 @@ function renderRpaList(releases) {
     const releaseKey = item.Key || "";
 
     btn.innerHTML =
-      '<div class="rpa-name">' + escapeHtml(name) + '</div>' +
+      '<div class="rpa-name">' +
+      escapeHtml(name) +
+      "</div>" +
       '<div class="rpa-meta">' +
-      "Folder " + escapeHtml(folderId) + " / " +
-      escapeHtml(source) + " / " +
+      "Folder " +
+      escapeHtml(folderId) +
+      " / " +
+      escapeHtml(source) +
+      " / " +
       escapeHtml(processKey) +
       (version ? " / v" + escapeHtml(version) : "") +
-      '</div>';
+      "</div>";
 
     btn.addEventListener("click", () => {
-      runRpaJob({ name, releaseKey, folderId, source });
+      runRpaJob({
+        name,
+        releaseKey,
+        folderId,
+        source,
+      });
     });
 
     wrap.appendChild(btn);
@@ -277,7 +330,11 @@ function renderRpaList(releases) {
 
 async function runRpaJob(item) {
   if (item.source === "Processes") {
-    addMessage(rpaBody, "bot", "이 항목은 Processes 조회 결과입니다. 실행에는 ReleaseKey가 필요해서 실패할 수 있습니다. Releases 목록에서 나온 항목을 우선 실행하세요.");
+    addMessage(
+      rpaBody,
+      "bot",
+      "이 항목은 Processes 조회 결과입니다. 실행에는 ReleaseKey가 필요해서 실패할 수 있습니다. Releases 목록에서 나온 항목을 우선 실행하세요."
+    );
   }
 
   const ok = confirm("RPA 업무를 실행하시겠습니까?\n\n" + item.name);
@@ -287,7 +344,7 @@ async function runRpaJob(item) {
   addMessage(rpaBody, "bot", "RPA 실행 요청 중입니다.");
 
   try {
-    const data = await apiJson("/api/rpa/run", {
+    const data = await apiJson(RPA_API_URL + "/run", {
       method: "POST",
       body: JSON.stringify({
         releaseKey: item.releaseKey,
@@ -298,10 +355,15 @@ async function runRpaJob(item) {
     if (data.ok) {
       addMessage(rpaBody, "bot", "RPA 실행 요청이 완료되었습니다.");
     } else {
-      addMessage(rpaBody, "bot", "RPA 실행 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)), true);
+      addMessage(
+        rpaBody,
+        "bot",
+        "RPA 실행 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)),
+        true
+      );
     }
   } catch (err) {
-    addMessage(rpaBody, "bot", "RPA 실행 중 오류 발생: " + err.message);
+    addMessage(rpaBody, "bot", "RPA 실행 중 오류 발생: " + getErrorMessage(err));
   }
 }
 
@@ -309,13 +371,16 @@ async function sendChat(message) {
   const thinkingBox = createThinkingBox();
 
   try {
-    const res = await fetch(API_BASE_URL + "/api/chat", {
+    const res = await fetch(AI_API_URL + "/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer " + sessionToken,
       },
-      body: JSON.stringify({ message, stream: true }),
+      body: JSON.stringify({
+        message,
+        stream: true,
+      }),
     });
 
     removeThinkingBox(thinkingBox);
@@ -334,6 +399,7 @@ async function sendChat(message) {
     const botDiv = addMessage(aiBody, "bot", "");
     const reader = res.body.getReader();
     const decoder = new TextDecoder("utf-8");
+
     let fullText = "";
     let buffer = "";
 
@@ -346,20 +412,26 @@ async function sendChat(message) {
 
       buffer += chunk;
 
-      // [DONE]이 포함되었거나 줄 단위 data가 완성된 경우 파싱합니다.
+      // SideTalk 응답 예:
+      // data: {"chunk":"..."}
+      // data: [DONE]
       if (buffer.includes("\n\n") || buffer.includes("data: [DONE]") || !buffer.includes("data:")) {
         const parsed = parseStreamText(buffer);
+
         if (parsed) {
           fullText += parsed;
           botDiv.textContent = fullText;
           aiBody.scrollTop = aiBody.scrollHeight;
         }
+
         buffer = "";
       }
     }
 
     const tail = decoder.decode();
-    if (tail) buffer += tail;
+    if (tail) {
+      buffer += tail;
+    }
 
     const finalParsed = parseStreamText(buffer);
     if (finalParsed) {
@@ -372,7 +444,7 @@ async function sendChat(message) {
     }
   } catch (err) {
     removeThinkingBox(thinkingBox);
-    addMessage(aiBody, "bot", "호출 실패: " + err.message);
+    addMessage(aiBody, "bot", "호출 실패: " + getErrorMessage(err));
   } finally {
     sendBtn.disabled = false;
     messageInput.focus();
@@ -380,7 +452,9 @@ async function sendChat(message) {
 }
 
 aiBtn.addEventListener("click", () => setMode("ai"));
+
 rpaBtn.addEventListener("click", () => setMode("rpa"));
+
 reloadRpaBtn.addEventListener("click", () => {
   rpaLoaded = false;
   loadRpaList();
@@ -395,6 +469,7 @@ chatForm.addEventListener("submit", async (e) => {
   if (!message) return;
 
   addMessage(aiBody, "user", message);
+
   messageInput.value = "";
   sendBtn.disabled = true;
 
