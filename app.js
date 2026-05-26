@@ -57,7 +57,7 @@ async function bootstrap() {
       throw new Error(me.message || "인증 확인 실패");
     }
 
-    userInfo.textContent = "사번: " + me.empNo + " / 로그인ID: " + me.loginId;
+    userInfo.textContent = "로그인ID: " + me.loginId;
     enableApp();
   } catch (err) {
     sessionStorage.removeItem("sso_session_token");
@@ -270,8 +270,14 @@ async function loadRpaList() {
     }
 
     if (!data.releases || data.releases.length === 0) {
-      addMessage(rpaBody, "bot", "RPA 목록이 비어 있습니다. 아래 디버그 정보를 확인하세요.");
-      addMessage(rpaBody, "bot", JSON.stringify(data.debug || data, null, 2), true);
+      addMessage(
+        rpaBody,
+        "bot",
+        "사용 가능한 RPA 업무가 없습니다.\n관리자에게 권한을 요청하세요."
+      );
+
+      console.log("RPA DEBUG:", data.debug || data);
+
       return;
     }
 
