@@ -49,8 +49,8 @@ async function bootstrap() {
   }
 
   try {
-    const me = await apiJson(AI_API_URL + "/me", {
-      method: "GET",
+    const me = await apiJson(AI_API_URL, {
+      method: "GET"
     });
 
     if (!me.ok) {
