@@ -1,0 +1,402 @@
+// 운영 배포 시 본인 Supabase Edge Function URL로 변경하세요.
+// 예: https://anucqzffvxyxwdnafacr.supabase.co/functions/v1/sso-test
+const API_BASE_URL = "https://anucqzffvxyxwdnafacr.supabase.co/functions/v1/sso-test";
+
+let sessionToken = sessionStorage.getItem("sso_session_token") || "";
+let currentMode = "ai";
+let thinkingTimer = null;
+let rpaLoaded = false;
+
+const aiBtn = document.getElementById("aiBtn");
+const rpaBtn = document.getElementById("rpaBtn");
+const aiPanel = document.getElementById("aiPanel");
+const rpaPanel = document.getElementById("rpaPanel");
+const aiBody = document.getElementById("aiBody");
+const rpaBody = document.getElementById("rpaBody");
+const chatForm = document.getElementById("chatForm");
+const messageInput = document.getElementById("messageInput");
+const sendBtn = document.getElementById("sendBtn");
+const reloadRpaBtn = document.getElementById("reloadRpaBtn");
+const userInfo = document.getElementById("userInfo");
+
+bootstrap();
+
+async function bootstrap() {
+  const url = new URL(location.href);
+  const tokenFromUrl = url.searchParams.get("token");
+
+  if (tokenFromUrl) {
+    sessionToken = tokenFromUrl;
+    sessionStorage.setItem("sso_session_token", sessionToken);
+    url.searchParams.delete("token");
+    history.replaceState({}, "", url.toString());
+  }
+
+  if (!sessionToken) {
+    userInfo.textContent = "인증 정보가 없습니다. 그룹웨어에서 다시 접속하세요.";
+    disableApp();
+    return;
+  }
+
+  try {
+    const me = await apiJson("/api/me", { method: "GET" });
+    if (!me.ok) throw new Error(me.message || "인증 확인 실패");
+    userInfo.textContent = "사번: " + me.empNo + " / 로그인ID: " + me.loginId;
+  } catch (err) {
+    userInfo.textContent = "인증 실패: " + err.message;
+    disableApp();
+  }
+}
+
+function disableApp() {
+  messageInput.disabled = true;
+  sendBtn.disabled = true;
+  reloadRpaBtn.disabled = true;
+}
+
+function setMode(mode) {
+  currentMode = mode;
+
+  aiBtn.classList.toggle("active", mode === "ai");
+  rpaBtn.classList.toggle("active", mode === "rpa");
+  aiPanel.classList.toggle("active", mode === "ai");
+  rpaPanel.classList.toggle("active", mode === "rpa");
+
+  if (mode === "rpa" && !rpaLoaded) {
+    loadRpaList();
+  }
+
+  if (mode === "ai") {
+    messageInput.focus();
+  }
+}
+
+function addMessage(targetBody, type, text, debug = false) {
+  const div = document.createElement("div");
+  div.className = debug ? "msg bot debug" : "msg " + type;
+  div.textContent = text;
+  targetBody.appendChild(div);
+  targetBody.scrollTop = targetBody.scrollHeight;
+  return div;
+}
+
+function clearBody(targetBody) {
+  targetBody.innerHTML = "";
+}
+
+function createThinkingBox() {
+  const steps = [
+    "질문을 이해하는 중",
+    "관련 내용을 확인하는 중",
+    "답변을 정리하는 중",
+    "곧 답변드릴게요"
+  ];
+
+  const wrap = document.createElement("div");
+  wrap.className = "thinking";
+
+  const title = document.createElement("div");
+  title.className = "thinking-title";
+  title.textContent = "처리 중";
+
+  const list = document.createElement("ul");
+  list.className = "thinking-list";
+
+  steps.forEach((step, index) => {
+    const li = document.createElement("li");
+    li.dataset.index = String(index);
+    if (index === 0) li.className = "active";
+    li.innerHTML = '<span class="dot"></span><span>' + escapeHtml(step) + '</span>';
+    list.appendChild(li);
+  });
+
+  wrap.appendChild(title);
+  wrap.appendChild(list);
+  aiBody.appendChild(wrap);
+  aiBody.scrollTop = aiBody.scrollHeight;
+
+  let current = 0;
+  thinkingTimer = setInterval(() => {
+    const items = Array.from(list.querySelectorAll("li"));
+    items.forEach((li, idx) => {
+      li.classList.toggle("done", idx < current);
+      li.classList.toggle("active", idx === current);
+    });
+    current = Math.min(current + 1, steps.length - 1);
+    aiBody.scrollTop = aiBody.scrollHeight;
+  }, 900);
+
+  return wrap;
+}
+
+function removeThinkingBox(box) {
+  if (thinkingTimer) {
+    clearInterval(thinkingTimer);
+    thinkingTimer = null;
+  }
+  if (box) box.remove();
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function parseStreamText(text) {
+  if (!text) return "";
+
+  if (!text.includes("data:")) {
+    return text;
+  }
+
+  let output = "";
+  const lines = text.split(/\r?\n/);
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) continue;
+
+    const payload = trimmed.slice(5).trim();
+    if (!payload || payload === "[DONE]") continue;
+
+    try {
+      const data = JSON.parse(payload);
+      output +=
+        data.chunk ||
+        data.message?.content ||
+        data.delta?.content ||
+        data.choices?.[0]?.delta?.content ||
+        data.choices?.[0]?.message?.content ||
+        data.answer ||
+        data.content ||
+        data.text ||
+        "";
+    } catch {
+      output += payload;
+    }
+  }
+
+  return output;
+}
+
+async function apiJson(path, options = {}) {
+  const res = await fetch(API_BASE_URL + path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + sessionToken,
+      ...(options.headers || {}),
+    },
+  });
+
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { ok: false, message: text || "JSON 파싱 실패" };
+  }
+
+  if (!res.ok) {
+    throw new Error(data.message || data.raw || "HTTP " + res.status);
+  }
+
+  return data;
+}
+
+async function loadRpaList() {
+  clearBody(rpaBody);
+  addMessage(rpaBody, "bot", "RPA 목록을 불러오는 중입니다.");
+
+  try {
+    const data = await apiJson("/api/rpa/list", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+
+    if (!data.ok) {
+      addMessage(rpaBody, "bot", "RPA 목록 조회 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)), true);
+      return;
+    }
+
+    if (!data.releases || data.releases.length === 0) {
+      addMessage(rpaBody, "bot", "RPA 목록이 비어 있습니다. 아래 디버그 정보를 확인하세요.");
+      addMessage(rpaBody, "bot", JSON.stringify(data.debug || data, null, 2), true);
+      return;
+    }
+
+    renderRpaList(data.releases || []);
+    rpaLoaded = true;
+  } catch (err) {
+    addMessage(rpaBody, "bot", "RPA 목록 조회 중 오류 발생: " + err.message);
+  }
+}
+
+function renderRpaList(releases) {
+  clearBody(rpaBody);
+  addMessage(rpaBody, "bot", "실행할 RPA 업무를 선택하세요.");
+
+  const wrap = document.createElement("div");
+  wrap.className = "rpa-list";
+
+  releases.forEach((item) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "rpa-item";
+
+    const name = item.Name || "이름 없음";
+    const processKey = item.ProcessKey || "";
+    const version = item.ProcessVersion || "";
+    const source = item.source || "";
+    const folderId = item.folderId || "";
+    const releaseKey = item.Key || "";
+
+    btn.innerHTML =
+      '<div class="rpa-name">' + escapeHtml(name) + '</div>' +
+      '<div class="rpa-meta">' +
+      "Folder " + escapeHtml(folderId) + " / " +
+      escapeHtml(source) + " / " +
+      escapeHtml(processKey) +
+      (version ? " / v" + escapeHtml(version) : "") +
+      '</div>';
+
+    btn.addEventListener("click", () => {
+      runRpaJob({ name, releaseKey, folderId, source });
+    });
+
+    wrap.appendChild(btn);
+  });
+
+  rpaBody.appendChild(wrap);
+  rpaBody.scrollTop = rpaBody.scrollHeight;
+}
+
+async function runRpaJob(item) {
+  if (item.source === "Processes") {
+    addMessage(rpaBody, "bot", "이 항목은 Processes 조회 결과입니다. 실행에는 ReleaseKey가 필요해서 실패할 수 있습니다. Releases 목록에서 나온 항목을 우선 실행하세요.");
+  }
+
+  const ok = confirm("RPA 업무를 실행하시겠습니까?\n\n" + item.name);
+  if (!ok) return;
+
+  addMessage(rpaBody, "user", item.name + " 실행 요청");
+  addMessage(rpaBody, "bot", "RPA 실행 요청 중입니다.");
+
+  try {
+    const data = await apiJson("/api/rpa/run", {
+      method: "POST",
+      body: JSON.stringify({
+        releaseKey: item.releaseKey,
+        folderId: item.folderId,
+      }),
+    });
+
+    if (data.ok) {
+      addMessage(rpaBody, "bot", "RPA 실행 요청이 완료되었습니다.");
+    } else {
+      addMessage(rpaBody, "bot", "RPA 실행 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)), true);
+    }
+  } catch (err) {
+    addMessage(rpaBody, "bot", "RPA 실행 중 오류 발생: " + err.message);
+  }
+}
+
+async function sendChat(message) {
+  const thinkingBox = createThinkingBox();
+
+  try {
+    const res = await fetch(API_BASE_URL + "/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + sessionToken,
+      },
+      body: JSON.stringify({ message, stream: true }),
+    });
+
+    removeThinkingBox(thinkingBox);
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      addMessage(aiBody, "bot", "AI API 오류가 발생했습니다.\nHTTP " + res.status + "\n" + errorText, true);
+      return;
+    }
+
+    if (!res.body) {
+      addMessage(aiBody, "bot", "스트림 응답 본문이 없습니다.");
+      return;
+    }
+
+    const botDiv = addMessage(aiBody, "bot", "");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let fullText = "";
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      console.log("SIDETALK STREAM CHUNK:", chunk);
+
+      buffer += chunk;
+
+      // [DONE]이 포함되었거나 줄 단위 data가 완성된 경우 파싱합니다.
+      if (buffer.includes("\n\n") || buffer.includes("data: [DONE]") || !buffer.includes("data:")) {
+        const parsed = parseStreamText(buffer);
+        if (parsed) {
+          fullText += parsed;
+          botDiv.textContent = fullText;
+          aiBody.scrollTop = aiBody.scrollHeight;
+        }
+        buffer = "";
+      }
+    }
+
+    const tail = decoder.decode();
+    if (tail) buffer += tail;
+
+    const finalParsed = parseStreamText(buffer);
+    if (finalParsed) {
+      fullText += finalParsed;
+      botDiv.textContent = fullText;
+    }
+
+    if (!fullText.trim()) {
+      botDiv.textContent = "답변 데이터는 수신했지만 화면에 표시할 텍스트를 찾지 못했습니다.";
+    }
+  } catch (err) {
+    removeThinkingBox(thinkingBox);
+    addMessage(aiBody, "bot", "호출 실패: " + err.message);
+  } finally {
+    sendBtn.disabled = false;
+    messageInput.focus();
+  }
+}
+
+aiBtn.addEventListener("click", () => setMode("ai"));
+rpaBtn.addEventListener("click", () => setMode("rpa"));
+reloadRpaBtn.addEventListener("click", () => {
+  rpaLoaded = false;
+  loadRpaList();
+});
+
+chatForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (currentMode !== "ai") return;
+
+  const message = messageInput.value.trim();
+  if (!message) return;
+
+  addMessage(aiBody, "user", message);
+  messageInput.value = "";
+  sendBtn.disabled = true;
+
+  await sendChat(message);
+});
