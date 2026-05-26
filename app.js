@@ -16,6 +16,10 @@ let currentMode = "ai";
 let thinkingTimer = null;
 let rpaLoaded = false;
 
+let selectedRpaItem = null;
+let runningRpaName = "";
+let rpaRunInProgress = false;
+
 const aiBtn = document.getElementById("aiBtn");
 const rpaBtn = document.getElementById("rpaBtn");
 const aiPanel = document.getElementById("aiPanel");
@@ -37,7 +41,6 @@ async function bootstrap() {
   if (tokenFromUrl) {
     sessionToken = tokenFromUrl;
     sessionStorage.setItem("sso_session_token", sessionToken);
-
     url.searchParams.delete("token");
     history.replaceState({}, "", url.toString());
   }
@@ -49,14 +52,8 @@ async function bootstrap() {
   }
 
   try {
-    const me = await apiJson(AI_API_URL, {
-      method: "GET"
-    });
-
-    if (!me.ok) {
-      throw new Error(me.message || "인증 확인 실패");
-    }
-
+    const me = await apiJson(AI_API_URL, { method: "GET" });
+    if (!me.ok) throw new Error(me.message || "인증 확인 실패");
     userInfo.textContent = "사번: " + me.empNo + " / 로그인ID: " + me.loginId;
     enableApp();
   } catch (err) {
@@ -81,19 +78,13 @@ function disableApp() {
 
 function setMode(mode) {
   currentMode = mode;
-
   aiBtn.classList.toggle("active", mode === "ai");
   rpaBtn.classList.toggle("active", mode === "rpa");
   aiPanel.classList.toggle("active", mode === "ai");
   rpaPanel.classList.toggle("active", mode === "rpa");
 
-  if (mode === "rpa" && !rpaLoaded) {
-    loadRpaList();
-  }
-
-  if (mode === "ai") {
-    messageInput.focus();
-  }
+  if (mode === "rpa" && !rpaLoaded) loadRpaList();
+  if (mode === "ai") messageInput.focus();
 }
 
 function addMessage(targetBody, type, text, debug = false) {
@@ -110,20 +101,12 @@ function clearBody(targetBody) {
 }
 
 function createThinkingBox() {
-  const steps = [
-    "질문을 이해하는 중",
-    "관련 내용을 확인하는 중",
-    "답변을 정리하는 중",
-    "곧 답변드릴게요",
-  ];
-
+  const steps = ["질문을 이해하는 중", "관련 내용을 확인하는 중", "답변을 정리하는 중", "곧 답변드릴게요"];
   const wrap = document.createElement("div");
   wrap.className = "thinking";
-
   const title = document.createElement("div");
   title.className = "thinking-title";
   title.textContent = "처리 중";
-
   const list = document.createElement("ul");
   list.className = "thinking-list";
 
@@ -147,7 +130,6 @@ function createThinkingBox() {
       li.classList.toggle("done", idx < current);
       li.classList.toggle("active", idx === current);
     });
-
     current = Math.min(current + 1, steps.length - 1);
     aiBody.scrollTop = aiBody.scrollHeight;
   }, 900);
@@ -160,10 +142,7 @@ function removeThinkingBox(box) {
     clearInterval(thinkingTimer);
     thinkingTimer = null;
   }
-
-  if (box) {
-    box.remove();
-  }
+  if (box) box.remove();
 }
 
 function escapeHtml(value) {
@@ -182,10 +161,7 @@ function getErrorMessage(err) {
 
 function parseStreamText(text) {
   if (!text) return "";
-
-  if (!text.includes("data:")) {
-    return text;
-  }
+  if (!text.includes("data:")) return text;
 
   let output = "";
   const lines = text.split(/\r?\n/);
@@ -193,27 +169,16 @@ function parseStreamText(text) {
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed.startsWith("data:")) continue;
-
     const payload = trimmed.slice(5).trim();
     if (!payload || payload === "[DONE]") continue;
 
     try {
       const data = JSON.parse(payload);
-      output +=
-        data.chunk ||
-        data.message?.content ||
-        data.delta?.content ||
-        data.choices?.[0]?.delta?.content ||
-        data.choices?.[0]?.message?.content ||
-        data.answer ||
-        data.content ||
-        data.text ||
-        "";
+      output += data.chunk || data.message?.content || data.delta?.content || data.choices?.[0]?.delta?.content || data.choices?.[0]?.message?.content || data.answer || data.content || data.text || "";
     } catch {
       output += payload;
     }
   }
-
   return output;
 }
 
@@ -228,47 +193,36 @@ async function apiJson(url, options = {}) {
   });
 
   const text = await res.text();
-
   let data = {};
   try {
     data = text ? JSON.parse(text) : {};
   } catch {
-    data = {
-      ok: false,
-      message: text || "JSON 파싱 실패",
-    };
+    data = { ok: false, message: text || "JSON 파싱 실패" };
   }
 
-  if (!res.ok) {
-    throw new Error(data.message || data.raw || "HTTP " + res.status);
-  }
-
+  if (!res.ok) throw new Error(data.message || data.raw || "HTTP " + res.status);
   return data;
 }
 
 async function loadRpaList() {
+  selectedRpaItem = null;
+  rpaLoaded = false;
   clearBody(rpaBody);
   addMessage(rpaBody, "bot", "RPA 목록을 불러오는 중입니다.");
 
   try {
     const data = await apiJson(RPA_API_URL, {
       method: "POST",
-      body: JSON.stringify({
-        action: "list"
-      }),
+      body: JSON.stringify({ action: "list" }),
     });
 
     if (!data.ok) {
-      addMessage(
-        rpaBody,
-        "bot",
-        "RPA 목록 조회 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)),
-        true
-      );
+      addMessage(rpaBody, "bot", "RPA 목록 조회 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)), true);
       return;
     }
 
     if (!data.releases || data.releases.length === 0) {
+      clearBody(rpaBody);
       addMessage(rpaBody, "bot", "RPA 목록이 비어 있습니다. 아래 디버그 정보를 확인하세요.");
       addMessage(rpaBody, "bot", JSON.stringify(data.debug || data, null, 2), true);
       return;
@@ -294,56 +248,99 @@ function renderRpaList(releases) {
     btn.className = "rpa-item";
 
     const name = item.Name || "이름 없음";
-    const processKey = item.ProcessKey || "";
-    const version = item.ProcessVersion || "";
     const source = item.source || "";
     const folderId = item.folderId || "";
     const releaseKey = item.Key || "";
 
-    btn.innerHTML =
-      '<div class="rpa-name">' +
-      escapeHtml(name) +
-      "</div>" +
-      '<div class="rpa-meta">' +
-      "Folder " +
-      escapeHtml(folderId) +
-      " / " +
-      escapeHtml(source) +
-      " / " +
-      escapeHtml(processKey) +
-      (version ? " / v" + escapeHtml(version) : "") +
-      "</div>";
-
-    btn.addEventListener("click", () => {
-      runRpaJob({
-        name,
-        releaseKey,
-        folderId,
-        source,
-      });
-    });
-
+    btn.innerHTML = '<div class="rpa-name">' + escapeHtml(name) + "</div>";
+    btn.addEventListener("click", () => selectRpaJob({ name, releaseKey, folderId, source }));
     wrap.appendChild(btn);
   });
 
   rpaBody.appendChild(wrap);
+  renderRpaActionPanel();
   rpaBody.scrollTop = rpaBody.scrollHeight;
 }
 
-async function runRpaJob(item) {
-  if (item.source === "Processes") {
-    addMessage(
-      rpaBody,
-      "bot",
-      "이 항목은 Processes 조회 결과입니다. 실행에는 ReleaseKey가 필요해서 실패할 수 있습니다. Releases 목록에서 나온 항목을 우선 실행하세요."
-    );
+function selectRpaJob(item) {
+  selectedRpaItem = item;
+
+  const buttons = Array.from(rpaBody.querySelectorAll(".rpa-item"));
+  buttons.forEach((btn) => {
+    const title = btn.querySelector(".rpa-name")?.textContent || "";
+    btn.classList.toggle("selected", title === item.name);
+  });
+
+  renderRpaActionPanel();
+}
+
+function cancelSelectedRpaJob() {
+  selectedRpaItem = null;
+  clearRpaSelectionStyle();
+  renderRpaActionPanel();
+}
+
+function renderRpaActionPanel() {
+  const oldPanel = document.getElementById("rpaActionPanel");
+  if (oldPanel) oldPanel.remove();
+
+  const panel = document.createElement("div");
+  panel.id = "rpaActionPanel";
+  panel.className = "rpa-action-panel";
+
+  let html = "";
+
+  if (runningRpaName) {
+    html +=
+      '<div class="rpa-status running">' +
+      '<div class="rpa-status-label">실행 중인 작업:</div>' +
+      '<div class="rpa-status-value">' + escapeHtml(runningRpaName) + "</div>" +
+      "</div>";
   }
 
-  const ok = confirm("RPA 업무를 실행하시겠습니까?\n\n" + item.name);
-  if (!ok) return;
+  html +=
+    '<div class="rpa-status selected-job">' +
+    '<div class="rpa-status-label">선택된 작업:</div>' +
+    '<div class="rpa-status-value">' + (selectedRpaItem ? escapeHtml(selectedRpaItem.name) : "없음") + "</div>" +
+    "</div>" +
+    '<div class="rpa-action-buttons">' +
+    '<button id="runSelectedRpaBtn" class="rpa-run-btn" type="button">' + (rpaRunInProgress ? "실행 요청 중..." : "실행") + "</button>" +
+    '<button id="cancelSelectedRpaBtn" class="rpa-cancel-btn" type="button">취소</button>' +
+    "</div>";
+
+  panel.innerHTML = html;
+  rpaBody.appendChild(panel);
+
+  const runBtn = document.getElementById("runSelectedRpaBtn");
+  const cancelBtn = document.getElementById("cancelSelectedRpaBtn");
+
+  if (runBtn) {
+    runBtn.disabled = !selectedRpaItem || rpaRunInProgress;
+    runBtn.addEventListener("click", () => {
+      if (selectedRpaItem) runRpaJob(selectedRpaItem);
+    });
+  }
+
+  if (cancelBtn) {
+    cancelBtn.disabled = !selectedRpaItem || rpaRunInProgress;
+    cancelBtn.addEventListener("click", cancelSelectedRpaJob);
+  }
+}
+
+async function runRpaJob(item) {
+  if (!item) return;
+
+  if (!item.releaseKey || !item.folderId) {
+    addMessage(rpaBody, "bot", "RPA 실행에 필요한 ReleaseKey 또는 Folder ID가 없습니다.", true);
+    return;
+  }
+
+  rpaRunInProgress = true;
+  runningRpaName = item.name;
+  renderRpaActionPanel();
 
   addMessage(rpaBody, "user", item.name + " 실행 요청");
-  addMessage(rpaBody, "bot", "RPA 실행 요청 중입니다.");
+  addMessage(rpaBody, "bot", item.name + " 실행 요청 중입니다.");
 
   try {
     const data = await apiJson(RPA_API_URL, {
@@ -356,18 +353,33 @@ async function runRpaJob(item) {
     });
 
     if (data.ok) {
-      addMessage(rpaBody, "bot", "RPA 실행 요청이 완료되었습니다.");
+      addMessage(rpaBody, "bot", item.name + " 실행 요청이 완료되었습니다.");
+      selectedRpaItem = null;
+      clearRpaSelectionStyle();
+
+      setTimeout(() => {
+        if (runningRpaName === item.name) {
+          runningRpaName = "";
+          renderRpaActionPanel();
+        }
+      }, 30000);
     } else {
-      addMessage(
-        rpaBody,
-        "bot",
-        "RPA 실행 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)),
-        true
-      );
+      addMessage(rpaBody, "bot", "RPA 실행 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)), true);
+      runningRpaName = "";
     }
   } catch (err) {
     addMessage(rpaBody, "bot", "RPA 실행 중 오류 발생: " + getErrorMessage(err));
+    runningRpaName = "";
+  } finally {
+    rpaRunInProgress = false;
+    renderRpaActionPanel();
+    rpaBody.scrollTop = rpaBody.scrollHeight;
   }
+}
+
+function clearRpaSelectionStyle() {
+  const buttons = Array.from(rpaBody.querySelectorAll(".rpa-item"));
+  buttons.forEach((btn) => btn.classList.remove("selected"));
 }
 
 async function sendChat(message) {
@@ -380,10 +392,7 @@ async function sendChat(message) {
         "Content-Type": "application/json",
         Authorization: "Bearer " + sessionToken,
       },
-      body: JSON.stringify({
-        message,
-        stream: true,
-      }),
+      body: JSON.stringify({ message, stream: true }),
     });
 
     removeThinkingBox(thinkingBox);
@@ -412,29 +421,21 @@ async function sendChat(message) {
 
       const chunk = decoder.decode(value, { stream: true });
       console.log("SIDETALK STREAM CHUNK:", chunk);
-
       buffer += chunk;
 
-      // SideTalk 응답 예:
-      // data: {"chunk":"..."}
-      // data: [DONE]
       if (buffer.includes("\n\n") || buffer.includes("data: [DONE]") || !buffer.includes("data:")) {
         const parsed = parseStreamText(buffer);
-
         if (parsed) {
           fullText += parsed;
           botDiv.textContent = fullText;
           aiBody.scrollTop = aiBody.scrollHeight;
         }
-
         buffer = "";
       }
     }
 
     const tail = decoder.decode();
-    if (tail) {
-      buffer += tail;
-    }
+    if (tail) buffer += tail;
 
     const finalParsed = parseStreamText(buffer);
     if (finalParsed) {
@@ -455,26 +456,22 @@ async function sendChat(message) {
 }
 
 aiBtn.addEventListener("click", () => setMode("ai"));
-
 rpaBtn.addEventListener("click", () => setMode("rpa"));
-
 reloadRpaBtn.addEventListener("click", () => {
+  selectedRpaItem = null;
   rpaLoaded = false;
   loadRpaList();
 });
 
 chatForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-
   if (currentMode !== "ai") return;
 
   const message = messageInput.value.trim();
   if (!message) return;
 
   addMessage(aiBody, "user", message);
-
   messageInput.value = "";
   sendBtn.disabled = true;
-
   await sendChat(message);
 });
