@@ -251,9 +251,11 @@ async function loadRpaList() {
   addMessage(rpaBody, "bot", "RPA 목록을 불러오는 중입니다.");
 
   try {
-    const data = await apiJson(RPA_API_URL + "/list", {
+    const data = await apiJson(RPA_API_URL, {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        action: "list"
+      }),
     });
 
     if (!data.ok) {
@@ -344,9 +346,10 @@ async function runRpaJob(item) {
   addMessage(rpaBody, "bot", "RPA 실행 요청 중입니다.");
 
   try {
-    const data = await apiJson(RPA_API_URL + "/run", {
+    const data = await apiJson(RPA_API_URL, {
       method: "POST",
       body: JSON.stringify({
+        action: "run",
         releaseKey: item.releaseKey,
         folderId: item.folderId,
       }),
@@ -371,7 +374,7 @@ async function sendChat(message) {
   const thinkingBox = createThinkingBox();
 
   try {
-    const res = await fetch(AI_API_URL + "/chat", {
+    const res = await fetch(AI_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
