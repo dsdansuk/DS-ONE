@@ -14,6 +14,9 @@ const RPA_API_URL =
 const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
 const CHAT_HISTORY_STORAGE_PREFIX = "ds_chatbot_ai_history_v1_";
 
+const RPA_STATUS_POLL_INTERVAL_MS = 30 * 1000; // 30초
+const RPA_STATUS_POLL_MAX_MS = 10 * 60 * 1000; // 최대 10분
+
 let sessionToken = sessionStorage.getItem("sso_session_token") || "";
 let currentMode = "ai";
 let thinkingTimer = null;
@@ -21,6 +24,8 @@ let rpaLoaded = false;
 let selectedRpaItem = null;
 let selectedRpaButton = null;
 let runningRpaJobs = [];
+let rpaStatusPollTimer = null;
+let rpaStatusPollStartedAt = 0;
 let currentLoginId = "";
 let currentEmpNo = "";
 
@@ -40,6 +45,12 @@ bootstrap();
 
 async function bootstrap() {
   cleanupExpiredChatHistories();
+
+  // RPA 목록 새로고침 버튼은 최종 사용자용 UI에서는 숨깁니다.
+  if (reloadRpaBtn) {
+    reloadRpaBtn.style.display = "none";
+    reloadRpaBtn.disabled = true;
+  }
 
   const url = new URL(location.href);
   const tokenFromUrl = url.searchParams.get("token");
@@ -81,13 +92,12 @@ async function bootstrap() {
 function enableApp() {
   messageInput.disabled = false;
   sendBtn.disabled = false;
-  reloadRpaBtn.disabled = false;
 }
 
 function disableApp() {
   messageInput.disabled = true;
   sendBtn.disabled = true;
-  reloadRpaBtn.disabled = true;
+  if (reloadRpaBtn) reloadRpaBtn.disabled = true;
 }
 
 function setMode(mode) {
@@ -99,6 +109,7 @@ function setMode(mode) {
   rpaPanel.classList.toggle("active", mode === "rpa");
 
   if (mode === "rpa" && !rpaLoaded) {
+    // RPA 탭 진입 시 1회만 목록 + 상태를 조회합니다.
     loadRpaList();
   }
 
@@ -208,7 +219,9 @@ function parseStreamText(text) {
   }
 
   let output = "";
-  const lines = text.split(/\r?\n/);
+  const lines = text.split(/
+?
+/);
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -372,18 +385,14 @@ async function loadRpaList() {
       addMessage(
         rpaBody,
         "bot",
-        "RPA 목록 조회 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)),
+        "RPA 목록 조회 실패
+" + (data.raw || data.message || JSON.stringify(data, null, 2)),
         true
       );
       return;
     }
 
-    if (Array.isArray(data.jobs)) {
-      runningRpaJobs = data.jobs.map((job) => ({
-        name: job.name || job.Name || "이름 없음",
-        status: convertJobState(job.status || job.State || job.state),
-      }));
-    }
+    updateRunningRpaJobsFromApi(data.jobs);
 
     if (!data.releases || data.releases.length === 0) {
       clearBody(rpaBody);
@@ -391,19 +400,90 @@ async function loadRpaList() {
       addMessage(
         rpaBody,
         "bot",
-        "사용 가능한 RPA 업무가 없습니다.\n관리자에게 권한을 요청하세요."
+        "사용 가능한 RPA 업무가 없습니다.
+관리자에게 권한을 요청하세요."
       );
 
       console.log("RPA DEBUG:", data.debug || data);
-
+      syncRpaPollingByCurrentJobs();
       return;
     }
 
     renderRpaList(data.releases || []);
     rpaLoaded = true;
+    syncRpaPollingByCurrentJobs();
   } catch (err) {
     addMessage(rpaBody, "bot", "RPA 목록 조회 중 오류 발생: " + getErrorMessage(err));
   }
+}
+
+async function refreshRpaStatus() {
+  if (!sessionToken) return;
+
+  try {
+    const data = await apiJson(RPA_API_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "status" }),
+    });
+
+    if (!data.ok) return;
+
+    updateRunningRpaJobsFromApi(data.jobs);
+    renderRunningRpaNotice();
+    syncRpaPollingByCurrentJobs();
+  } catch (err) {
+    console.warn("RPA 상태 조회 실패:", err);
+  }
+}
+
+function updateRunningRpaJobsFromApi(jobs) {
+  if (!Array.isArray(jobs)) return;
+
+  runningRpaJobs = jobs
+    .map((job) => ({
+      name: job.name || job.Name || "이름 없음",
+      status: convertJobState(job.status || job.State || job.state),
+    }))
+    .filter((job) => {
+      return job.status === "대기 중" || job.status === "실행 중" || job.status === "실행 요청 중";
+    });
+}
+
+function syncRpaPollingByCurrentJobs() {
+  if (runningRpaJobs.length > 0) {
+    startRpaStatusPolling();
+  } else {
+    stopRpaStatusPolling();
+  }
+}
+
+function startRpaStatusPolling() {
+  if (rpaStatusPollTimer) return;
+
+  rpaStatusPollStartedAt = Date.now();
+
+  rpaStatusPollTimer = setInterval(() => {
+    if (Date.now() - rpaStatusPollStartedAt > RPA_STATUS_POLL_MAX_MS) {
+      stopRpaStatusPolling();
+      return;
+    }
+
+    if (!runningRpaJobs.length) {
+      stopRpaStatusPolling();
+      return;
+    }
+
+    refreshRpaStatus();
+  }, RPA_STATUS_POLL_INTERVAL_MS);
+}
+
+function stopRpaStatusPolling() {
+  if (rpaStatusPollTimer) {
+    clearInterval(rpaStatusPollTimer);
+    rpaStatusPollTimer = null;
+  }
+
+  rpaStatusPollStartedAt = 0;
 }
 
 function renderRpaList(releases) {
@@ -580,6 +660,7 @@ function setRunningJob(name, status) {
   ];
 
   refreshRunningRpaNotice();
+  syncRpaPollingByCurrentJobs();
 }
 
 function addOrUpdateRunningJob(name, status) {
@@ -592,6 +673,7 @@ function addOrUpdateRunningJob(name, status) {
   }
 
   refreshRunningRpaNotice();
+  syncRpaPollingByCurrentJobs();
 }
 
 async function runRpaJob(item, executeBtn, cancelBtn) {
@@ -619,27 +701,37 @@ async function runRpaJob(item, executeBtn, cancelBtn) {
     });
 
     if (data.ok) {
+      if (Array.isArray(data.jobs)) {
+        updateRunningRpaJobsFromApi(data.jobs);
+        refreshRunningRpaNotice();
+      }
+
       const runState = getRunStateFromResponse(data);
 
       if (runState === "queued") {
         addOrUpdateRunningJob(item.name, "대기 중");
         addTemporaryRpaMessage(
-          "다른 작업이 실행 중입니다.\n작업이 대기열에 등록되었습니다.",
+          "다른 작업이 실행 중입니다.
+작업이 대기열에 등록되었습니다.",
           8000
         );
       } else {
-        addOrUpdateRunningJob(item.name, "실행 중");
+        if (!runningRpaJobs.some((job) => job.name === item.name)) {
+          addOrUpdateRunningJob(item.name, "실행 중");
+        }
         addTemporaryRpaMessage(item.name + " 실행 요청이 완료되었습니다.", 8000);
       }
 
       clearSelectedRpaInline();
+      syncRpaPollingByCurrentJobs();
       return;
     }
 
     addMessage(
       rpaBody,
       "bot",
-      "RPA 실행 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)),
+      "RPA 실행 실패
+" + (data.raw || data.message || JSON.stringify(data, null, 2)),
       true
     );
 
@@ -697,7 +789,9 @@ async function sendChat(message) {
 
     if (!res.ok) {
       const errorText = await res.text();
-      addMessage(aiBody, "bot", "AI API 오류가 발생했습니다.\nHTTP " + res.status + "\n" + errorText, true);
+      addMessage(aiBody, "bot", "AI API 오류가 발생했습니다.
+HTTP " + res.status + "
+" + errorText, true);
       return;
     }
 
@@ -722,7 +816,9 @@ async function sendChat(message) {
 
       buffer += chunk;
 
-      if (buffer.includes("\n\n") || buffer.includes("data: [DONE]") || !buffer.includes("data:")) {
+      if (buffer.includes("
+
+") || buffer.includes("data: [DONE]") || !buffer.includes("data:")) {
         const parsed = parseStreamText(buffer);
 
         if (parsed) {
@@ -765,11 +861,13 @@ aiBtn.addEventListener("click", () => setMode("ai"));
 
 rpaBtn.addEventListener("click", () => setMode("rpa"));
 
-reloadRpaBtn.addEventListener("click", () => {
-  rpaLoaded = false;
-  runningRpaJobs = [];
-  loadRpaList();
-});
+if (reloadRpaBtn) {
+  reloadRpaBtn.addEventListener("click", () => {
+    // 최종 사용자 화면에서는 버튼이 숨겨져 있지만, 테스트용으로 남겨둡니다.
+    rpaLoaded = false;
+    loadRpaList();
+  });
+}
 
 chatForm.addEventListener("submit", async (e) => {
   e.preventDefault();
