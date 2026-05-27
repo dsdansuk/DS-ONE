@@ -12,7 +12,7 @@ const RPA_API_URL =
   "https://anucqzffvxyxwdnafacr.supabase.co/functions/v1/rpa-api";
 
 const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
-const AI_PROVIDER = "vertex"; // vertex | sidetalk | openai
+const AI_PROVIDER = "sidetalk"; // vertex | sidetalk | openai
 const CHAT_HISTORY_STORAGE_PREFIX = "ds_chatbot_ai_history_v1_";
 
 const RPA_STATUS_POLL_INTERVAL_MS = 30 * 1000; // 30초
