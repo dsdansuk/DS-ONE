@@ -20,7 +20,7 @@ let thinkingTimer = null;
 let rpaLoaded = false;
 let selectedRpaItem = null;
 let selectedRpaButton = null;
-let runningRpaName = "";
+let runningRpaJobs = [];
 let currentLoginId = "";
 let currentEmpNo = "";
 
@@ -120,6 +120,7 @@ function addMessage(targetBody, type, text, debug = false, options = {}) {
 
   return div;
 }
+
 function clearBody(targetBody) {
   targetBody.innerHTML = "";
 
@@ -265,7 +266,6 @@ async function apiJson(url, options = {}) {
   return data;
 }
 
-
 function getChatHistoryKey() {
   const userKey = currentLoginId || currentEmpNo || "unknown";
   return CHAT_HISTORY_STORAGE_PREFIX + userKey;
@@ -378,7 +378,16 @@ async function loadRpaList() {
       return;
     }
 
+    if (Array.isArray(data.jobs)) {
+      runningRpaJobs = data.jobs.map((job) => ({
+        name: job.name || job.Name || "이름 없음",
+        status: convertJobState(job.status || job.State || job.state),
+      }));
+    }
+
     if (!data.releases || data.releases.length === 0) {
+      clearBody(rpaBody);
+      renderRunningRpaNotice();
       addMessage(
         rpaBody,
         "bot",
@@ -400,7 +409,7 @@ async function loadRpaList() {
 function renderRpaList(releases) {
   clearBody(rpaBody);
 
-  if (runningRpaName) {
+  if (runningRpaJobs.length) {
     renderRunningRpaNotice();
   }
 
@@ -443,12 +452,39 @@ function renderRpaList(releases) {
 }
 
 function renderRunningRpaNotice() {
+  const oldBox = rpaBody.querySelector(".rpa-running-box");
+
+  if (oldBox) {
+    oldBox.remove();
+  }
+
+  if (!runningRpaJobs.length) return;
+
   const div = document.createElement("div");
   div.className = "rpa-running-box";
-  div.innerHTML =
-    '<div class="rpa-state-label">실행 중인 작업</div>' +
-    '<div class="rpa-state-name">' + escapeHtml(runningRpaName) + '</div>';
-  rpaBody.appendChild(div);
+
+  let html = '<div class="rpa-state-label">진행 중인 작업</div>';
+
+  runningRpaJobs.forEach((job) => {
+    html +=
+      '<div class="rpa-running-item">' +
+      '<span class="rpa-running-name">' +
+      escapeHtml(job.name) +
+      "</span>" +
+      '<span class="rpa-running-status">' +
+      escapeHtml(job.status) +
+      "</span>" +
+      "</div>";
+  });
+
+  div.innerHTML = html;
+
+  const firstChild = rpaBody.firstElementChild;
+  if (firstChild) {
+    rpaBody.insertBefore(div, firstChild);
+  } else {
+    rpaBody.appendChild(div);
+  }
 }
 
 function selectRpaJob(item, button) {
@@ -463,11 +499,11 @@ function selectRpaJob(item, button) {
   actionBox.className = "rpa-inline-action";
   actionBox.dataset.role = "rpa-inline-action";
   actionBox.innerHTML =
-    '<div class="rpa-inline-title">' + escapeHtml(item.name) + '</div>' +
+    '<div class="rpa-inline-title">' + escapeHtml(item.name) + "</div>" +
     '<div class="rpa-inline-buttons">' +
     '<button type="button" class="rpa-execute-btn">실행</button>' +
     '<button type="button" class="rpa-cancel-btn">취소</button>' +
-    '</div>';
+    "</div>";
 
   const executeBtn = actionBox.querySelector(".rpa-execute-btn");
   const cancelBtn = actionBox.querySelector(".rpa-cancel-btn");
@@ -500,6 +536,64 @@ function clearSelectedRpaInline() {
   selectedRpaButton = null;
 }
 
+function addTemporaryRpaMessage(text, timeoutMs = 8000) {
+  const msg = addMessage(rpaBody, "bot", text);
+
+  setTimeout(() => {
+    if (msg && msg.parentNode) {
+      msg.remove();
+    }
+  }, timeoutMs);
+
+  return msg;
+}
+
+function getRunStateFromResponse(data) {
+  const rawText = String(data?.raw || "");
+
+  if (
+    rawText.includes('"State":"Pending"') ||
+    rawText.includes('"State": "Pending"') ||
+    rawText.includes("Pending") ||
+    rawText.includes("Queued")
+  ) {
+    return "queued";
+  }
+
+  if (
+    rawText.includes('"State":"Running"') ||
+    rawText.includes('"State": "Running"') ||
+    rawText.includes("Running")
+  ) {
+    return "running";
+  }
+
+  return "running";
+}
+
+function setRunningJob(name, status) {
+  runningRpaJobs = [
+    {
+      name,
+      status,
+    },
+  ];
+
+  refreshRunningRpaNotice();
+}
+
+function addOrUpdateRunningJob(name, status) {
+  const exists = runningRpaJobs.find((job) => job.name === name);
+
+  if (exists) {
+    exists.status = status;
+  } else {
+    runningRpaJobs.push({ name, status });
+  }
+
+  refreshRunningRpaNotice();
+}
+
 async function runRpaJob(item, executeBtn, cancelBtn) {
   if (!item) return;
 
@@ -512,8 +606,7 @@ async function runRpaJob(item, executeBtn, cancelBtn) {
     cancelBtn.disabled = true;
   }
 
-  runningRpaName = item.name;
-  refreshRunningRpaNotice();
+  setRunningJob(item.name, "실행 요청 중");
 
   try {
     const data = await apiJson(RPA_API_URL, {
@@ -526,17 +619,31 @@ async function runRpaJob(item, executeBtn, cancelBtn) {
     });
 
     if (data.ok) {
-      addMessage(rpaBody, "bot", item.name + " 실행 요청이 완료되었습니다.");
+      const runState = getRunStateFromResponse(data);
+
+      if (runState === "queued") {
+        addOrUpdateRunningJob(item.name, "대기 중");
+        addTemporaryRpaMessage(
+          "다른 작업이 실행 중입니다.\n작업이 대기열에 등록되었습니다.",
+          8000
+        );
+      } else {
+        addOrUpdateRunningJob(item.name, "실행 중");
+        addTemporaryRpaMessage(item.name + " 실행 요청이 완료되었습니다.", 8000);
+      }
+
       clearSelectedRpaInline();
-    } else {
-      addMessage(
-        rpaBody,
-        "bot",
-        "RPA 실행 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)),
-        true
-      );
-      restoreInlineButtons(executeBtn, cancelBtn);
+      return;
     }
+
+    addMessage(
+      rpaBody,
+      "bot",
+      "RPA 실행 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)),
+      true
+    );
+
+    restoreInlineButtons(executeBtn, cancelBtn);
   } catch (err) {
     addMessage(rpaBody, "bot", "RPA 실행 중 오류 발생: " + getErrorMessage(err));
     restoreInlineButtons(executeBtn, cancelBtn);
@@ -555,21 +662,19 @@ function restoreInlineButtons(executeBtn, cancelBtn) {
 }
 
 function refreshRunningRpaNotice() {
-  const oldNotice = rpaBody.querySelector(".rpa-running-box");
-  if (oldNotice) {
-    oldNotice.remove();
-  }
+  renderRunningRpaNotice();
+}
 
-  if (!runningRpaName) return;
+function convertJobState(state) {
+  const value = String(state || "").toLowerCase();
 
-  const firstChild = rpaBody.firstElementChild;
-  const div = document.createElement("div");
-  div.className = "rpa-running-box";
-  div.innerHTML =
-    '<div class="rpa-state-label">실행 중인 작업</div>' +
-    '<div class="rpa-state-name">' + escapeHtml(runningRpaName) + '</div>';
+  if (value === "pending") return "대기 중";
+  if (value === "running") return "실행 중";
+  if (value === "successful") return "완료";
+  if (value === "faulted") return "오류";
+  if (value === "stopped") return "중지됨";
 
-  rpaBody.insertBefore(div, firstChild);
+  return state || "상태 확인 중";
 }
 
 async function sendChat(message) {
@@ -662,7 +767,7 @@ rpaBtn.addEventListener("click", () => setMode("rpa"));
 
 reloadRpaBtn.addEventListener("click", () => {
   rpaLoaded = false;
-  runningRpaName = "";
+  runningRpaJobs = [];
   loadRpaList();
 });
 
