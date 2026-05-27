@@ -880,20 +880,10 @@ messageInput.addEventListener("keydown", (e) => {
   }
 });
 
-messageInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && e.shiftKey) {
-    return;
-  }
-
-  if (e.key === "Enter") {
-    e.preventDefault();
-    chatForm.requestSubmit();
-  }
-});
-
 messageInput.addEventListener("input", () => {
-  messageInput.style.height = "auto";
-  messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + "px";
+  messageInput.style.height = "44px";
+  messageInput.style.height =
+    Math.min(messageInput.scrollHeight, 120) + "px";
 });
 
 chatForm.addEventListener("submit", async (e) => {
@@ -907,6 +897,7 @@ chatForm.addEventListener("submit", async (e) => {
   addMessage(aiBody, "user", message);
 
   messageInput.value = "";
+  messageInput.style.height = "44px";
   sendBtn.disabled = true;
 
   await sendChat(message);
