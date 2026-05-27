@@ -883,7 +883,7 @@ messageInput.addEventListener("keydown", (e) => {
 messageInput.addEventListener("input", () => {
   messageInput.style.height = "44px";
   messageInput.style.height =
-    Math.min(messageInput.scrollHeight, 120) + "px";
+    Math.min(messageInput.scrollHeight, 80) + "px";
 });
 
 chatForm.addEventListener("submit", async (e) => {
