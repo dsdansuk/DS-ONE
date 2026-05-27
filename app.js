@@ -619,6 +619,12 @@ function addTemporaryRpaMessage(text, timeoutMs = 8000) {
     if (msg && msg.parentNode) {
       msg.remove();
     }
+
+    // 안내 메시지가 사라진 뒤 상단 상태창이 보이도록 이동
+    rpaBody.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }, timeoutMs);
 
   return msg;
