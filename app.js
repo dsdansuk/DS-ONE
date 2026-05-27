@@ -12,6 +12,7 @@ const RPA_API_URL =
   "https://anucqzffvxyxwdnafacr.supabase.co/functions/v1/rpa-api";
 
 const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
+const AI_PROVIDER = "gemini"; // gemini | sidetalk | openai
 const CHAT_HISTORY_STORAGE_PREFIX = "ds_chatbot_ai_history_v1_";
 
 const RPA_STATUS_POLL_INTERVAL_MS = 30 * 1000; // 30초
@@ -781,6 +782,7 @@ async function sendChat(message) {
       },
       body: JSON.stringify({
         message,
+        provider: AI_PROVIDER,
         stream: true,
       }),
     });
@@ -810,7 +812,7 @@ async function sendChat(message) {
       if (done) break;
 
       const chunk = decoder.decode(value, { stream: true });
-      console.log("SIDETALK STREAM CHUNK:", chunk);
+      console.log("AI STREAM CHUNK:", chunk);
 
       buffer += chunk;
 

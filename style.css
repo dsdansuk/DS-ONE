@@ -320,3 +320,33 @@ input {
   word-break: break-word;
 }
 
+.rpa-running-box {
+  margin-bottom: 16px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.rpa-state-label {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.7;
+  margin-bottom: 10px;
+}
+
+.rpa-running-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.rpa-running-name {
+  font-weight: 600;
+}
+
+.rpa-running-status {
+  font-size: 13px;
+  opacity: 0.75;
+}
