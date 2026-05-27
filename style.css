@@ -212,7 +212,7 @@ html, body {
   border-top: 1px solid #e5e7eb;
 }
 
-input {
+#messageInput {
   flex: 1;
   border: 1px solid #d1d5db;
   border-radius: 12px;
@@ -220,6 +220,14 @@ input {
   font-size: 14px;
   outline: none;
   min-width: 0;
+
+  resize: none;
+  overflow-y: auto;
+  min-height: 44px;
+  max-height: 120px;
+  line-height: 1.4;
+
+  font-family: inherit;
 }
 
 .send-btn {

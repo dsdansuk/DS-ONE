@@ -12,7 +12,7 @@ const RPA_API_URL =
   "https://anucqzffvxyxwdnafacr.supabase.co/functions/v1/rpa-api";
 
 const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
-const AI_PROVIDER = "gemini"; // gemini | sidetalk | openai
+const AI_PROVIDER = "vertex"; // vertex | sidetalk | openai
 const CHAT_HISTORY_STORAGE_PREFIX = "ds_chatbot_ai_history_v1_";
 
 const RPA_STATUS_POLL_INTERVAL_MS = 30 * 1000; // 30초
@@ -866,6 +866,35 @@ if (reloadRpaBtn) {
     loadRpaList();
   });
 }
+
+messageInput.addEventListener("keydown", (e) => {
+  // Shift + Enter → 줄바꿈
+  if (e.key === "Enter" && e.shiftKey) {
+    return;
+  }
+
+  // Enter → 전송
+  if (e.key === "Enter") {
+    e.preventDefault();
+    chatForm.requestSubmit();
+  }
+});
+
+messageInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.shiftKey) {
+    return;
+  }
+
+  if (e.key === "Enter") {
+    e.preventDefault();
+    chatForm.requestSubmit();
+  }
+});
+
+messageInput.addEventListener("input", () => {
+  messageInput.style.height = "auto";
+  messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + "px";
+});
 
 chatForm.addEventListener("submit", async (e) => {
   e.preventDefault();
