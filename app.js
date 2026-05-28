@@ -709,18 +709,31 @@ async function runRpaJob(item, executeBtn, cancelBtn) {
         refreshRunningRpaNotice();
       }
 
-      const runState = getRunStateFromResponse(data);
+      const currentJob = Array.isArray(data.jobs)
+        ? data.jobs.find((job) => {
+            const name = job.name || job.Name || "";
+            return name === item.name;
+          })
+        : null;
 
-      if (runState === "queued") {
-        addOrUpdateRunningJob(item.name, "대기 중");
-        addTemporaryRpaMessage(
-          "다른 작업이 실행 중입니다.\n작업이 대기열에 등록되었습니다.",
-          8000
+      if (currentJob) {
+        const currentStatus = convertJobState(
+          currentJob.status || currentJob.State || currentJob.state
         );
-      } else {
-        if (!runningRpaJobs.some((job) => job.name === item.name)) {
+
+        if (currentStatus === "대기 중") {
+          addOrUpdateRunningJob(item.name, "대기 중");
+          addTemporaryRpaMessage(
+            "다른 작업이 실행 중입니다.\n작업이 대기열에 등록되었습니다.",
+            8000
+          );
+        } else {
           addOrUpdateRunningJob(item.name, "실행 중");
+          addTemporaryRpaMessage(item.name + " 실행 요청이 완료되었습니다.", 8000);
         }
+      } else {
+        runningRpaJobs = [];
+        refreshRunningRpaNotice();
         addTemporaryRpaMessage(item.name + " 실행 요청이 완료되었습니다.", 8000);
       }
 
