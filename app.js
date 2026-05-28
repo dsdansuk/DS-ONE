@@ -6,10 +6,10 @@
 // - rpa-api: UiPath RPA 호출
 
 const AI_API_URL =
-  "https://anucqzffvxyxwdnafacr.supabase.co/functions/v1/ai-api";
+  "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/ai-api";
 
 const RPA_API_URL =
-  "https://anucqzffvxyxwdnafacr.supabase.co/functions/v1/rpa-api";
+  "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api";
 
 const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
 const AI_PROVIDER = "sidetalk"; // vertex | sidetalk | openai
