@@ -3,25 +3,90 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>사내 업무 도우미</title>
+  <title>AI 도우미</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <div class="wrap">
-    <header class="header">
+    <header class="header" aria-label="AI 도우미 홈">
       <div>
-        <div class="title">사내 업무 도우미</div>
+        <div class="title">AI 도우미</div>
         <div id="userInfo" class="user-info">인증 확인 중...</div>
       </div>
     </header>
 
+    <!-- 기존 JS 호환용 버튼입니다. 화면에는 노출하지 않습니다. -->
     <nav class="mode-buttons" aria-label="업무 도우미 메뉴">
       <button id="aiBtn" class="mode-btn active" type="button">사내 AI</button>
       <button id="rpaBtn" class="mode-btn" type="button">RPA 실행</button>
     </nav>
 
     <main class="main">
-      <section id="aiPanel" class="panel active" aria-label="사내 AI">
+      <section id="homePanel" class="panel home-panel active" aria-label="AI 도우미 메뉴">
+        <div class="home-content">
+          <div class="hero-copy">
+            <h1>AI 도우미</h1>
+            <p>궁금한 것은 묻고, 반복 업무는 자동으로</p>
+          </div>
+
+          <div class="mascot-wrap" aria-hidden="true">
+            <div class="orb orb-a"></div>
+            <div class="orb orb-b"></div>
+            <div class="mascot">
+              <span class="ear left"></span>
+              <span class="ear right"></span>
+              <span class="face">
+                <span class="eye"></span>
+                <span class="eye"></span>
+                <span class="mouth"></span>
+              </span>
+            </div>
+          </div>
+
+          <div class="menu-card-list" aria-label="AI 도우미 기능 선택">
+            <button id="directQuestionBtn" class="menu-card" type="button">
+              <span class="menu-icon chat-icon" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </span>
+              <span class="menu-text">
+                <strong>직접 질문하기</strong>
+                <em>사내 규정, 시스템, 업무 문의</em>
+              </span>
+              <span class="menu-arrow" aria-hidden="true"></span>
+            </button>
+
+            <button id="docWriteBtn" class="menu-card" type="button">
+              <span class="menu-icon doc-icon" aria-hidden="true"></span>
+              <span class="menu-text">
+                <strong>AI 문서 작성</strong>
+                <em>이메일, 결재문, 보고서 작성</em>
+              </span>
+              <span class="menu-arrow" aria-hidden="true"></span>
+            </button>
+
+            <button id="rpaEntryBtn" class="menu-card" type="button">
+              <span class="menu-icon bot-icon" aria-hidden="true">
+                <span class="bot-face"></span>
+              </span>
+              <span class="menu-text">
+                <strong>RPA 실행</strong>
+                <em>반복 업무 자동화 시작</em>
+              </span>
+              <span class="menu-arrow" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="aiPanel" class="panel" aria-label="직접 질문하기">
+        <div class="sub-header">
+          <button id="aiBackBtn" class="back-btn" type="button" aria-label="메뉴로 돌아가기">‹</button>
+          <div>
+            <strong>직접 질문하기</strong>
+            <span>사내 규정, 시스템, 업무 문의</span>
+          </div>
+        </div>
+
         <div id="aiBody" class="body">
           <div class="msg bot">사내 AI 모드입니다. 질문을 입력하세요.</div>
         </div>
@@ -38,11 +103,19 @@
       </section>
 
       <section id="rpaPanel" class="panel" aria-label="RPA 실행">
+        <div class="sub-header">
+          <button id="rpaBackBtn" class="back-btn" type="button" aria-label="메뉴로 돌아가기">‹</button>
+          <div>
+            <strong>RPA 실행</strong>
+            <span>반복 업무 자동화 시작</span>
+          </div>
+        </div>
+
         <div id="rpaBody" class="body">
           <div class="msg bot">RPA 실행 모드입니다. 실행 가능한 업무 목록을 불러오세요.</div>
         </div>
 
-        <div class="input-area">
+        <div class="input-area rpa-refresh-area">
           <button id="reloadRpaBtn" class="send-btn wide" type="button">RPA 목록 새로고침</button>
         </div>
       </section>

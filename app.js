@@ -19,7 +19,7 @@ const RPA_STATUS_POLL_INTERVAL_MS = 30 * 1000; // 30초
 const RPA_STATUS_POLL_MAX_MS = 10 * 60 * 1000; // 최대 10분
 
 let sessionToken = sessionStorage.getItem("sso_session_token") || "";
-let currentMode = "ai";
+let currentMode = "home";
 let thinkingTimer = null;
 let rpaLoaded = false;
 let selectedRpaItem = null;
@@ -32,6 +32,7 @@ let currentEmpNo = "";
 
 const aiBtn = document.getElementById("aiBtn");
 const rpaBtn = document.getElementById("rpaBtn");
+const homePanel = document.getElementById("homePanel");
 const aiPanel = document.getElementById("aiPanel");
 const rpaPanel = document.getElementById("rpaPanel");
 const aiBody = document.getElementById("aiBody");
@@ -41,6 +42,11 @@ const messageInput = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
 const reloadRpaBtn = document.getElementById("reloadRpaBtn");
 const userInfo = document.getElementById("userInfo");
+const directQuestionBtn = document.getElementById("directQuestionBtn");
+const docWriteBtn = document.getElementById("docWriteBtn");
+const rpaEntryBtn = document.getElementById("rpaEntryBtn");
+const aiBackBtn = document.getElementById("aiBackBtn");
+const rpaBackBtn = document.getElementById("rpaBackBtn");
 
 bootstrap();
 
@@ -93,30 +99,58 @@ async function bootstrap() {
 function enableApp() {
   messageInput.disabled = false;
   sendBtn.disabled = false;
+
+  if (directQuestionBtn) directQuestionBtn.disabled = false;
+  if (docWriteBtn) docWriteBtn.disabled = false;
+  if (rpaEntryBtn) rpaEntryBtn.disabled = false;
 }
 
 function disableApp() {
   messageInput.disabled = true;
   sendBtn.disabled = true;
   if (reloadRpaBtn) reloadRpaBtn.disabled = true;
+
+  if (directQuestionBtn) directQuestionBtn.disabled = true;
+  if (docWriteBtn) docWriteBtn.disabled = true;
+  if (rpaEntryBtn) rpaEntryBtn.disabled = true;
 }
 
 function setMode(mode) {
   currentMode = mode;
 
-  aiBtn.classList.toggle("active", mode === "ai");
-  rpaBtn.classList.toggle("active", mode === "rpa");
+  if (aiBtn) aiBtn.classList.toggle("active", mode === "ai");
+  if (rpaBtn) rpaBtn.classList.toggle("active", mode === "rpa");
+  if (homePanel) homePanel.classList.toggle("active", mode === "home");
   aiPanel.classList.toggle("active", mode === "ai");
   rpaPanel.classList.toggle("active", mode === "rpa");
 
   if (mode === "rpa" && !rpaLoaded) {
-    // RPA 탭 진입 시 1회만 목록 + 상태를 조회합니다.
+    // RPA 화면 진입 시 1회만 목록 + 상태를 조회합니다.
     loadRpaList();
   }
 
   if (mode === "ai") {
-    messageInput.focus();
+    setTimeout(() => messageInput.focus(), 0);
   }
+}
+
+function showComingSoonNotice() {
+  // 두 번째 버튼은 아직 기능 연동 전이므로 화면 전환 없이 안내만 표시합니다.
+  const originalTitle = docWriteBtn?.querySelector("strong")?.textContent || "AI 문서 작성";
+  const originalDesc = docWriteBtn?.querySelector("em")?.textContent || "이메일, 결재문, 보고서 작성";
+  const title = docWriteBtn?.querySelector("strong");
+  const desc = docWriteBtn?.querySelector("em");
+
+  if (!title || !desc) return;
+
+  title.textContent = "AI 문서 작성";
+  desc.textContent = "준비 중입니다";
+
+  window.clearTimeout(showComingSoonNotice.timer);
+  showComingSoonNotice.timer = window.setTimeout(() => {
+    title.textContent = originalTitle;
+    desc.textContent = originalDesc;
+  }, 1400);
 }
 
 function addMessage(targetBody, type, text, debug = false, options = {}) {
@@ -868,9 +902,29 @@ async function sendChat(message) {
   }
 }
 
-aiBtn.addEventListener("click", () => setMode("ai"));
+if (aiBtn) aiBtn.addEventListener("click", () => setMode("ai"));
 
-rpaBtn.addEventListener("click", () => setMode("rpa"));
+if (rpaBtn) rpaBtn.addEventListener("click", () => setMode("rpa"));
+
+if (directQuestionBtn) {
+  directQuestionBtn.addEventListener("click", () => setMode("ai"));
+}
+
+if (docWriteBtn) {
+  docWriteBtn.addEventListener("click", showComingSoonNotice);
+}
+
+if (rpaEntryBtn) {
+  rpaEntryBtn.addEventListener("click", () => setMode("rpa"));
+}
+
+if (aiBackBtn) {
+  aiBackBtn.addEventListener("click", () => setMode("home"));
+}
+
+if (rpaBackBtn) {
+  rpaBackBtn.addEventListener("click", () => setMode("home"));
+}
 
 if (reloadRpaBtn) {
   reloadRpaBtn.addEventListener("click", () => {
