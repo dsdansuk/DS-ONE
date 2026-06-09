@@ -100,8 +100,9 @@ textarea {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   gap: clamp(14px, 3vh, 22px);
+  padding-top: 42px;
 }
 
 .hero-copy h1 {
