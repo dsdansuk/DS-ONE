@@ -1156,3 +1156,291 @@ button {
     font-size: 12px;
   }
 }
+
+
+/* 344 x 462 iframe 최적화: 두 번째 시안의 구성은 유지하되 작은 영역에 맞게 압축 */
+@media (max-width: 390px), (max-height: 600px) {
+  .home-panel {
+    padding: 0;
+  }
+
+  .home-shell {
+    height: 100%;
+    padding: 14px 20px 10px;
+    gap: 7px;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    overflow: hidden;
+  }
+
+  .employee-badge {
+    display: inline-flex;
+    padding: 5px 10px;
+    gap: 6px;
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: -0.045em;
+  }
+
+  .badge-shield {
+    width: 13px;
+    height: 14px;
+  }
+
+  .badge-shield::before {
+    border-width: 2px;
+    border-radius: 6px 6px 7px 7px;
+  }
+
+  .badge-shield::after {
+    left: 4px;
+    top: 5px;
+    width: 6px;
+    height: 4px;
+    border-left-width: 1.5px;
+    border-bottom-width: 1.5px;
+  }
+
+  .hero-area {
+    grid-template-columns: minmax(0, 1fr) 104px;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .hero-copy h1 {
+    font-size: 41px;
+    line-height: 0.88;
+    margin-bottom: 6px;
+    letter-spacing: -0.09em;
+  }
+
+  .hero-title {
+    font-size: 20px;
+    line-height: 1.05;
+    margin-bottom: 5px;
+    letter-spacing: -0.07em;
+  }
+
+  .hero-desc {
+    font-size: 12px;
+    line-height: 1.28;
+    letter-spacing: -0.045em;
+    max-width: 185px;
+  }
+
+  .hero-visual {
+    min-height: 100px;
+  }
+
+  .hero-visual::before {
+    width: 88%;
+  }
+
+  .orbit-a { width: 88%; }
+  .orbit-b { width: 66%; }
+
+  .orbit-dot {
+    width: 7px;
+    height: 7px;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12);
+  }
+
+  .dot-a { right: 6%; top: 28%; }
+  .dot-b { left: 8%; bottom: 31%; }
+
+  .hero-robot {
+    width: 76px;
+  }
+
+  .hero-robot::before {
+    border-radius: 16px;
+  }
+
+  .floating-tile {
+    display: none;
+  }
+
+  .feature-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2px;
+    font-size: 10.5px;
+    line-height: 1.1;
+    margin: 1px 0 4px;
+    letter-spacing: -0.055em;
+  }
+
+  .feature-row span {
+    gap: 3px;
+  }
+
+  .feature-icon {
+    width: 13px;
+    height: 13px;
+  }
+
+  .feature-icon.shield::before,
+  .feature-icon.clock::before {
+    border-width: 1.5px;
+  }
+
+  .feature-icon.shield::after {
+    left: 5px;
+    top: 5px;
+    width: 5px;
+    height: 3px;
+    border-left-width: 1.5px;
+    border-bottom-width: 1.5px;
+  }
+
+  .feature-icon.clock::after {
+    left: 7px;
+    top: 3px;
+    width: 5px;
+    height: 5px;
+    border-left-width: 1.5px;
+    border-bottom-width: 1.5px;
+  }
+
+  .feature-icon.spark::before {
+    font-size: 13px;
+  }
+
+  .feature-icon.spark::after {
+    font-size: 8px;
+  }
+
+  .menu-card-list {
+    gap: 8px;
+    margin-top: 0;
+  }
+
+  .menu-card {
+    min-height: 66px;
+    grid-template-columns: 46px minmax(0, 1fr) 14px;
+    gap: 10px;
+    padding: 9px 13px;
+    border-radius: 17px;
+    border-left-width: 3px;
+    box-shadow: 0 9px 20px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255,255,255,0.96);
+  }
+
+  .menu-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 15px;
+  }
+
+  .chat-icon span {
+    width: 4px;
+    height: 4px;
+    margin: 0 2px;
+  }
+
+  .doc-icon::after {
+    border-left-width: 3px;
+    border-bottom-width: 3px;
+  }
+
+  .bot-face {
+    border-radius: 10px;
+  }
+
+  .menu-text {
+    gap: 4px;
+  }
+
+  .menu-text strong {
+    font-size: 18px;
+    line-height: 1.05;
+    letter-spacing: -0.07em;
+  }
+
+  .menu-text em {
+    font-size: 12px;
+    line-height: 1.18;
+    letter-spacing: -0.055em;
+  }
+
+  .menu-arrow {
+    width: 13px;
+    height: 13px;
+    border-width: 3px;
+  }
+
+  .safe-note {
+    display: block;
+    margin: 1px 0 0;
+    font-size: 10.5px;
+    line-height: 1.1;
+    letter-spacing: -0.045em;
+  }
+}
+
+@media (max-height: 470px) and (max-width: 390px) {
+  .home-shell {
+    padding-top: 12px;
+    padding-bottom: 8px;
+    gap: 6px;
+  }
+
+  .employee-badge {
+    font-size: 10.5px;
+    padding: 4px 9px;
+  }
+
+  .hero-copy h1 {
+    font-size: 39px;
+    margin-bottom: 5px;
+  }
+
+  .hero-title {
+    font-size: 19px;
+    margin-bottom: 4px;
+  }
+
+  .hero-desc {
+    font-size: 11.5px;
+  }
+
+  .hero-visual {
+    min-height: 92px;
+  }
+
+  .hero-robot {
+    width: 72px;
+  }
+
+  .feature-row {
+    font-size: 10px;
+    margin-bottom: 3px;
+  }
+
+  .menu-card-list {
+    gap: 7px;
+  }
+
+  .menu-card {
+    min-height: 63px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .menu-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .menu-text strong {
+    font-size: 17px;
+  }
+
+  .menu-text em {
+    font-size: 11.5px;
+  }
+
+  .safe-note {
+    font-size: 10px;
+  }
+}
