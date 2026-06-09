@@ -103,6 +103,8 @@ function enableApp() {
   if (directQuestionBtn) directQuestionBtn.disabled = false;
   if (docWriteBtn) docWriteBtn.disabled = false;
   if (rpaEntryBtn) rpaEntryBtn.disabled = false;
+  if (aiBtn) aiBtn.disabled = false;
+  if (rpaBtn) rpaBtn.disabled = false;
 }
 
 function disableApp() {
@@ -113,6 +115,8 @@ function disableApp() {
   if (directQuestionBtn) directQuestionBtn.disabled = true;
   if (docWriteBtn) docWriteBtn.disabled = true;
   if (rpaEntryBtn) rpaEntryBtn.disabled = true;
+  if (aiBtn) aiBtn.disabled = true;
+  if (rpaBtn) rpaBtn.disabled = true;
 }
 
 function setMode(mode) {
