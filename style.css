@@ -102,7 +102,7 @@ button {
   padding: 13px 20px 10px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 18px;
   overflow: hidden;
   background:
     radial-gradient(circle at 78% 20%, rgba(147, 197, 253, 0.15), transparent 30%),
@@ -187,7 +187,7 @@ button {
   max-width: 185px;
   margin: 0;
   color: #64748b;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.28;
   font-weight: 700;
   letter-spacing: -0.045em;
