@@ -116,6 +116,7 @@ button {
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
+  margin-top: 12px;
   border: 1px solid rgba(191, 219, 254, 0.9);
   border-radius: 999px;
   background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
