@@ -151,69 +151,20 @@ textarea {
 }
 
 .mascot {
-  position: relative;
-  width: 90px;
-  height: 64px;
-  border-radius: 29px;
-  background: linear-gradient(180deg, #ffffff 0%, #e5e7eb 100%);
-  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12), inset 0 1px 1px rgba(255,255,255,0.9);
-}
-
-.mascot .ear {
-  position: absolute;
-  width: 10px;
-  height: 28px;
-  top: 19px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #bfdbfe 0%, #93c5fd 100%);
-}
-
-.mascot .ear.left { left: -10px; }
-.mascot .ear.right { right: -10px; }
-
-.mascot::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: -9px;
-  width: 2px;
-  height: 12px;
-  background: #bfdbfe;
-  transform: translateX(-50%);
-  border-radius: 99px;
-}
-
-.face {
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  top: 17px;
-  height: 30px;
-  border-radius: 15px;
-  background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+  width: clamp(82px, 22vw, 112px);
+  height: clamp(82px, 22vw, 112px);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
 }
 
-.eye {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #22d3ee;
-  box-shadow: 0 0 8px rgba(34, 211, 238, 0.75);
-}
-
-.mouth {
-  position: absolute;
-  width: 8px;
-  height: 3px;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  border-radius: 999px;
-  background: #2dd4bf;
+.mascot img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
 }
 
 .menu-card-list {
