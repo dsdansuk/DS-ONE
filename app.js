@@ -42,11 +42,45 @@ const messageInput = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
 const reloadRpaBtn = document.getElementById("reloadRpaBtn");
 const userInfo = document.getElementById("userInfo");
+const homeGreetingText = document.getElementById("homeGreetingText");
 const directQuestionBtn = document.getElementById("directQuestionBtn");
 const docWriteBtn = document.getElementById("docWriteBtn");
 const rpaEntryBtn = document.getElementById("rpaEntryBtn");
 const aiBackBtn = document.getElementById("aiBackBtn");
 const rpaBackBtn = document.getElementById("rpaBackBtn");
+
+
+function getDisplayUserName(profile) {
+  const candidates = [
+    profile?.userName,
+    profile?.user_name,
+    profile?.name,
+    profile?.displayName,
+    profile?.display_name,
+    profile?.empName,
+    profile?.empNm,
+    profile?.employeeName,
+    profile?.korName,
+    profile?.koreanName,
+  ];
+
+  const found = candidates
+    .map((value) => String(value || "").trim())
+    .find((value) => value && value !== "undefined" && value !== "null");
+
+  return found || "사용자";
+}
+
+function setHomeGreeting(name, isAuthenticated = true) {
+  if (!homeGreetingText) return;
+
+  if (!isAuthenticated) {
+    homeGreetingText.textContent = "인증 후 이용 가능합니다";
+    return;
+  }
+
+  homeGreetingText.textContent = name + "님, 필요한 업무를 선택해 주세요";
+}
 
 bootstrap();
 
@@ -71,6 +105,7 @@ async function bootstrap() {
 
   if (!sessionToken) {
     userInfo.textContent = "인증 정보가 없습니다. 그룹웨어에서 다시 접속하세요.";
+    setHomeGreeting("", false);
     disableApp();
     return;
   }
@@ -84,14 +119,17 @@ async function bootstrap() {
 
     currentEmpNo = String(me.empNo || "");
     currentLoginId = String(me.loginId || "");
+    const displayUserName = getDisplayUserName(me);
 
     userInfo.textContent = "로그인ID: " + currentLoginId;
+    setHomeGreeting(displayUserName, true);
     restoreChatHistory();
     enableApp();
   } catch (err) {
     sessionStorage.removeItem("sso_session_token");
     sessionToken = "";
     userInfo.textContent = "인증 실패: " + getErrorMessage(err);
+    setHomeGreeting("", false);
     disableApp();
   }
 }
