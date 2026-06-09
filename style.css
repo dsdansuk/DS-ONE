@@ -266,17 +266,6 @@ button {
   z-index: 3;
 }
 
-.tile-chat::after {
-  content: "";
-  position: absolute;
-  left: 8px;
-  bottom: -4px;
-  width: 8px;
-  height: 8px;
-  background: #dbeafe;
-  transform: rotate(45deg);
-}
-
 .tile-chat span {
   position: relative;
   z-index: 1;
@@ -342,66 +331,6 @@ button {
   width: 13px;
   height: 13px;
   flex: 0 0 auto;
-  color: #2563eb;
-}
-
-.feature-icon.shield::before {
-  content: "";
-  position: absolute;
-  inset: 1px 3px 0;
-  border: 1.5px solid currentColor;
-  border-radius: 5px 5px 6px 6px;
-  clip-path: polygon(50% 0, 100% 18%, 100% 58%, 50% 100%, 0 58%, 0 18%);
-}
-
-.feature-icon.shield::after {
-  content: "";
-  position: absolute;
-  left: 5px;
-  top: 5px;
-  width: 5px;
-  height: 3px;
-  border-left: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(-45deg);
-}
-
-.feature-icon.clock::before {
-  content: "";
-  position: absolute;
-  inset: 1px;
-  border: 1.5px solid currentColor;
-  border-radius: 50%;
-}
-
-.feature-icon.clock::after {
-  content: "";
-  position: absolute;
-  left: 7px;
-  top: 3px;
-  width: 5px;
-  height: 5px;
-  border-left: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-}
-
-.feature-icon.spark::before,
-.feature-icon.spark::after {
-  content: "✦";
-  position: absolute;
-  color: currentColor;
-}
-
-.feature-icon.spark::before {
-  left: 1px;
-  top: -2px;
-  font-size: 13px;
-}
-
-.feature-icon.spark::after {
-  right: 0;
-  bottom: 0;
-  font-size: 8px;
 }
 
 .menu-card-list {
