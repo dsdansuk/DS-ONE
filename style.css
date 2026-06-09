@@ -133,7 +133,6 @@ button {
   font-size: 11px;
   line-height: 1;
   font-weight: 900;
-  letter-spacing: -0.045em;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
@@ -180,7 +179,7 @@ button {
   font-size: 40px;
   line-height: 0.88;
   font-weight: 950;
-  letter-spacing: -0.09em;
+  letter-spacing: -0.04em;
   text-shadow: 0 8px 20px rgba(30, 64, 175, 0.12);
 }
 
@@ -191,7 +190,6 @@ button {
   font-size: 17px;
   line-height: 1.05;
   font-weight: 950;
-  letter-spacing: -0.07em;
 }
 
 .hero-desc {
@@ -357,7 +355,6 @@ button {
   font-size: 14px;
   line-height: 1.2;
   font-weight: 800;
-  letter-spacing: -0.045em;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -536,7 +533,6 @@ button {
   font-size: 18px;
   line-height: 1.05;
   font-weight: 950;
-  letter-spacing: -0.07em;
 }
 
 .menu-text em {
@@ -545,7 +541,6 @@ button {
   line-height: 1.18;
   font-style: normal;
   font-weight: 750;
-  letter-spacing: -0.055em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
