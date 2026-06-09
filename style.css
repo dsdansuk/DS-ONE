@@ -336,62 +336,23 @@ button {
 
 
 .user-greeting {
-  width: calc(100% - 26px);
-  min-height: 42px;
-  margin: 2px auto 0;
-  padding: 0 14px;
-  border: 1px solid rgba(191, 219, 254, 0.95);
-  border-radius: 999px;
-  background: rgba(248, 251, 255, 0.84);
-  color: #334155;
+  width: 100%;
+  min-height: 20px;
+  margin: 0 auto 1px;
+  padding: 0 2px;
+  color: #475569;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  font-size: 15px;
-  line-height: 1.15;
-  font-weight: 900;
-  letter-spacing: -0.055em;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96), 0 8px 18px rgba(30, 64, 175, 0.05);
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.greeting-icon {
-  width: 25px;
-  height: 25px;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
-  position: relative;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96);
-}
-
-.greeting-icon::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 6px;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #2563eb;
-  transform: translateX(-50%);
-}
-
-.greeting-icon::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: 5px;
-  width: 15px;
-  height: 8px;
-  border-radius: 9px 9px 5px 5px;
-  background: #2563eb;
-  transform: translateX(-50%);
-}
-
 .menu-card-list {
   display: grid;
   gap: 7px;
