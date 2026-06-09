@@ -334,11 +334,10 @@ button {
   flex: 0 0 auto;
 }
 
-
 .user-greeting {
   width: 100%;
   min-height: 20px;
-  margin: 0 auto 1px;
+  margin: 12px auto 18px;
   padding: 0 2px;
   color: #475569;
   display: flex;
