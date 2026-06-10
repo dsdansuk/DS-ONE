@@ -416,14 +416,27 @@ button {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 8px 16px rgba(30, 64, 175, 0.06);
 }
 
-.chat-icon img,
-.doc-icon img,
+.chat-icon img {
+  position: relative;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+}
+
+.doc-icon img {
+  position: relative;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+}
+
 .rpa-icon img {
   position: relative;
   z-index: 1;
   width: 24px;
   height: 24px;
 }
+
 
 .menu-text {
   min-width: 0;
