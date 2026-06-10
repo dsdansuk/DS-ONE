@@ -426,17 +426,16 @@ button {
 .doc-icon img {
   position: relative;
   z-index: 1;
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 28px;
 }
 
 .rpa-icon img {
   position: relative;
   z-index: 1;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
 }
-
 
 .menu-text {
   min-width: 0;
