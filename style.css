@@ -416,110 +416,28 @@ button {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 8px 16px rgba(30, 64, 175, 0.06);
 }
 
-.chat-icon::before {
-  content: "";
-  position: absolute;
-  width: 58%;
-  height: 44%;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-}
-
-.chat-icon::after {
-  content: "";
-  position: absolute;
-  left: 42%;
-  bottom: 27%;
-  width: 14%;
-  height: 14%;
-  background: #2563eb;
-  transform: skew(-18deg) rotate(10deg);
-}
-
-.chat-icon span {
+.chat-icon img {
   position: relative;
   z-index: 1;
-  width: 4px;
-  height: 4px;
-  margin: 0 2px;
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
-  background: #fff;
-  opacity: 0.96;
 }
 
-.doc-icon::before {
-  content: "";
-  position: absolute;
-  width: 45%;
-  height: 56%;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #2563eb, #60a5fa);
-  clip-path: polygon(0 0, 72% 0, 100% 27%, 100% 100%, 0 100%);
-}
-
-.doc-icon::after {
-  content: "";
-  position: absolute;
-  right: 24%;
-  bottom: 23%;
-  width: 24%;
-  height: 14%;
-  border-left: 3px solid #fff;
-  border-bottom: 3px solid #fff;
-  border-radius: 1px;
-  transform: rotate(-45deg);
-}
-
-.bot-icon::before {
-  content: "";
-  position: absolute;
-  top: 14%;
-  left: 50%;
-  width: 3px;
-  height: 16%;
-  background: #2563eb;
-  border-radius: 999px;
-  transform: translateX(-50%);
-}
-
-.bot-icon::after {
-  content: "";
-  position: absolute;
-  top: 9%;
-  left: 50%;
-  width: 10%;
-  height: 10%;
-  border-radius: 999px;
-  background: #2563eb;
-  transform: translateX(-50%);
-}
-
-.bot-face {
-  width: 54%;
-  height: 36%;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+.doc-icon img {
   position: relative;
-}
-
-.bot-face::before,
-.bot-face::after {
-  content: "";
-  position: absolute;
-  top: 42%;
-  width: 12%;
-  height: 22%;
+  z-index: 1;
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
-  background: #fff;
-  transform: translateY(-50%);
 }
 
-.bot-face::before {
-  left: 27%;
-}
-
-.bot-face::after {
-  right: 27%;
+.rpa-icon img {
+  position: relative;
+  z-index: 1;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
 }
 
 .menu-text {
