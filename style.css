@@ -115,7 +115,7 @@ button {
   overflow: hidden;
   background:
     radial-gradient(circle at 78% 20%, rgba(147, 197, 253, 0.15), transparent 30%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.94));
+    linear-gradient(180deg, #f4f9fe, rgba(248, 251, 255, 0.94));
 }
 
 .employee-badge {
