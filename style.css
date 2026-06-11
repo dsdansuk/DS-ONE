@@ -221,7 +221,7 @@ button {
 
 .orbit {
   position: absolute;
-  border: 1px solid rgba(96, 165, 250, 0.35);
+  border: 1px solid #058df5;
   border-radius: 50%;
 }
 
