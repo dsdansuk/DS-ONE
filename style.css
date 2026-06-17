@@ -405,7 +405,7 @@ button {
 .menu-icon {
   width: 42px;
   height: 42px;
-  border: 1px solid #3b82f6;
+  border: 1px solid #dbeafe;
   border-radius: 15px;
   background: linear-gradient(135deg, #f8fbff, #eaf3ff);
   color: #2563eb;
@@ -469,6 +469,92 @@ button {
   transform: rotate(45deg);
   justify-self: end;
   opacity: 0.9;
+}
+
+
+/* =========================
+   AI 문서 작성 화면
+   ========================= */
+
+.doc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.doc-form {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.doc-field {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.doc-field input,
+.doc-field textarea {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #fff;
+  color: #111827;
+  font-size: 13px;
+  line-height: 1.4;
+  outline: none;
+}
+
+.doc-field input {
+  height: 40px;
+  padding: 0 12px;
+}
+
+.doc-field textarea {
+  min-height: 112px;
+  max-height: 150px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.doc-field input:focus,
+.doc-field textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.doc-actions {
+  display: grid;
+  grid-template-columns: 1fr 82px;
+  gap: 8px;
+}
+
+.doc-actions .send-btn,
+.doc-clear-btn {
+  height: 40px;
+}
+
+.doc-clear-btn {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #fff;
+  color: #334155;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.doc-clear-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.doc-output {
+  display: grid;
+  gap: 0;
 }
 
 /* =========================

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DS ONE</title>
-  <link rel="stylesheet" href="./style.css?v=20260601_greeting_text" />
+  <link rel="stylesheet" href="./style.css?v=20260617_doc_auth_cache" />
 </head>
 <body>
   <div class="wrap">
@@ -114,6 +114,49 @@
         </form>
       </section>
 
+
+      <section id="docPanel" class="panel" aria-label="AI 문서 작성">
+        <div class="sub-header">
+          <button id="docBackBtn" class="back-btn" type="button" aria-label="메뉴로 돌아가기">‹</button>
+          <div>
+            <strong>AI 문서 작성</strong>
+            <span>이메일, 결재문, 보고서 작성</span>
+          </div>
+        </div>
+
+        <div id="docBody" class="body doc-body">
+          <div class="msg bot">작성할 문서 종류와 내용을 입력한 뒤 작성하기를 눌러 주세요.</div>
+
+          <form id="docForm" class="doc-form">
+            <label class="doc-field">
+              <span>작성 요청</span>
+              <input
+                id="docInstruction"
+                type="text"
+                placeholder="예: 연차 신청 안내 메일을 정중하게 작성해줘"
+                autocomplete="off"
+              />
+            </label>
+
+            <label class="doc-field">
+              <span>초안 또는 참고 내용</span>
+              <textarea
+                id="docText"
+                placeholder="초안이나 핵심 내용을 입력하세요. 비워두고 요청만 입력해도 됩니다."
+                rows="5"
+              ></textarea>
+            </label>
+
+            <div class="doc-actions">
+              <button id="docGenerateBtn" class="send-btn wide" type="submit">작성하기</button>
+              <button id="docClearBtn" class="doc-clear-btn" type="button">초기화</button>
+            </div>
+          </form>
+
+          <div id="docOutput" class="doc-output" aria-live="polite"></div>
+        </div>
+      </section>
+
       <section id="rpaPanel" class="panel" aria-label="RPA 실행">
         <div class="sub-header">
           <button id="rpaBackBtn" class="back-btn" type="button" aria-label="메뉴로 돌아가기">‹</button>
@@ -134,6 +177,6 @@
     </main>
   </div>
 
-  <script src="./app.js?v=20260609_greeting_text"></script>
+  <script src="./app.js?v=20260617_doc_auth_cache"></script>
 </body>
 </html>

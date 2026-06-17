@@ -14,6 +14,8 @@ const RPA_API_URL =
 const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
 const AI_PROVIDER = "sidetalk"; // vertex | sidetalk | openai
 const CHAT_HISTORY_STORAGE_PREFIX = "ds_chatbot_ai_history_v1_";
+const AUTH_CACHE_STORAGE_PREFIX = "ds_chatbot_auth_cache_v1_";
+const AUTH_CACHE_TTL_MS = 10 * 60 * 1000; // 10분
 
 const RPA_STATUS_POLL_INTERVAL_MS = 30 * 1000; // 30초
 const RPA_STATUS_POLL_MAX_MS = 10 * 60 * 1000; // 최대 10분
@@ -35,8 +37,16 @@ const rpaBtn = document.getElementById("rpaBtn");
 const homePanel = document.getElementById("homePanel");
 const aiPanel = document.getElementById("aiPanel");
 const rpaPanel = document.getElementById("rpaPanel");
+const docPanel = document.getElementById("docPanel");
 const aiBody = document.getElementById("aiBody");
 const rpaBody = document.getElementById("rpaBody");
+const docBody = document.getElementById("docBody");
+const docOutput = document.getElementById("docOutput");
+const docForm = document.getElementById("docForm");
+const docInstruction = document.getElementById("docInstruction");
+const docText = document.getElementById("docText");
+const docGenerateBtn = document.getElementById("docGenerateBtn");
+const docClearBtn = document.getElementById("docClearBtn");
 const chatForm = document.getElementById("chatForm");
 const messageInput = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
@@ -48,7 +58,75 @@ const docWriteBtn = document.getElementById("docWriteBtn");
 const rpaEntryBtn = document.getElementById("rpaEntryBtn");
 const aiBackBtn = document.getElementById("aiBackBtn");
 const rpaBackBtn = document.getElementById("rpaBackBtn");
+const docBackBtn = document.getElementById("docBackBtn");
 
+
+
+function getAuthCacheKey() {
+  if (!sessionToken) return "";
+  const parts = sessionToken.split(".");
+  const signaturePart = parts[1] || sessionToken;
+  return AUTH_CACHE_STORAGE_PREFIX + signaturePart.slice(0, 24);
+}
+
+function getCachedAuth() {
+  const key = getAuthCacheKey();
+  if (!key) return null;
+
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+
+    const cached = JSON.parse(raw);
+    const savedAt = Number(cached.savedAt || 0);
+
+    if (!savedAt || Date.now() - savedAt > AUTH_CACHE_TTL_MS) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+
+    return cached;
+  } catch {
+    sessionStorage.removeItem(key);
+    return null;
+  }
+}
+
+function setCachedAuth(profile) {
+  const key = getAuthCacheKey();
+  if (!key || !profile) return;
+
+  try {
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        savedAt: Date.now(),
+        empNo: profile.empNo || "",
+        loginId: profile.loginId || "",
+        userName: getDisplayUserName(profile),
+        defaultProvider: profile.defaultProvider || "",
+      })
+    );
+  } catch (err) {
+    console.warn("인증 캐시 저장 실패:", err);
+  }
+}
+
+function clearCachedAuth() {
+  const key = getAuthCacheKey();
+  if (key) sessionStorage.removeItem(key);
+}
+
+function applyAuthenticatedProfile(profile) {
+  currentEmpNo = String(profile.empNo || "");
+  currentLoginId = String(profile.loginId || "");
+  const displayUserName = getDisplayUserName(profile);
+
+  userInfo.textContent = "로그인ID: " + currentLoginId;
+  setHomeGreeting(displayUserName, true);
+  restoreChatHistory();
+  enableApp();
+}
 
 function getDisplayUserName(profile) {
   const candidates = [
@@ -110,6 +188,12 @@ async function bootstrap() {
     return;
   }
 
+  const cachedAuth = getCachedAuth();
+  if (cachedAuth) {
+    applyAuthenticatedProfile(cachedAuth);
+    return;
+  }
+
   try {
     const me = await apiJson(AI_API_URL, { method: "GET" });
 
@@ -117,15 +201,10 @@ async function bootstrap() {
       throw new Error(me.message || "인증 확인 실패");
     }
 
-    currentEmpNo = String(me.empNo || "");
-    currentLoginId = String(me.loginId || "");
-    const displayUserName = getDisplayUserName(me);
-
-    userInfo.textContent = "로그인ID: " + currentLoginId;
-    setHomeGreeting(displayUserName, true);
-    restoreChatHistory();
-    enableApp();
+    setCachedAuth(me);
+    applyAuthenticatedProfile(me);
   } catch (err) {
+    clearCachedAuth();
     sessionStorage.removeItem("sso_session_token");
     sessionToken = "";
     userInfo.textContent = "인증 실패: " + getErrorMessage(err);
@@ -141,6 +220,10 @@ function enableApp() {
   if (directQuestionBtn) directQuestionBtn.disabled = false;
   if (docWriteBtn) docWriteBtn.disabled = false;
   if (rpaEntryBtn) rpaEntryBtn.disabled = false;
+  if (docInstruction) docInstruction.disabled = false;
+  if (docText) docText.disabled = false;
+  if (docGenerateBtn) docGenerateBtn.disabled = false;
+  if (docClearBtn) docClearBtn.disabled = false;
   if (aiBtn) aiBtn.disabled = false;
   if (rpaBtn) rpaBtn.disabled = false;
 }
@@ -153,6 +236,10 @@ function disableApp() {
   if (directQuestionBtn) directQuestionBtn.disabled = true;
   if (docWriteBtn) docWriteBtn.disabled = true;
   if (rpaEntryBtn) rpaEntryBtn.disabled = true;
+  if (docInstruction) docInstruction.disabled = true;
+  if (docText) docText.disabled = true;
+  if (docGenerateBtn) docGenerateBtn.disabled = true;
+  if (docClearBtn) docClearBtn.disabled = true;
   if (aiBtn) aiBtn.disabled = true;
   if (rpaBtn) rpaBtn.disabled = true;
 }
@@ -163,8 +250,9 @@ function setMode(mode) {
   if (aiBtn) aiBtn.classList.toggle("active", mode === "ai");
   if (rpaBtn) rpaBtn.classList.toggle("active", mode === "rpa");
   if (homePanel) homePanel.classList.toggle("active", mode === "home");
-  aiPanel.classList.toggle("active", mode === "ai");
-  rpaPanel.classList.toggle("active", mode === "rpa");
+  if (aiPanel) aiPanel.classList.toggle("active", mode === "ai");
+  if (docPanel) docPanel.classList.toggle("active", mode === "doc");
+  if (rpaPanel) rpaPanel.classList.toggle("active", mode === "rpa");
 
   if (mode === "rpa" && !rpaLoaded) {
     // RPA 화면 진입 시 1회만 목록 + 상태를 조회합니다.
@@ -173,6 +261,10 @@ function setMode(mode) {
 
   if (mode === "ai") {
     setTimeout(() => messageInput.focus(), 0);
+  }
+
+  if (mode === "doc") {
+    setTimeout(() => docInstruction?.focus(), 0);
   }
 }
 
@@ -217,7 +309,7 @@ function clearBody(targetBody) {
   }
 }
 
-function createThinkingBox() {
+function createThinkingBox(targetBody = aiBody) {
   const steps = [
     "질문을 이해하는 중",
     "관련 내용을 확인하는 중",
@@ -245,8 +337,8 @@ function createThinkingBox() {
 
   wrap.appendChild(title);
   wrap.appendChild(list);
-  aiBody.appendChild(wrap);
-  aiBody.scrollTop = aiBody.scrollHeight;
+  targetBody.appendChild(wrap);
+  targetBody.scrollTop = targetBody.scrollHeight;
 
   let current = 0;
   thinkingTimer = setInterval(() => {
@@ -257,7 +349,7 @@ function createThinkingBox() {
     });
 
     current = Math.min(current + 1, steps.length - 1);
-    aiBody.scrollTop = aiBody.scrollHeight;
+    targetBody.scrollTop = targetBody.scrollHeight;
   }, 900);
 
   return wrap;
@@ -860,7 +952,7 @@ function convertJobState(state) {
 }
 
 async function sendChat(message) {
-  const thinkingBox = createThinkingBox();
+  const thinkingBox = createThinkingBox(aiBody);
 
   try {
     const res = await fetch(AI_API_URL, {
@@ -944,6 +1036,105 @@ async function sendChat(message) {
   }
 }
 
+
+async function sendDocumentRequest() {
+  if (!docInstruction || !docText || !docGenerateBtn || !docOutput) return;
+
+  const instruction = docInstruction.value.trim();
+  const draftText = docText.value.trim();
+
+  if (!instruction && !draftText) {
+    clearBody(docOutput);
+    addMessage(docOutput, "bot", "작성 요청이나 초안 내용을 입력해 주세요.", false, { skipSave: true });
+    return;
+  }
+
+  clearBody(docOutput);
+
+  const requestText = instruction || "아래 내용을 업무 문서 형식으로 자연스럽고 정중하게 작성해 주세요.";
+  const userPreview = requestText + (draftText ? "\n\n[초안/참고 내용]\n" + draftText : "");
+  addMessage(docOutput, "user", userPreview, false, { skipSave: true });
+
+  docGenerateBtn.disabled = true;
+  docGenerateBtn.textContent = "작성 중";
+
+  const thinkingBox = createThinkingBox(docOutput);
+
+  try {
+    const res = await fetch(AI_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + sessionToken,
+      },
+      body: JSON.stringify({
+        task: "document",
+        provider: AI_PROVIDER,
+        stream: true,
+        message: requestText,
+        documentText: draftText,
+      }),
+    });
+
+    removeThinkingBox(thinkingBox);
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      addMessage(docOutput, "bot", "문서 작성 API 오류가 발생했습니다.\nHTTP " + res.status + "\n" + errorText, true, { skipSave: true });
+      return;
+    }
+
+    if (!res.body) {
+      addMessage(docOutput, "bot", "스트림 응답 본문이 없습니다.", false, { skipSave: true });
+      return;
+    }
+
+    const botDiv = addMessage(docOutput, "bot", "", false, { skipSave: true });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+
+    let fullText = "";
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      if (buffer.includes("\n\n") || buffer.includes("data: [DONE]") || !buffer.includes("data:")) {
+        const parsed = parseStreamText(buffer);
+        if (parsed) {
+          fullText += parsed;
+          botDiv.textContent = fullText;
+          docOutput.scrollTop = docOutput.scrollHeight;
+        }
+        buffer = "";
+      }
+    }
+
+    const tail = decoder.decode();
+    if (tail) buffer += tail;
+
+    const finalParsed = parseStreamText(buffer);
+    if (finalParsed) {
+      fullText += finalParsed;
+      botDiv.textContent = fullText;
+    }
+
+    if (!fullText.trim()) {
+      botDiv.textContent = "문서 작성 결과를 표시할 텍스트를 찾지 못했습니다.";
+    }
+  } catch (err) {
+    removeThinkingBox(thinkingBox);
+    addMessage(docOutput, "bot", "문서 작성 호출 실패: " + getErrorMessage(err), false, { skipSave: true });
+  } finally {
+    docGenerateBtn.disabled = false;
+    docGenerateBtn.textContent = "작성하기";
+    docInstruction.focus();
+  }
+}
+
 if (aiBtn) aiBtn.addEventListener("click", () => setMode("ai"));
 
 if (rpaBtn) rpaBtn.addEventListener("click", () => setMode("rpa"));
@@ -953,7 +1144,8 @@ if (directQuestionBtn) {
 }
 
 if (docWriteBtn) {
-  docWriteBtn.addEventListener("click", showComingSoonNotice);
+  // 버튼 클릭만으로는 API를 호출하지 않고, 문서 작성 화면만 엽니다.
+  docWriteBtn.addEventListener("click", () => setMode("doc"));
 }
 
 if (rpaEntryBtn) {
@@ -968,11 +1160,33 @@ if (rpaBackBtn) {
   rpaBackBtn.addEventListener("click", () => setMode("home"));
 }
 
+if (docBackBtn) {
+  docBackBtn.addEventListener("click", () => setMode("home"));
+}
+
 if (reloadRpaBtn) {
   reloadRpaBtn.addEventListener("click", () => {
     // 최종 사용자 화면에서는 버튼이 숨겨져 있지만, 테스트용으로 남겨둡니다.
     rpaLoaded = false;
     loadRpaList();
+  });
+}
+
+
+if (docForm) {
+  docForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (currentMode !== "doc") return;
+    await sendDocumentRequest();
+  });
+}
+
+if (docClearBtn) {
+  docClearBtn.addEventListener("click", () => {
+    if (docInstruction) docInstruction.value = "";
+    if (docText) docText.value = "";
+    if (docOutput) docOutput.innerHTML = "";
+    docInstruction?.focus();
   });
 }
 
