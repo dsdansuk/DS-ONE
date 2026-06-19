@@ -615,7 +615,7 @@ button {
   margin-bottom: 10px;
   font-size: 14px;
   line-height: 1.45;
-  white-space: pre-wrap;
+  white-space: pre-line;
   word-break: break-word;
 }
 
