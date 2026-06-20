@@ -163,6 +163,9 @@ button {
   font-weight: 850;
   letter-spacing: -0.03em;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  margin-bottom: 0;
+
+  transform: translateY(4px);
 }
 
 .badge-shield {
@@ -326,7 +329,7 @@ button {
   width: 100%;
   min-height: 66px;
   border: 1px solid rgba(203, 213, 225, 0.74);
-  border-left: 2px solid rgba(59, 130, 246, 0.62);
+  border-left: 2px solid rgba(59, 130, 246, 0.45);
   border-radius: 17px;
   background: rgba(255, 255, 255, 0.88);
   box-shadow:
