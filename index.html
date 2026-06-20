@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DS ONE</title>
-  <link rel="stylesheet" href="./style.css?v=20260611_doc_auth_cache" />
+  <link rel="stylesheet" href="./style.css?v=20260620_chat_ui" />
 </head>
 <body>
   <div class="wrap">
@@ -83,27 +83,45 @@
         </div>
       </section>
 
-      <section id="aiPanel" class="panel" aria-label="직접 질문하기">
-        <div class="sub-header">
+      <section id="aiPanel" class="panel chat-panel" aria-label="직접 질문하기">
+        <div class="sub-header chat-header">
           <button id="aiBackBtn" class="back-btn" type="button" aria-label="메뉴로 돌아가기">‹</button>
-          <div>
+          <div class="sub-title-group">
             <strong>직접 질문하기</strong>
             <span>사내 규정, 시스템, 업무 문의</span>
           </div>
         </div>
 
-        <div id="aiBody" class="body">
-          <div class="msg bot">사내 AI 모드입니다. 질문을 입력하세요.</div>
+        <div id="aiBody" class="body chat-body">
+          <section class="chat-welcome-card" aria-label="사내 AI 안내">
+            <div class="welcome-avatar" aria-hidden="true">
+              <img src="./chat-robot.png" alt="" />
+            </div>
+            <div class="welcome-copy">
+              <strong>안녕하세요. 사내 AI입니다.</strong>
+              <p>궁금한 내용을 편하게 질문해 주세요.</p>
+              <div class="welcome-note">
+                <span class="welcome-note-icon" aria-hidden="true"></span>
+                <span>사내 문서·규정 기반으로 정확하게 답변드려요.</span>
+              </div>
+            </div>
+          </section>
         </div>
 
-        <form id="chatForm" class="input-area">
-          <textarea
-            id="messageInput"
-            placeholder="질문을 입력하세요"
-            autocomplete="off"
-            rows="1"
-          ></textarea>
-          <button id="sendBtn" class="send-btn" type="submit">전송</button>
+        <form id="chatForm" class="input-area chat-input-area">
+          <div class="chat-input-row">
+            <textarea
+              id="messageInput"
+              placeholder="질문을 입력하세요"
+              autocomplete="off"
+              rows="1"
+            ></textarea>
+            <button id="sendBtn" class="send-btn" type="submit">전송</button>
+          </div>
+          <p class="chat-disclaimer" aria-label="AI 답변 안내">
+            <span class="info-dot" aria-hidden="true">i</span>
+            AI 답변은 참고용이며, 중요 내용은 관련 부서 확인이 필요합니다.
+          </p>
         </form>
       </section>
 
@@ -171,6 +189,6 @@
     </main>
   </div>
 
-  <script src="./app.js?v=20260617_doc_auth_cache"></script>
+  <script src="./app.js?v=20260620_chat_ui"></script>
 </body>
 </html>

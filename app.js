@@ -291,7 +291,25 @@ function addMessage(targetBody, type, text, debug = false, options = {}) {
   const div = document.createElement("div");
   div.className = debug ? "msg bot debug" : "msg " + type;
   div.textContent = text;
-  targetBody.appendChild(div);
+
+  if (targetBody === aiBody && !debug) {
+    const row = document.createElement("div");
+    row.className = type === "user" ? "chat-row user-row" : "chat-row bot-row";
+
+    if (type !== "user") {
+      const avatar = document.createElement("span");
+      avatar.className = "chat-avatar";
+      avatar.setAttribute("aria-hidden", "true");
+      avatar.innerHTML = '<img src="./chat-robot.png" alt="" />';
+      row.appendChild(avatar);
+    }
+
+    row.appendChild(div);
+    targetBody.appendChild(row);
+  } else {
+    targetBody.appendChild(div);
+  }
+
   targetBody.scrollTop = targetBody.scrollHeight;
 
   if (targetBody === aiBody && !debug && !options.skipSave) {
