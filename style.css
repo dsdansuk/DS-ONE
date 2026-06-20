@@ -264,12 +264,12 @@ button {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: 13px;
+  bottom: 8px;
   width: 56px;
   height: 10px;
   transform: translateX(-50%);
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.10);
+  background: rgba(15, 23, 42, 0.80);
   filter: blur(7px);
   z-index: 0;
   pointer-events: none;
