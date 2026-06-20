@@ -649,9 +649,9 @@ button {
   min-height: 44px;
   max-height: 116px;
   padding: 11px 12px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid rgba(203, 213, 225, 0.9);
   border-radius: 13px;
-  background: #fff;
+  background: #f8fbff;
   color: #111827;
   font-size: 13.5px;
   line-height: 1.4;
@@ -661,6 +661,7 @@ button {
 }
 
 #messageInput:focus {
+  background: #ffffff;
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
@@ -927,9 +928,10 @@ button {
 .chat-header {
   min-height: 58px;
   padding: 11px 15px 10px;
-  background: rgba(255, 255, 255, 0.9);
+  background:
+    linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(226, 232, 240, 0.88);
+  border-bottom: 1px solid rgba(203, 213, 225, 0.75);
   box-shadow: 0 7px 18px rgba(15, 23, 42, 0.045);
 }
 
@@ -1159,12 +1161,9 @@ button {
 }
 
 .chat-input-area {
-  flex: 0 0 auto;
-  display: block;
-  padding: 11px 12px 9px;
-  background: rgba(255, 255, 255, 0.96);
-  border-top: 1px solid rgba(226, 232, 240, 0.95);
-  box-shadow: 0 -8px 22px rgba(15, 23, 42, 0.045);
+  background:
+    linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%);
+  border-top: 1px solid rgba(203, 213, 225, 0.78);
 }
 
 .chat-input-row {
