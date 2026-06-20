@@ -649,9 +649,9 @@ button {
   min-height: 44px;
   max-height: 116px;
   padding: 11px 12px;
-  border: 1px solid rgba(203, 213, 225, 0.9);
+  border: 1px solid rgba(180, 195, 215, 0.95);
   border-radius: 13px;
-  background: #f8fbff;
+  background: #ffffff;
   color: #111827;
   font-size: 13.5px;
   line-height: 1.4;
@@ -928,11 +928,10 @@ button {
 .chat-header {
   min-height: 58px;
   padding: 11px 15px 10px;
-  background:
-    linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%);
+  background: linear-gradient(180deg, #f7faff 0%, #eef4fb 100%);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(203, 213, 225, 0.75);
-  box-shadow: 0 7px 18px rgba(15, 23, 42, 0.045);
+  border-bottom: 1px solid rgba(180, 195, 215, 0.9);
+  box-shadow: 0 7px 16px rgba(15, 23, 42, 0.055);
 }
 
 .chat-header .back-btn {
@@ -981,7 +980,7 @@ button {
   padding: 15px 15px 14px;
   overflow-y: auto;
   background:
-    radial-gradient(circle at 82% 10%, rgba(147, 197, 253, 0.12), transparent 30%),
+    radial-gradient(circle at 82% 10%, rgba(147, 197, 253, 0.07), transparent 30%),
     linear-gradient(180deg, #fbfdff 0%, #f7faff 100%);
 }
 
@@ -1163,10 +1162,10 @@ button {
 .chat-input-area {
   flex: 0 0 auto;
   display: block;
-  padding: 11px 12px 9px;
-  background: linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%);
-  border-top: 1px solid rgba(203, 213, 225, 0.78);
-  box-shadow: 0 -8px 22px rgba(15, 23, 42, 0.045);
+  padding: 11px 12px 8px;
+  background: linear-gradient(180deg, #eef4fb 0%, #eaf1f9 100%);
+  border-top: 1px solid rgba(180, 195, 215, 0.9);
+  box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.045);
 }
 
 .chat-input-row {
