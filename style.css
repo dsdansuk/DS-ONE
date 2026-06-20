@@ -174,7 +174,7 @@ button {
 }
 
 .hero-copy h1 {
-  margin: 0 0 8px;
+  margin: 0 0 12px;
   color: #0b3285;
   font-size: 40px;
   line-height: 0.88;
@@ -187,9 +187,9 @@ button {
   margin: 0 0 5px;
   padding-left: 2px;
   color: #082762;
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.05;
-  font-weight: 950;
+  font-weight: 500;
 }
 
 .hero-desc {
@@ -210,84 +210,10 @@ button {
   justify-content: center;
 }
 
-.hero-visual::before {
-  content: "";
-  position: absolute;
-  width: 88%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(191, 219, 254, 0.32), rgba(239, 246, 255, 0.08) 54%, transparent 68%);
-}
-
-.orbit {
-  position: absolute;
-  border: 1px solid #058df5;
-  border-radius: 50%;
-}
-
-.orbit-a {
-  width: 88%;
-  aspect-ratio: 1;
-}
-
-.orbit-b {
-  width: 66%;
-  aspect-ratio: 1;
-  opacity: 0.55;
-}
-
-.orbit-dot {
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #60a5fa;
-  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12);
-}
-
-.dot-a {
-  right: 6%;
-  top: 28%;
-}
-
-.dot-b {
-  left: 8%;
-  bottom: 31%;
-}
-
-.floating-tile {
-  display: none;
-}
-
-.tile-chat {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  right: 16px;
-  top: 7px;
-  width: 28px;
-  height: 22px;
-  border-radius: 999px;
-  background: #bcd7f9;
-  box-shadow: 0 8px 16px rgba(30, 64, 175, 0.12);
-  z-index: 3;
-}
-
-.tile-chat span {
-  position: relative;
-  z-index: 1;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: #64748b;
-}
-
 .hero-robot {
   position: relative;
   z-index: 2;
-  width: 76px;
+  width: 100px;
   aspect-ratio: 1;
   display: flex;
   align-items: center;
@@ -304,7 +230,7 @@ button {
   pointer-events: none;
 }
 
-.hero-robot::before {
+/* .hero-robot::before {
   content: "";
   position: absolute;
   width: 70%;
@@ -313,7 +239,7 @@ button {
   background: linear-gradient(180deg, #fff, #e5edf7);
   box-shadow: 0 14px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 #fff;
   z-index: -1;
-}
+} */
 
 .feature-row {
   display: grid;
@@ -354,7 +280,7 @@ button {
   justify-content: center;
   font-size: 14px;
   line-height: 1.2;
-  font-weight: 800;
+  font-weight: 600;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -362,13 +288,13 @@ button {
 }
 .menu-card-list {
   display: grid;
-  gap: 7px;
+  gap: 9px;
   margin-top: 0;
 }
 
 .menu-card {
   width: 100%;
-  min-height: 63px;
+  min-height: 60px;
   border: 1px solid rgba(203, 213, 225, 0.8);
   border-left: 3px solid #3b82f6;
   border-radius: 17px;
