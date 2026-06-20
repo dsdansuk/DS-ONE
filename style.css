@@ -1,11 +1,27 @@
 @font-face {
-    font-family: "Pretendard";
-    src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/woff2/PretendardVariable.woff2") format("woff2-variations");
-    font-weight: 100 900;
-    font-style: normal;
-    font-display: swap;
+  font-family: "Pretendard";
+  src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/woff2/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
 }
 
+:root {
+  --ds-blue: #2563eb;
+  --ds-blue-dark: #0b3285;
+  --ds-navy: #082762;
+  --text-main: #0f172a;
+  --text-sub: #475569;
+  --text-muted: #64748b;
+  --line: #dbe3ef;
+  --line-soft: #e5edf7;
+  --bg: #f4f7fb;
+  --white: #ffffff;
+  --radius-lg: 18px;
+  --radius-md: 14px;
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.07);
+  --shadow-card: 0 8px 18px rgba(15, 23, 42, 0.055);
+}
 
 * {
   box-sizing: border-box;
@@ -16,14 +32,23 @@ body {
   margin: 0;
   width: 100%;
   height: 100%;
-  font-family: "Pretendard", "Noto Sans KR", sans-serif;
-  background: #eef3f9;
-  color: #111827;
+  font-family:
+    "Pretendard",
+    "Noto Sans KR",
+    "Apple SD Gothic Neo",
+    "Malgun Gothic",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  background: transparent;
+  color: var(--text-main);
   overflow: hidden;
 }
 
 button,
-textarea {
+textarea,
+input {
   font-family: inherit;
 }
 
@@ -31,26 +56,29 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 전체 iframe 영역: 344 x 462 고정 기준 */
+/* 346 x 464 iframe 기준 */
 .wrap {
   width: 100%;
   height: 100vh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  background:
-    radial-gradient(circle at 76% 14%, rgba(59, 130, 246, 0.12), transparent 28%),
-    radial-gradient(circle at 12% 94%, rgba(37, 99, 235, 0.08), transparent 26%),
-    linear-gradient(180deg, #fbfdff 0%, #f3f7fc 100%);
-  border: 1px solid #dbe3ef;
   overflow: hidden;
+  border: 1px solid #d9e4f2;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 78% 13%, rgba(96, 165, 250, 0.13), transparent 28%),
+    radial-gradient(circle at 10% 98%, rgba(37, 99, 235, 0.07), transparent 30%),
+    linear-gradient(180deg, #fbfdff 0%, #f4f8fd 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
-/* 인증 정보는 JS에서만 사용하고 화면에는 노출하지 않음 */
+/* 인증 정보는 JS에서만 사용 */
 .header {
   display: none;
 }
 
-/* 기존 JS 호환용 버튼: 화면 비노출, 기능 ID 유지 */
+/* 기존 JS 호환용 */
 .mode-buttons {
   position: absolute;
   width: 1px;
@@ -74,9 +102,9 @@ button {
 }
 
 .mode-btn.active {
-  background: #2563eb;
+  background: var(--ds-blue);
   color: #fff;
-  border-color: #2563eb;
+  border-color: var(--ds-blue);
 }
 
 .main {
@@ -97,7 +125,7 @@ button {
 }
 
 /* =========================
-   Home: DS ONE 344 x 462
+   Home
    ========================= */
 
 .home-panel {
@@ -108,16 +136,17 @@ button {
 .home-shell {
   width: 100%;
   height: 100%;
-  padding: 12px 20px 10px;
+  min-height: 0;
+  padding: 16px 20px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 78% 20%, rgba(147, 197, 253, 0.15), transparent 30%),
-    linear-gradient(180deg, #f4f9fe, rgba(248, 251, 255, 0.94));
+    radial-gradient(circle at 80% 18%, rgba(147, 197, 253, 0.14), transparent 30%),
+    linear-gradient(180deg, #f6faff 0%, #f8fbff 48%, #f4f7fb 100%);
 }
 
+/* 상단 배지 */
 .employee-badge {
   width: max-content;
   max-width: 100%;
@@ -125,15 +154,15 @@ button {
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  margin-top: 8px;
-  border: 1px solid rgba(191, 219, 254, 0.9);
+  border: 1px solid rgba(191, 219, 254, 0.82);
   border-radius: 999px;
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  background: rgba(239, 246, 255, 0.88);
   color: #1d4ed8;
   font-size: 11px;
   line-height: 1;
-  font-weight: 900;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  font-weight: 850;
+  letter-spacing: -0.03em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
 .badge-shield {
@@ -165,46 +194,49 @@ button {
   transform: rotate(-45deg);
 }
 
+/* 히어로 영역 */
 .hero-area {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 104px;
+  grid-template-columns: minmax(0, 1fr) 96px;
   align-items: center;
   gap: 6px;
-  min-height: 96px;
+  min-height: 112px;
+  margin-top: 6px;
 }
 
 .hero-copy h1 {
-  margin: 0 0 12px;
-  color: #0b3285;
-  font-size: 40px;
-  line-height: 0.88;
+  margin: 11px 0 10px;
+  color: var(--ds-blue-dark);
+  font-size: 39px;
+  line-height: 0.9;
   font-weight: 950;
-  letter-spacing: -0.04em;
-  text-shadow: 0 8px 20px rgba(30, 64, 175, 0.12);
+  letter-spacing: -0.045em;
+  text-shadow: 0 8px 18px rgba(30, 64, 175, 0.11);
 }
 
 .hero-title {
   margin: 0 0 5px;
-  padding-left: 2px;
-  color: #082762;
-  font-size: 16px;
+  padding-left: 1px;
+  color: var(--ds-navy);
+  font-size: 13px;
   line-height: 1.05;
-  font-weight: 500;
+  font-weight: 520;
+  letter-spacing: -0.055em;
 }
 
 .hero-desc {
-  max-width: 185px;
+  max-width: 180px;
   margin: 0;
   color: #64748b;
-  font-size: 11px;
+  font-size: 10.8px;
   line-height: 1.28;
-  font-weight: 700;
-  letter-spacing: -0.045em;
+  font-weight: 650;
+  letter-spacing: -0.04em;
 }
 
 .hero-visual {
   position: relative;
-  min-height: 100px;
+  min-height: 98px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -213,7 +245,7 @@ button {
 .hero-robot {
   position: relative;
   z-index: 2;
-  width: 100px;
+  width: 92px;
   aspect-ratio: 1;
   display: flex;
   align-items: center;
@@ -225,31 +257,21 @@ button {
   height: 100%;
   display: block;
   object-fit: contain;
-  filter: drop-shadow(0 14px 18px rgba(15, 23, 42, 0.14));
+  filter: drop-shadow(0 12px 16px rgba(15, 23, 42, 0.12));
   user-select: none;
   pointer-events: none;
 }
 
-/* .hero-robot::before {
-  content: "";
-  position: absolute;
-  width: 70%;
-  height: 52%;
-  border-radius: 16px;
-  background: linear-gradient(180deg, #fff, #e5edf7);
-  box-shadow: 0 14px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 #fff;
-  z-index: -1;
-} */
-
+/* 기능 키워드 */
 .feature-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 2px;
-  margin: 1px 0 4px;
+  margin: 0 0 10px;
   color: #475569;
-  font-size: 10.5px;
+  font-size: 10.3px;
   line-height: 1.1;
-  font-weight: 800;
+  font-weight: 750;
   letter-spacing: -0.055em;
 }
 
@@ -268,24 +290,27 @@ button {
   flex: 0 0 auto;
 }
 
-
+/* 사용자 안내 */
 .user-greeting {
   width: 100%;
   min-height: 20px;
-  margin: 12px auto 18px;
+  margin: 4px auto 13px;
   padding: 0 2px;
   color: #475569;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.2;
-  font-weight: 600;
+  font-weight: 520;
   text-align: center;
+  letter-spacing: -0.045em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* 홈 메뉴 카드 */
 .menu-card-list {
   display: grid;
   gap: 9px;
@@ -295,26 +320,33 @@ button {
 .menu-card {
   width: 100%;
   min-height: 60px;
-  border: 1px solid rgba(203, 213, 225, 0.8);
-  border-left: 3px solid #3b82f6;
+  border: 1px solid rgba(203, 213, 225, 0.74);
+  border-left: 2px solid rgba(59, 130, 246, 0.62);
   border-radius: 17px;
-  background: #F9F9F9;
-  box-shadow: 0 9px 20px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 8px 18px rgba(15, 23, 42, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) 14px;
+  grid-template-columns: 44px minmax(0, 1fr) 13px;
   align-items: center;
   gap: 10px;
   padding: 8px 13px;
   text-align: left;
   cursor: pointer;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease;
 }
 
 .menu-card:hover,
 .menu-card:focus-visible {
   transform: translateY(-1px);
-  border-color: rgba(37, 99, 235, 0.52);
-  box-shadow: 0 13px 24px rgba(15, 23, 42, 0.1);
+  border-color: rgba(37, 99, 235, 0.46);
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.095);
   outline: none;
 }
 
@@ -329,38 +361,40 @@ button {
 }
 
 .menu-icon {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border: 1px solid #dbeafe;
   border-radius: 15px;
-  background: linear-gradient(135deg, #f8fbff, #eaf3ff);
-  color: #2563eb;
+  background: linear-gradient(135deg, #f9fbff, #edf5ff);
+  color: var(--ds-blue);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 8px 16px rgba(30, 64, 175, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 7px 14px rgba(30, 64, 175, 0.055);
 }
 
 .chat-icon img {
   position: relative;
   z-index: 1;
-  width: 24px;
-  height: 24px;
+  width: 23px;
+  height: 23px;
 }
 
 .doc-icon img {
   position: relative;
   z-index: 1;
-  width: 30px;
-  height: 28px;
+  width: 28px;
+  height: 26px;
 }
 
 .rpa-icon img {
   position: relative;
   z-index: 1;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
 }
 
 .menu-text {
@@ -371,191 +405,137 @@ button {
 
 .menu-text strong {
   color: #0b2b6f;
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.05;
-  font-weight: 950;
+  font-weight: 900;
+  letter-spacing: -0.055em;
 }
 
 .menu-text em {
   color: #64748b;
-  font-size: 11.5px;
+  font-size: 11.3px;
   line-height: 1.18;
   font-style: normal;
-  font-weight: 750;
+  font-weight: 650;
+  letter-spacing: -0.04em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .menu-arrow {
-  width: 13px;
-  height: 13px;
-  border-top: 3px solid #64748b;
-  border-right: 3px solid #64748b;
+  width: 12px;
+  height: 12px;
+  border-top: 2.5px solid #94a3b8;
+  border-right: 2.5px solid #94a3b8;
   transform: rotate(45deg);
   justify-self: end;
-  opacity: 0.9;
-}
-
-
-/* =========================
-   AI 문서 작성 화면
-   ========================= */
-
-.doc-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.doc-form {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-}
-
-.doc-field {
-  display: grid;
-  gap: 6px;
-  color: #334155;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: -0.035em;
-}
-
-.doc-field input,
-.doc-field textarea {
-  width: 100%;
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  background: #fff;
-  color: #111827;
-  font-size: 13px;
-  line-height: 1.4;
-  outline: none;
-}
-
-.doc-field input {
-  height: 40px;
-  padding: 0 12px;
-}
-
-.doc-field textarea {
-  min-height: 112px;
-  max-height: 150px;
-  padding: 10px 12px;
-  resize: vertical;
-}
-
-.doc-field input:focus,
-.doc-field textarea:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-}
-
-.doc-actions {
-  display: grid;
-  grid-template-columns: 1fr 82px;
-  gap: 8px;
-}
-
-.doc-actions .send-btn,
-.doc-clear-btn {
-  height: 40px;
-}
-
-.doc-clear-btn {
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  background: #fff;
-  color: #334155;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.doc-clear-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.doc-output {
-  display: grid;
-  gap: 0;
+  opacity: 0.95;
 }
 
 /* =========================
-   AI / RPA 공통 화면
+   공통 서브 화면
    ========================= */
 
 .sub-header {
   flex: 0 0 auto;
   min-height: 58px;
   padding: 11px 14px;
-  background: #F4F5F7;
-  border-bottom: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   gap: 10px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045);
 }
 
 .back-btn {
   width: 34px;
   height: 34px;
-  border: 1px solid #8d8d8d;
-  border-radius: 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
   background: #f8fafc;
   color: #1f2937;
-  font-size: 28px;
+  font-size: 25px;
   line-height: 1;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back-btn:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
 }
 
 .sub-header strong {
   display: block;
   color: #1e3a8a;
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 850;
   line-height: 1.2;
+  letter-spacing: -0.04em;
 }
 
 .sub-header span {
   display: block;
   margin-top: 3px;
-  color: #6b7280;
+  color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: -0.035em;
 }
 
 .body {
   flex: 1;
+  min-height: 0;
   padding: 14px;
   overflow-y: auto;
   background: linear-gradient(180deg, #f8fbff 0%, #f4f7fb 100%);
 }
 
+.body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* =========================
+   채팅 화면
+   ========================= */
+
 .msg {
   max-width: 88%;
   padding: 10px 12px;
-  border-radius: 14px;
+  border-radius: 15px;
   margin-bottom: 10px;
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 13.5px;
+  line-height: 1.46;
+  letter-spacing: -0.035em;
   white-space: pre-line;
   word-break: break-word;
 }
 
 .bot {
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e2e8f0;
   color: #111827;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.045);
 }
 
 .user {
   margin-left: auto;
   background: #2563eb;
   color: #fff;
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.18);
 }
 
 .debug {
@@ -569,16 +549,17 @@ button {
 
 .thinking {
   width: min(88%, 390px);
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
+  background: #fff;
+  border: 1px solid #e2e8f0;
   color: #1f2937;
   padding: 14px 16px;
-  border-radius: 20px;
+  border-radius: 18px;
   margin-bottom: 10px;
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.045);
 }
 
 .thinking-title {
-  font-weight: 700;
+  font-weight: 800;
   margin-bottom: 8px;
   color: #111827;
 }
@@ -628,11 +609,12 @@ button {
 }
 
 .input-area {
+  flex: 0 0 auto;
   display: flex;
   gap: 8px;
-  padding: 12px;
+  padding: 11px 12px 12px;
   background: #fff;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid #e2e8f0;
 }
 
 #messageInput {
@@ -640,13 +622,14 @@ button {
   min-width: 0;
   height: 44px;
   min-height: 44px;
-  max-height: 120px;
+  max-height: 116px;
   padding: 11px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  font-size: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 13px;
+  background: #fff;
+  color: #111827;
+  font-size: 13.5px;
   line-height: 1.4;
-  font-family: inherit;
   outline: none;
   resize: none;
   overflow-y: auto;
@@ -659,13 +642,18 @@ button {
 
 .send-btn {
   border: 0;
-  border-radius: 12px;
-  padding: 0 16px;
+  border-radius: 13px;
+  padding: 0 15px;
   background: #2563eb;
   color: #fff;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.18);
+}
+
+.send-btn:hover {
+  background: #1d4ed8;
 }
 
 .send-btn.wide {
@@ -676,10 +664,100 @@ button {
 .send-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* =========================
-   RPA 동적 목록/실행 상태
+   AI 문서 작성 화면
+   ========================= */
+
+.doc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.doc-form {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.doc-field {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+
+.doc-field input,
+.doc-field textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 13px;
+  background: #fff;
+  color: #111827;
+  font-size: 13px;
+  line-height: 1.4;
+  outline: none;
+}
+
+.doc-field input {
+  height: 40px;
+  padding: 0 12px;
+}
+
+.doc-field textarea {
+  min-height: 112px;
+  max-height: 150px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.doc-field input:focus,
+.doc-field textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.doc-actions {
+  display: grid;
+  grid-template-columns: 1fr 82px;
+  gap: 8px;
+}
+
+.doc-actions .send-btn,
+.doc-clear-btn {
+  height: 40px;
+}
+
+.doc-clear-btn {
+  border: 1px solid #cbd5e1;
+  border-radius: 13px;
+  background: #fff;
+  color: #334155;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.doc-clear-btn:hover {
+  background: #f8fafc;
+}
+
+.doc-clear-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.doc-output {
+  display: grid;
+  gap: 0;
+}
+
+/* =========================
+   RPA 목록/실행 상태
    ========================= */
 
 .rpa-refresh-area {
@@ -695,34 +773,35 @@ button {
 .rpa-item {
   text-align: center;
   padding: 11px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 13px;
   background: #fff;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13.5px;
   color: #111827;
+  box-shadow: 0 5px 12px rgba(15, 23, 42, 0.035);
 }
 
 .rpa-item:hover {
-  border-color: #2563eb;
+  border-color: #93c5fd;
   background: #f1f6ff;
 }
 
 .rpa-item.selected {
   border-color: #2563eb;
   background: #eef4ff;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.14);
 }
 
 .rpa-name {
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .rpa-inline-action {
   margin: -2px 0 8px;
   padding: 12px;
   border: 1px solid #bfdbfe;
-  border-radius: 14px;
+  border-radius: 15px;
   background: #f8fbff;
 }
 
@@ -743,7 +822,7 @@ button {
 .rpa-execute-btn,
 .rpa-cancel-btn {
   height: 40px;
-  border-radius: 12px;
+  border-radius: 13px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -752,10 +831,11 @@ button {
   border: 0;
   background: #2563eb;
   color: #fff;
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.18);
 }
 
 .rpa-cancel-btn {
-  border: 1px solid #d1d5db;
+  border: 1px solid #cbd5e1;
   background: #fff;
   color: #111827;
 }
@@ -764,6 +844,7 @@ button {
 .rpa-cancel-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .rpa-running-box {
@@ -789,7 +870,7 @@ button {
 
 .rpa-running-name {
   display: block;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 800;
   color: #111827;
   line-height: 1.35;
@@ -806,4 +887,36 @@ button {
   color: #92400e;
   font-size: 12px;
   font-weight: 800;
+}
+
+/* =========================
+   작은 화면 보정
+   ========================= */
+
+@media (max-height: 450px) {
+  .home-shell {
+    padding: 12px 18px 12px;
+  }
+
+  .hero-area {
+    min-height: 102px;
+    margin-top: 4px;
+  }
+
+  .hero-copy h1 {
+    font-size: 37px;
+    margin: 9px 0 8px;
+  }
+
+  .hero-robot {
+    width: 86px;
+  }
+
+  .user-greeting {
+    margin-bottom: 10px;
+  }
+
+  .menu-card {
+    min-height: 58px;
+  }
 }
