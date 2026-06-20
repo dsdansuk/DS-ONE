@@ -142,8 +142,8 @@ button {
   flex-direction: column;
   overflow: hidden;
   background:
-    radial-gradient(circle at 80% 18%, rgba(147, 197, 253, 0.14), transparent 30%),
-    linear-gradient(180deg, #f6faff 0%, #f8fbff 48%, #f4f7fb 100%);
+    radial-gradient(circle at 78% 18%, rgba(147, 197, 253, 0.11), transparent 30%),
+    linear-gradient(180deg, #fbfdff 0%, #f7faff 48%, #f5f8fc 100%);
 }
 
 /* 상단 배지 */
