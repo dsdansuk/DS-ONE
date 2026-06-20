@@ -213,7 +213,7 @@ button {
 }
 
 .hero-copy h1 {
-  margin: 8px 0 10px;
+  margin: 10px 0 10px;
   color: var(--ds-blue-dark);
   font-size: 39px;
   line-height: 0.9;
