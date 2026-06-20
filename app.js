@@ -300,7 +300,7 @@ function addMessage(targetBody, type, text, debug = false, options = {}) {
       const avatar = document.createElement("span");
       avatar.className = "chat-avatar";
       avatar.setAttribute("aria-hidden", "true");
-      avatar.innerHTML = '<img src="./chat-robot.png" alt="" />';
+      avatar.innerHTML = '<img src="./robot.png" alt="" />';
       row.appendChild(avatar);
     }
 
