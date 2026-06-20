@@ -1163,9 +1163,9 @@ button {
   flex: 0 0 auto;
   display: block;
   padding: 11px 12px 8px;
-  background: linear-gradient(180deg, #eef4fb 0%, #eaf1f9 100%);
-  border-top: 1px solid rgba(180, 195, 215, 0.9);
-  box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.045);
+  background: linear-gradient(180deg, #eef4fb 0%, #e9f1f9 100%);
+  border-top: 1px solid rgba(148, 163, 184, 0.45);
+  box-shadow: 0 -6px 14px rgba(15, 23, 42, 0.045);
 }
 
 .chat-input-row {
