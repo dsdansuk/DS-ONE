@@ -999,7 +999,7 @@ button {
   grid-template-columns: 46px minmax(0, 1fr);
   gap: 11px;
   align-items: center;
-  padding: 14px 14px 13px;
+  padding: 12px 14px;
   margin: 0 0 16px;
   border: 1px solid rgba(203, 213, 225, 0.74);
   border-radius: 18px;
@@ -1040,8 +1040,8 @@ button {
 .welcome-avatar img {
   position: relative;
   z-index: 1;
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
   object-fit: contain;
   display: block;
   filter: drop-shadow(0 4px 7px rgba(15, 23, 42, 0.14));
@@ -1063,7 +1063,7 @@ button {
 }
 
 .welcome-copy p {
-  margin: 4px 0 9px;
+  margin: 0;
   color: #334155;
   font-size: 12.8px;
   line-height: 1.35;
