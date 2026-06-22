@@ -39,17 +39,14 @@ const aiPanel = document.getElementById("aiPanel");
 const rpaPanel = document.getElementById("rpaPanel");
 const docPanel = document.getElementById("docPanel");
 const aiBody = document.getElementById("aiBody");
+const agentBody = document.getElementById("agentBody");
 const rpaBody = document.getElementById("rpaBody");
-const docBody = document.getElementById("docBody");
-const docOutput = document.getElementById("docOutput");
-const docForm = document.getElementById("docForm");
-const docInstruction = document.getElementById("docInstruction");
-const docText = document.getElementById("docText");
-const docGenerateBtn = document.getElementById("docGenerateBtn");
-const docClearBtn = document.getElementById("docClearBtn");
 const chatForm = document.getElementById("chatForm");
 const messageInput = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
+const agentForm = document.getElementById("agentForm");
+const agentMessageInput = document.getElementById("agentMessageInput");
+const agentSendBtn = document.getElementById("agentSendBtn");
 const reloadRpaBtn = document.getElementById("reloadRpaBtn");
 const userInfo = document.getElementById("userInfo");
 const homeGreetingText = document.getElementById("homeGreetingText");
@@ -214,32 +211,28 @@ async function bootstrap() {
 }
 
 function enableApp() {
-  messageInput.disabled = false;
-  sendBtn.disabled = false;
+  if (messageInput) messageInput.disabled = false;
+  if (sendBtn) sendBtn.disabled = false;
+  if (agentMessageInput) agentMessageInput.disabled = false;
+  if (agentSendBtn) agentSendBtn.disabled = false;
 
   if (directQuestionBtn) directQuestionBtn.disabled = false;
   if (docWriteBtn) docWriteBtn.disabled = false;
   if (rpaEntryBtn) rpaEntryBtn.disabled = false;
-  if (docInstruction) docInstruction.disabled = false;
-  if (docText) docText.disabled = false;
-  if (docGenerateBtn) docGenerateBtn.disabled = false;
-  if (docClearBtn) docClearBtn.disabled = false;
   if (aiBtn) aiBtn.disabled = false;
   if (rpaBtn) rpaBtn.disabled = false;
 }
 
 function disableApp() {
-  messageInput.disabled = true;
-  sendBtn.disabled = true;
+  if (messageInput) messageInput.disabled = true;
+  if (sendBtn) sendBtn.disabled = true;
+  if (agentMessageInput) agentMessageInput.disabled = true;
+  if (agentSendBtn) agentSendBtn.disabled = true;
   if (reloadRpaBtn) reloadRpaBtn.disabled = true;
 
   if (directQuestionBtn) directQuestionBtn.disabled = true;
   if (docWriteBtn) docWriteBtn.disabled = true;
   if (rpaEntryBtn) rpaEntryBtn.disabled = true;
-  if (docInstruction) docInstruction.disabled = true;
-  if (docText) docText.disabled = true;
-  if (docGenerateBtn) docGenerateBtn.disabled = true;
-  if (docClearBtn) docClearBtn.disabled = true;
   if (aiBtn) aiBtn.disabled = true;
   if (rpaBtn) rpaBtn.disabled = true;
 }
@@ -260,11 +253,11 @@ function setMode(mode) {
   }
 
   if (mode === "ai") {
-    setTimeout(() => messageInput.focus(), 0);
+    setTimeout(() => messageInput?.focus(), 0);
   }
 
   if (mode === "doc") {
-    setTimeout(() => docInstruction?.focus(), 0);
+    setTimeout(() => agentMessageInput?.focus(), 0);
   }
 }
 
@@ -292,7 +285,7 @@ function addMessage(targetBody, type, text, debug = false, options = {}) {
   div.className = debug ? "msg bot debug" : "msg " + type;
   div.textContent = text;
 
-  if (targetBody === aiBody && !debug) {
+  if ((targetBody === aiBody || targetBody === agentBody) && !debug) {
     const row = document.createElement("div");
     row.className = type === "user" ? "chat-row user-row" : "chat-row bot-row";
 
@@ -969,8 +962,18 @@ function convertJobState(state) {
   return state || "상태 확인 중";
 }
 
-async function sendChat(message) {
-  const thinkingBox = createThinkingBox(aiBody);
+async function sendChat(message, options = {}) {
+  const targetBody = options.targetBody || aiBody;
+  const input = options.input || messageInput;
+  const submitButton = options.button || sendBtn;
+  const requestPayload = {
+    message,
+    provider: AI_PROVIDER,
+    stream: true,
+    ...(options.task ? { task: options.task } : {}),
+  };
+
+  const thinkingBox = createThinkingBox(targetBody);
 
   try {
     const res = await fetch(AI_API_URL, {
@@ -979,27 +982,23 @@ async function sendChat(message) {
         "Content-Type": "application/json",
         Authorization: "Bearer " + sessionToken,
       },
-      body: JSON.stringify({
-        message,
-        provider: AI_PROVIDER,
-        stream: true,
-      }),
+      body: JSON.stringify(requestPayload),
     });
 
     removeThinkingBox(thinkingBox);
 
     if (!res.ok) {
       const errorText = await res.text();
-      addMessage(aiBody, "bot", "AI API 오류가 발생했습니다.\nHTTP " + res.status + "\n" + errorText, true);
+      addMessage(targetBody, "bot", "AI API 오류가 발생했습니다.\nHTTP " + res.status + "\n" + errorText, true);
       return;
     }
 
     if (!res.body) {
-      addMessage(aiBody, "bot", "스트림 응답 본문이 없습니다.");
+      addMessage(targetBody, "bot", "스트림 응답 본문이 없습니다.");
       return;
     }
 
-    const botDiv = addMessage(aiBody, "bot", "");
+    const botDiv = addMessage(targetBody, "bot", "", false, { skipSave: targetBody !== aiBody });
     const reader = res.body.getReader();
     const decoder = new TextDecoder("utf-8");
 
@@ -1021,8 +1020,8 @@ async function sendChat(message) {
         if (parsed) {
           fullText += parsed;
           botDiv.textContent = fullText;
-          aiBody.scrollTop = aiBody.scrollHeight;
-          saveChatHistory();
+          targetBody.scrollTop = targetBody.scrollHeight;
+          if (targetBody === aiBody) saveChatHistory();
         }
 
         buffer = "";
@@ -1038,120 +1037,22 @@ async function sendChat(message) {
     if (finalParsed) {
       fullText += finalParsed;
       botDiv.textContent = fullText;
-      saveChatHistory();
+      if (targetBody === aiBody) saveChatHistory();
     }
 
     if (!fullText.trim()) {
       botDiv.textContent = "답변 데이터는 수신했지만 화면에 표시할 텍스트를 찾지 못했습니다.";
-      saveChatHistory();
+      if (targetBody === aiBody) saveChatHistory();
     }
   } catch (err) {
     removeThinkingBox(thinkingBox);
-    addMessage(aiBody, "bot", "호출 실패: " + getErrorMessage(err));
+    addMessage(targetBody, "bot", "호출 실패: " + getErrorMessage(err), false, { skipSave: targetBody !== aiBody });
   } finally {
-    sendBtn.disabled = false;
-    messageInput.focus();
+    if (submitButton) submitButton.disabled = false;
+    input?.focus();
   }
 }
 
-
-async function sendDocumentRequest() {
-  if (!docInstruction || !docText || !docGenerateBtn || !docOutput) return;
-
-  const instruction = docInstruction.value.trim();
-  const draftText = docText.value.trim();
-
-  if (!instruction && !draftText) {
-    clearBody(docOutput);
-    addMessage(docOutput, "bot", "작성 요청이나 초안 내용을 입력해 주세요.", false, { skipSave: true });
-    return;
-  }
-
-  clearBody(docOutput);
-
-  const requestText = instruction || "아래 내용을 업무 문서 형식으로 자연스럽고 정중하게 작성해 주세요.";
-  const userPreview = requestText + (draftText ? "\n\n[초안/참고 내용]\n" + draftText : "");
-  addMessage(docOutput, "user", userPreview, false, { skipSave: true });
-
-  docGenerateBtn.disabled = true;
-  docGenerateBtn.textContent = "작성 중";
-
-  const thinkingBox = createThinkingBox(docOutput);
-
-  try {
-    const res = await fetch(AI_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + sessionToken,
-      },
-      body: JSON.stringify({
-        task: "document",
-        provider: AI_PROVIDER,
-        stream: true,
-        message: requestText,
-        documentText: draftText,
-      }),
-    });
-
-    removeThinkingBox(thinkingBox);
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      addMessage(docOutput, "bot", "문서 작성 API 오류가 발생했습니다.\nHTTP " + res.status + "\n" + errorText, true, { skipSave: true });
-      return;
-    }
-
-    if (!res.body) {
-      addMessage(docOutput, "bot", "스트림 응답 본문이 없습니다.", false, { skipSave: true });
-      return;
-    }
-
-    const botDiv = addMessage(docOutput, "bot", "", false, { skipSave: true });
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-
-    let fullText = "";
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      if (buffer.includes("\n\n") || buffer.includes("data: [DONE]") || !buffer.includes("data:")) {
-        const parsed = parseStreamText(buffer);
-        if (parsed) {
-          fullText += parsed;
-          botDiv.textContent = fullText;
-          docOutput.scrollTop = docOutput.scrollHeight;
-        }
-        buffer = "";
-      }
-    }
-
-    const tail = decoder.decode();
-    if (tail) buffer += tail;
-
-    const finalParsed = parseStreamText(buffer);
-    if (finalParsed) {
-      fullText += finalParsed;
-      botDiv.textContent = fullText;
-    }
-
-    if (!fullText.trim()) {
-      botDiv.textContent = "문서 작성 결과를 표시할 텍스트를 찾지 못했습니다.";
-    }
-  } catch (err) {
-    removeThinkingBox(thinkingBox);
-    addMessage(docOutput, "bot", "문서 작성 호출 실패: " + getErrorMessage(err), false, { skipSave: true });
-  } finally {
-    docGenerateBtn.disabled = false;
-    docGenerateBtn.textContent = "작성하기";
-    docInstruction.focus();
-  }
-}
 
 if (aiBtn) aiBtn.addEventListener("click", () => setMode("ai"));
 
@@ -1191,55 +1092,61 @@ if (reloadRpaBtn) {
 }
 
 
-if (docForm) {
-  docForm.addEventListener("submit", async (e) => {
+function bindChatInput({ form, input, button, body, mode }) {
+  if (!form || !input || !button || !body) return;
+
+  input.addEventListener("keydown", (e) => {
+    // Shift + Enter → 줄바꿈
+    if (e.key === "Enter" && e.shiftKey) {
+      return;
+    }
+
+    // Enter → 전송
+    if (e.key === "Enter") {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  input.addEventListener("input", () => {
+    input.style.height = "42px";
+    input.style.height = Math.min(input.scrollHeight, 80) + "px";
+  });
+
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (currentMode !== "doc") return;
-    await sendDocumentRequest();
+
+    if (currentMode !== mode) return;
+
+    const message = input.value.trim();
+    if (!message) return;
+
+    addMessage(body, "user", message, false, { skipSave: body !== aiBody });
+
+    input.value = "";
+    input.style.height = "42px";
+    button.disabled = true;
+
+    await sendChat(message, {
+      targetBody: body,
+      input,
+      button,
+    });
   });
 }
 
-if (docClearBtn) {
-  docClearBtn.addEventListener("click", () => {
-    if (docInstruction) docInstruction.value = "";
-    if (docText) docText.value = "";
-    if (docOutput) docOutput.innerHTML = "";
-    docInstruction?.focus();
-  });
-}
-
-messageInput.addEventListener("keydown", (e) => {
-  // Shift + Enter → 줄바꿈
-  if (e.key === "Enter" && e.shiftKey) {
-    return;
-  }
-
-  // Enter → 전송
-  if (e.key === "Enter") {
-    e.preventDefault();
-    chatForm.requestSubmit();
-  }
+bindChatInput({
+  form: chatForm,
+  input: messageInput,
+  button: sendBtn,
+  body: aiBody,
+  mode: "ai",
 });
 
-messageInput.addEventListener("input", () => {
-  messageInput.style.height = "42px";
-  messageInput.style.height =
-    Math.min(messageInput.scrollHeight, 80) + "px";
-});
-
-chatForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  if (currentMode !== "ai") return;
-
-  const message = messageInput.value.trim();
-  if (!message) return;
-
-  addMessage(aiBody, "user", message);
-
-  messageInput.value = "";
-  messageInput.style.height = "42px";
-  sendBtn.disabled = true;
-
-  await sendChat(message);
+bindChatInput({
+  form: agentForm,
+  input: agentMessageInput,
+  button: agentSendBtn,
+  body: agentBody,
+  mode: "doc",
 });

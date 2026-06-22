@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DS ONE</title>
-  <link rel="stylesheet" href="./style.css?v=20260621_chat_ui" />
+  <link rel="stylesheet" href="./style.css?v=20260622_agent_fix" />
 </head>
 <body>
   <div class="wrap">
@@ -108,6 +108,7 @@
           <div class="chat-input-row">
             <textarea
               id="messageInput"
+              class="chat-message-input"
               placeholder="질문을 입력하세요"
               autocomplete="off"
               rows="1"
@@ -121,7 +122,7 @@
       </section>
 
 
-      <section id="docPanel" class="panel" aria-label="업무 AI Agent">
+      <section id="docPanel" class="panel chat-panel" aria-label="업무 AI Agent">
         <div class="sub-header chat-header">
           <button id="docBackBtn" class="back-btn" type="button" aria-label="메뉴로 돌아가기">‹</button>
           <div class="sub-title-group">
@@ -130,7 +131,7 @@
           </div>
         </div>
 
-        <div id="aiBody" class="body chat-body">
+        <div id="agentBody" class="body chat-body">
           <section class="chat-welcome-card" aria-label="업무 AI 답변">
             <div class="welcome-avatar" aria-hidden="true">
               <img src="./robot.png" alt="" />
@@ -142,15 +143,16 @@
           </section>
         </div>
 
-        <form id="chatForm" class="input-area chat-input-area">
+        <form id="agentForm" class="input-area chat-input-area">
           <div class="chat-input-row">
             <textarea
-              id="messageInput"
+              id="agentMessageInput"
+              class="chat-message-input"
               placeholder="질문이나 업무 요청을 입력하세요"
               autocomplete="off"
               rows="1"
             ></textarea>
-            <button id="sendBtn" class="send-btn" type="submit">전송</button>
+            <button id="agentSendBtn" class="send-btn" type="submit">전송</button>
           </div>
           <p class="chat-disclaimer" aria-label="AI 답변 안내">
             AI 답변은 참고용이므로 검토 후 업무에 활용해 주세요.
@@ -178,6 +180,6 @@
     </main>
   </div>
 
-  <script src="./app.js?v=20260620_chat_ui"></script>
+  <script src="./app.js?v=20260622_agent_fix"></script>
 </body>
 </html>
