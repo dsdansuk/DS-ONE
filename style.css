@@ -1267,3 +1267,49 @@ button {
 .chat-body .thinking-list {
   font-size: 12.5px;
 }
+
+/* =========================================================
+   Back button arrow / message input vertical alignment fix
+   - 화면 크기가 바뀌어도 화살표와 placeholder가 중앙 유지
+   ========================================================= */
+.back-btn,
+.chat-header .back-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 0;
+  line-height: 0;
+}
+
+.back-btn::before,
+.chat-header .back-btn::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translate(-42%, -50%) rotate(45deg);
+  pointer-events: none;
+}
+
+#messageInput,
+.chat-input-area #messageInput {
+  height: 42px;
+  min-height: 42px;
+  padding: 10px 12px;
+  line-height: 20px;
+  display: block;
+}
+
+.chat-input-area #messageInput::placeholder,
+#messageInput::placeholder {
+  line-height: 20px;
+}

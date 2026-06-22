@@ -1222,7 +1222,7 @@ messageInput.addEventListener("keydown", (e) => {
 });
 
 messageInput.addEventListener("input", () => {
-  messageInput.style.height = "44px";
+  messageInput.style.height = "42px";
   messageInput.style.height =
     Math.min(messageInput.scrollHeight, 80) + "px";
 });
@@ -1238,7 +1238,7 @@ chatForm.addEventListener("submit", async (e) => {
   addMessage(aiBody, "user", message);
 
   messageInput.value = "";
-  messageInput.style.height = "44px";
+  messageInput.style.height = "42px";
   sendBtn.disabled = true;
 
   await sendChat(message);
