@@ -940,9 +940,8 @@ button {
   display: block;
   color: #0f2b63;
   font-size: 15.5px;
-  /* line-height: 1.15; */
   font-weight: 900;
-  /* letter-spacing: -0.05em; */
+  transform: translateY(2px);
 }
 
 .sub-title-group span {
@@ -1074,9 +1073,6 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #eef6ff;
-  border: 1px solid #dbeafe;
-  box-shadow: 0 5px 10px rgba(37, 99, 235, 0.07);
   overflow: hidden;
 }
 
@@ -1085,6 +1081,7 @@ button {
   height: 22px;
   object-fit: contain;
   display: block;
+  filter: drop-shadow(0 4px 7px rgba(15, 23, 42, 0.14));
 }
 
 .chat-body .msg {
