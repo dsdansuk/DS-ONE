@@ -83,7 +83,7 @@
         </div>
       </section>
 
-      <section id="aiPanel" class="panel chat-panel" aria-label="직접 질문하기">
+      <section id="aiPanel" class="panel chat-panel" aria-label="사내 지식 문의">
         <div class="sub-header chat-header">
           <button id="aiBackBtn" class="back-btn" type="button" aria-label="메뉴로 돌아가기">‹</button>
           <div class="sub-title-group">
@@ -121,7 +121,7 @@
       </section>
 
 
-      <section id="docPanel" class="panel" aria-label="AI 문서 작성">
+      <section id="docPanel" class="panel" aria-label="업무 AI Agent">
         <div class="sub-header chat-header">
           <button id="docBackBtn" class="back-btn" type="button" aria-label="메뉴로 돌아가기">‹</button>
           <div class="sub-title-group">
@@ -130,38 +130,32 @@
           </div>
         </div>
 
-        <div id="docBody" class="body doc-body">
-          <div class="msg bot">작성할 문서와 내용을 입력하세요.
-            초안을 작성해 드립니다.</div>
-
-          <form id="docForm" class="doc-form">
-            <label class="doc-field">
-              <span>작성 요청</span>
-              <input
-                id="docInstruction"
-                type="text"
-                placeholder="예: 회의 결과 보고서 초안 작성해줘"
-                autocomplete="off"
-              />
-            </label>
-
-            <label class="doc-field">
-              <span>초안 또는 참고 내용</span>
-              <textarea
-                id="docText"
-                placeholder="초안이나 핵심 내용을 입력하세요.&#13;&#10;비워두고 요청만 입력해도 됩니다."
-                rows="5"
-              ></textarea>
-            </label>
-
-            <div class="doc-actions">
-              <button id="docGenerateBtn" class="send-btn wide" type="submit">작성하기</button>
-              <button id="docClearBtn" class="doc-clear-btn" type="button">초기화</button>
+        <div id="aiBody" class="body chat-body">
+          <section class="chat-welcome-card" aria-label="업무 AI 답변">
+            <div class="welcome-avatar" aria-hidden="true">
+              <img src="./robot.png" alt="" />
             </div>
-          </form>
-
-          <div id="docOutput" class="doc-output" aria-live="polite"></div>
+            <div class="welcome-copy">
+              <strong>안녕하세요. DS ONE입니다.</strong>
+              <p>도움이 필요한 업무를 입력해 주세요.</p>
+            </div>
+          </section>
         </div>
+
+        <form id="chatForm" class="input-area chat-input-area">
+          <div class="chat-input-row">
+            <textarea
+              id="messageInput"
+              placeholder="질문이나 업무 요청을 입력하세요"
+              autocomplete="off"
+              rows="1"
+            ></textarea>
+            <button id="sendBtn" class="send-btn" type="submit">전송</button>
+          </div>
+          <p class="chat-disclaimer" aria-label="AI 답변 안내">
+            AI 답변은 참고용이므로 검토 후 업무에 활용해 주세요.
+          </p>
+        </form>
       </section>
 
       <section id="rpaPanel" class="panel" aria-label="RPA 실행">
