@@ -210,11 +210,45 @@ async function bootstrap() {
   }
 }
 
+
+function focusInputWhenPanelReady(input, expectedMode) {
+  if (!input) return;
+
+  const tryFocus = () => {
+    if (currentMode !== expectedMode) return;
+    if (input.disabled) return;
+    if (!document.body.contains(input)) return;
+
+    input.focus({ preventScroll: true });
+
+    // textarea에 커서가 실제로 보이도록 마지막 위치로 이동합니다.
+    if (typeof input.setSelectionRange === "function") {
+      const cursorPosition = input.value.length;
+      input.setSelectionRange(cursorPosition, cursorPosition);
+    }
+  };
+
+  // 패널 display 전환 직후에는 focus가 무시될 수 있어 렌더링 이후 재시도합니다.
+  window.requestAnimationFrame(() => {
+    tryFocus();
+    window.setTimeout(tryFocus, 80);
+    window.setTimeout(tryFocus, 180);
+  });
+}
+
 function enableApp() {
   if (messageInput) messageInput.disabled = false;
   if (sendBtn) sendBtn.disabled = false;
   if (agentMessageInput) agentMessageInput.disabled = false;
   if (agentSendBtn) agentSendBtn.disabled = false;
+
+  if (currentMode === "ai") {
+    focusInputWhenPanelReady(messageInput, "ai");
+  }
+
+  if (currentMode === "doc") {
+    focusInputWhenPanelReady(agentMessageInput, "doc");
+  }
 
   if (directQuestionBtn) directQuestionBtn.disabled = false;
   if (docWriteBtn) docWriteBtn.disabled = false;
@@ -253,11 +287,11 @@ function setMode(mode) {
   }
 
   if (mode === "ai") {
-    setTimeout(() => messageInput?.focus(), 0);
+    focusInputWhenPanelReady(messageInput, "ai");
   }
 
   if (mode === "doc") {
-    setTimeout(() => agentMessageInput?.focus(), 0);
+    focusInputWhenPanelReady(agentMessageInput, "doc");
   }
 }
 
@@ -1059,16 +1093,25 @@ if (aiBtn) aiBtn.addEventListener("click", () => setMode("ai"));
 if (rpaBtn) rpaBtn.addEventListener("click", () => setMode("rpa"));
 
 if (directQuestionBtn) {
-  directQuestionBtn.addEventListener("click", () => setMode("ai"));
+  directQuestionBtn.addEventListener("click", () => {
+    directQuestionBtn.blur();
+    setMode("ai");
+  });
 }
 
 if (docWriteBtn) {
-  // 버튼 클릭만으로는 API를 호출하지 않고, 문서 작성 화면만 엽니다.
-  docWriteBtn.addEventListener("click", () => setMode("doc"));
+  // 버튼 클릭만으로는 API를 호출하지 않고, 업무 AI Agent 화면만 엽니다.
+  docWriteBtn.addEventListener("click", () => {
+    docWriteBtn.blur();
+    setMode("doc");
+  });
 }
 
 if (rpaEntryBtn) {
-  rpaEntryBtn.addEventListener("click", () => setMode("rpa"));
+  rpaEntryBtn.addEventListener("click", () => {
+    rpaEntryBtn.blur();
+    setMode("rpa");
+  });
 }
 
 if (aiBackBtn) {
