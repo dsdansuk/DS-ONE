@@ -493,24 +493,6 @@ button {
   background: #eff6ff;
 }
 
-.sub-header strong {
-  display: block;
-  color: #1e3a8a;
-  font-size: 15px;
-  font-weight: 850;
-  line-height: 1.2;
-  letter-spacing: -0.04em;
-}
-
-.sub-header span {
-  display: block;
-  margin-top: 3px;
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: -0.035em;
-}
-
 .body {
   flex: 1;
   min-height: 0;
@@ -955,6 +937,7 @@ button {
 }
 
 .sub-title-group strong {
+  display: block;
   color: #0f2b63;
   font-size: 15.5px;
   /* line-height: 1.15; */
@@ -1227,7 +1210,7 @@ button {
   font-size: 10.6px;
   line-height: 1.2;
   font-weight: 500;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.02em;
   white-space: nowrap;
 }
 
