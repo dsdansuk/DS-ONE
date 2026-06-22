@@ -433,7 +433,6 @@ button {
   font-size: 17px;
   line-height: 1.05;
   font-weight: 900;
-  letter-spacing: -0.055em;
 }
 
 .menu-text em {
@@ -955,22 +954,20 @@ button {
   outline: none;
 }
 
-.sub-title-group strong,
-.chat-header strong {
+.sub-title-group strong {
   color: #0f2b63;
   font-size: 15.5px;
-  line-height: 1.15;
+  /* line-height: 1.15; */
   font-weight: 900;
-  letter-spacing: -0.05em;
+  /* letter-spacing: -0.05em; */
 }
 
-.sub-title-group span,
-.chat-header span {
+.sub-title-group span {
   margin-top: 3px;
   color: #64748b;
   font-size: 11.5px;
   line-height: 1.1;
-  font-weight: 560;
+  font-weight: 400;
   letter-spacing: -0.04em;
 }
 
