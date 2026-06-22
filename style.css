@@ -1270,20 +1270,25 @@ button {
 
 /* =========================================================
    Back button arrow / message input vertical alignment fix
-   - 화면 크기가 바뀌어도 화살표와 placeholder가 중앙 유지
+   - 화살표를 글자/테두리 회전이 아닌 SVG mask로 고정 중앙 배치
    ========================================================= */
 .back-btn,
 .chat-header .back-btn {
   position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-grid;
+  place-items: center;
   flex: 0 0 34px;
   width: 34px;
   height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  max-width: 34px;
+  max-height: 34px;
   padding: 0;
+  overflow: hidden;
   font-size: 0;
   line-height: 0;
+  text-indent: -9999px;
 }
 
 .back-btn::before,
@@ -1292,12 +1297,13 @@ button {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 9px;
-  height: 9px;
-  border-left: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: translate(-42%, -50%) rotate(45deg);
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
   pointer-events: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15 6L9 12L15 18' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 18px 18px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15 6L9 12L15 18' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 18px 18px no-repeat;
 }
 
 #messageInput,
