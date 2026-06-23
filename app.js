@@ -406,6 +406,61 @@ function appendBotCopyAction(row, messageDiv, text, options = {}) {
   row.appendChild(actions);
 }
 
+function isKnowledgeRedirectText(text) {
+  const value = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!value) return false;
+
+  return (
+    value.includes("사내 지식 문의") &&
+    (
+      value.includes("사내 규정") ||
+      value.includes("업무 절차") ||
+      value.includes("정확한 답변") ||
+      value.includes("확인해") ||
+      value.includes("확인해 주세요")
+    )
+  );
+}
+
+function removeBotCopyAction(row) {
+  if (!row) return;
+  row.querySelectorAll(".bot-message-actions").forEach((el) => el.remove());
+}
+
+function appendKnowledgeRedirectButton(row, originalMessage = "") {
+  if (!row || row.querySelector(".knowledge-redirect-actions")) return;
+
+  removeBotCopyAction(row);
+
+  const actions = document.createElement("div");
+  actions.className = "knowledge-redirect-actions";
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "knowledge-redirect-btn";
+  btn.textContent = "사내 지식 문의로 이동";
+  btn.addEventListener("click", () => {
+    setMode("ai");
+    if (messageInput) {
+      messageInput.value = originalMessage || "";
+      autoResizeTextarea(messageInput);
+      focusInputWhenPanelReady(messageInput);
+    }
+  });
+
+  actions.appendChild(btn);
+  row.appendChild(actions);
+}
+
+function applyKnowledgeRedirectAction(messageDiv, originalMessage = "") {
+  const row = messageDiv?.closest ? messageDiv.closest(".chat-row") : null;
+  if (!row) return;
+  appendKnowledgeRedirectButton(row, originalMessage);
+}
+
 function setMessageContent(div, text) {
   if (!div) return;
   renderMessageContent(div, text);
@@ -1429,20 +1484,33 @@ async function initAgentSessionState() {
 
     if (Array.isArray(data.messages) && data.messages.length) {
       agentBody.innerHTML = "";
+      let lastRestoredUserMessage = "";
+
       data.messages.forEach((msg) => {
         const role = msg.role === "user" ? "user" : "bot";
         const metadata = msg.metadata || {};
+        const content = String(msg.content || msg.text || "");
         const isArtifact = role === "bot" && isArtifactMessageMetadata(metadata);
+        const isKnowledgeRedirect = role === "bot" && (metadata.route === "knowledge-redirect" || isKnowledgeRedirectText(content));
 
-        addMessage(agentBody, role, String(msg.content || msg.text || ""), false, {
+        const messageDiv = addMessage(agentBody, role, content, false, {
           skipAgentSave: true,
-          hideCopy: isArtifact,
+          hideCopy: isArtifact || isKnowledgeRedirect,
         });
+
+        if (role === "user") {
+          lastRestoredUserMessage = content;
+        }
 
         // 새로고침 후에도 1시간 유효한 PPT/엑셀 다운로드 버튼을 다시 표시합니다.
         // 다운로드 버튼은 메시지 본문 복사보다 파일 다운로드가 핵심 액션이므로 복사 버튼은 숨깁니다.
         if (isArtifact) {
           appendSavedArtifactDownloads(agentBody, metadata, metadata.artifactSavedAt || msg.created_at || msg.createdAt || "");
+        }
+
+        // 사내 규정/업무 절차 안내 메시지는 복사 버튼을 숨기고 이동 버튼만 복원합니다.
+        if (isKnowledgeRedirect) {
+          applyKnowledgeRedirectAction(messageDiv, metadata.originalMessage || lastRestoredUserMessage);
         }
       });
       agentBody.scrollTop = agentBody.scrollHeight;
@@ -1702,6 +1770,8 @@ function shouldRedirectToKnowledge(message, hasFiles = false) {
     /결재\s*(?:절차|규정|양식)|전결|품의|구매\s*절차/i,
     /보안\s*(?:규정|정책)|문서\s*반출|개인정보|사내\s*규정|업무\s*절차/i,
     /담당\s*부서|규정상|회사\s*내규/i,
+    /(?:모니터|노트북|pc|컴퓨터|마우스|키보드|프린터|복합기|소프트웨어|계정|권한|비품|장비|전산\s*장비|사무용품)\s*(?:은|는|을|를)?[^.?!\n]*(?:신청|요청|구매|지급|교체|수리|대여|반납|어디|방법)/i,
+    /(?:어디|어떻게|누구|어느\s*부서)[^.?!\n]*(?:신청|요청|문의|처리)/i,
   ];
 
   return hasPattern(text, internalPatterns);
@@ -1710,27 +1780,8 @@ function shouldRedirectToKnowledge(message, hasFiles = false) {
 function addKnowledgeRedirectMessage(originalMessage) {
   const answer = "해당 질문은 사내 규정·업무 절차 확인이 필요한 내용으로 보입니다. 정확한 답변을 위해 [사내 지식 문의]에서 확인해 주세요.";
   const div = addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-  saveAgentMessage("assistant", answer, { route: "knowledge-redirect" });
-
-  const row = div.closest ? div.closest(".chat-row") : null;
-  if (!row) return;
-
-  const actions = document.createElement("div");
-  actions.className = "knowledge-redirect-actions";
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "knowledge-redirect-btn";
-  btn.textContent = "사내 지식 문의로 이동";
-  btn.addEventListener("click", () => {
-    setMode("ai");
-    if (messageInput) {
-      messageInput.value = originalMessage || "";
-      autoResizeTextarea(messageInput);
-      focusInputWhenPanelReady(messageInput);
-    }
-  });
-  actions.appendChild(btn);
-  row.appendChild(actions);
+  applyKnowledgeRedirectAction(div, originalMessage);
+  saveAgentMessage("assistant", answer, { route: "knowledge-redirect", originalMessage });
 }
 
 function buildAgentMessage(message, files = agentSelectedFiles) {
@@ -1800,11 +1851,22 @@ async function sendChatToTarget({
 
       const answerText = data.answer || data.message || JSON.stringify(data, null, 2);
       const isArtifact = Boolean(data.ppt?.ok || data.excel?.ok || task === PPT_DRAFT_TASK || task === EXCEL_DRAFT_TASK);
-      addMessage(targetBody, "bot", answerText, false, { hideCopy: isArtifact });
+      const isKnowledgeRedirect = targetBody === agentBody && isKnowledgeRedirectText(answerText);
+      const messageDiv = addMessage(targetBody, "bot", answerText, false, { hideCopy: isArtifact || isKnowledgeRedirect });
       appendPptDownloadButton(targetBody, data.ppt);
       appendExcelDownloadButton(targetBody, data.excel);
       appendEvidenceBox(targetBody, data);
-      if (targetBody === agentBody) saveAgentMessage("assistant", answerText, { route: task || "agent-api", artifact: isArtifact, artifactSavedAt: new Date().toISOString(), ppt: data.ppt || null, excel: data.excel || null });
+      if (isKnowledgeRedirect) applyKnowledgeRedirectAction(messageDiv, message);
+      if (targetBody === agentBody) {
+        saveAgentMessage("assistant", answerText, {
+          route: isKnowledgeRedirect ? "knowledge-redirect" : task || "agent-api",
+          artifact: isArtifact,
+          artifactSavedAt: new Date().toISOString(),
+          ppt: data.ppt || null,
+          excel: data.excel || null,
+          originalMessage: isKnowledgeRedirect ? message : undefined,
+        });
+      }
       return;
     }
 
@@ -1859,7 +1921,12 @@ async function sendChatToTarget({
     }
 
     if (targetBody === agentBody && fullText.trim()) {
-      saveAgentMessage("assistant", fullText, { route: task || "agent-api" });
+      const isKnowledgeRedirect = isKnowledgeRedirectText(fullText);
+      if (isKnowledgeRedirect) applyKnowledgeRedirectAction(botDiv, message);
+      saveAgentMessage("assistant", fullText, {
+        route: isKnowledgeRedirect ? "knowledge-redirect" : task || "agent-api",
+        originalMessage: isKnowledgeRedirect ? message : undefined,
+      });
     }
   } catch (err) {
     removeThinkingBox(thinkingBox);
@@ -1927,11 +1994,21 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
       mergePersistedAgentFiles(data.files || []);
       const answerText = data.answer || data.message || JSON.stringify(data, null, 2);
       const isArtifact = Boolean(data.ppt?.ok || data.excel?.ok || task === PPT_DRAFT_TASK || task === EXCEL_DRAFT_TASK);
-      addMessage(agentBody, "bot", answerText, false, { hideCopy: isArtifact });
+      const isKnowledgeRedirect = isKnowledgeRedirectText(answerText);
+      const messageDiv = addMessage(agentBody, "bot", answerText, false, { hideCopy: isArtifact || isKnowledgeRedirect });
       appendPptDownloadButton(agentBody, data.ppt);
       appendExcelDownloadButton(agentBody, data.excel);
       appendEvidenceBox(agentBody, data);
-      saveAgentMessage("assistant", answerText, { route: task || "file-api", artifact: isArtifact, artifactSavedAt: new Date().toISOString(), ppt: data.ppt || null, excel: data.excel || null, fileIds: getAgentFileIds() });
+      if (isKnowledgeRedirect) applyKnowledgeRedirectAction(messageDiv, message);
+      saveAgentMessage("assistant", answerText, {
+        route: isKnowledgeRedirect ? "knowledge-redirect" : task || "file-api",
+        artifact: isArtifact,
+        artifactSavedAt: new Date().toISOString(),
+        ppt: data.ppt || null,
+        excel: data.excel || null,
+        fileIds: getAgentFileIds(),
+        originalMessage: isKnowledgeRedirect ? message : undefined,
+      });
       return;
     }
 
@@ -1983,6 +2060,14 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
 
     if (!fullText.trim()) {
       setMessageContent(botDiv, "파일 분석 응답은 수신했지만 화면에 표시할 텍스트를 찾지 못했습니다.");
+    } else {
+      const isKnowledgeRedirect = isKnowledgeRedirectText(fullText);
+      if (isKnowledgeRedirect) applyKnowledgeRedirectAction(botDiv, message);
+      saveAgentMessage("assistant", fullText, {
+        route: isKnowledgeRedirect ? "knowledge-redirect" : task || "file-api",
+        originalMessage: isKnowledgeRedirect ? message : undefined,
+        fileIds: getAgentFileIds(),
+      });
     }
   } catch (err) {
     removeThinkingBox(thinkingBox);
