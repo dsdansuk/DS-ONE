@@ -316,10 +316,22 @@ function renderMessageContent(div, text) {
   div.textContent = "";
   const lines = String(text || "").split(/\n/);
 
-  lines.forEach((line, lineIndex) => {
-    if (lineIndex > 0) div.appendChild(document.createElement("br"));
-    if (!line) return;
-    appendInlineMarkdown(div, line);
+  lines.forEach((line) => {
+    const trimmed = String(line || "").trim();
+
+    if (!trimmed) {
+      const spacer = document.createElement("div");
+      spacer.className = "msg-block-spacer";
+      div.appendChild(spacer);
+      return;
+    }
+
+    const lineDiv = document.createElement("div");
+    const isHeading = /^\*\*[^*]+\*\*$/.test(trimmed);
+    const isBullet = /^[-•]\s+/.test(trimmed);
+    lineDiv.className = "msg-line" + (isHeading ? " msg-heading" : "") + (isBullet ? " msg-bullet" : "");
+    appendInlineMarkdown(lineDiv, trimmed);
+    div.appendChild(lineDiv);
   });
 }
 
