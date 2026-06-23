@@ -47,6 +47,9 @@ const sendBtn = document.getElementById("sendBtn");
 const agentForm = document.getElementById("agentForm");
 const agentMessageInput = document.getElementById("agentMessageInput");
 const agentSendBtn = document.getElementById("agentSendBtn");
+const agentAttachBtn = document.getElementById("agentAttachBtn");
+const agentFileInput = document.getElementById("agentFileInput");
+const agentFileChips = document.getElementById("agentFileChips");
 const reloadRpaBtn = document.getElementById("reloadRpaBtn");
 const userInfo = document.getElementById("userInfo");
 const homeGreetingText = document.getElementById("homeGreetingText");
@@ -57,6 +60,7 @@ const aiBackBtn = document.getElementById("aiBackBtn");
 const rpaBackBtn = document.getElementById("rpaBackBtn");
 const docBackBtn = document.getElementById("docBackBtn");
 
+let agentSelectedFiles = [];
 
 
 function getAuthCacheKey() {
@@ -210,51 +214,20 @@ async function bootstrap() {
   }
 }
 
-
-function focusInputWhenPanelReady(input, expectedMode) {
-  if (!input) return;
-
-  const tryFocus = () => {
-    if (currentMode !== expectedMode) return;
-    if (input.disabled) return;
-    if (!document.body.contains(input)) return;
-
-    input.focus({ preventScroll: true });
-
-    // textarea에 커서가 실제로 보이도록 마지막 위치로 이동합니다.
-    if (typeof input.setSelectionRange === "function") {
-      const cursorPosition = input.value.length;
-      input.setSelectionRange(cursorPosition, cursorPosition);
-    }
-  };
-
-  // 패널 display 전환 직후에는 focus가 무시될 수 있어 렌더링 이후 재시도합니다.
-  window.requestAnimationFrame(() => {
-    tryFocus();
-    window.setTimeout(tryFocus, 80);
-    window.setTimeout(tryFocus, 180);
-  });
-}
-
 function enableApp() {
   if (messageInput) messageInput.disabled = false;
   if (sendBtn) sendBtn.disabled = false;
   if (agentMessageInput) agentMessageInput.disabled = false;
   if (agentSendBtn) agentSendBtn.disabled = false;
-
-  if (currentMode === "ai") {
-    focusInputWhenPanelReady(messageInput, "ai");
-  }
-
-  if (currentMode === "doc") {
-    focusInputWhenPanelReady(agentMessageInput, "doc");
-  }
+  if (agentAttachBtn) agentAttachBtn.disabled = false;
 
   if (directQuestionBtn) directQuestionBtn.disabled = false;
   if (docWriteBtn) docWriteBtn.disabled = false;
   if (rpaEntryBtn) rpaEntryBtn.disabled = false;
   if (aiBtn) aiBtn.disabled = false;
   if (rpaBtn) rpaBtn.disabled = false;
+
+  if (currentMode === "doc") focusInputWhenPanelReady(agentMessageInput);
 }
 
 function disableApp() {
@@ -262,6 +235,7 @@ function disableApp() {
   if (sendBtn) sendBtn.disabled = true;
   if (agentMessageInput) agentMessageInput.disabled = true;
   if (agentSendBtn) agentSendBtn.disabled = true;
+  if (agentAttachBtn) agentAttachBtn.disabled = true;
   if (reloadRpaBtn) reloadRpaBtn.disabled = true;
 
   if (directQuestionBtn) directQuestionBtn.disabled = true;
@@ -269,6 +243,18 @@ function disableApp() {
   if (rpaEntryBtn) rpaEntryBtn.disabled = true;
   if (aiBtn) aiBtn.disabled = true;
   if (rpaBtn) rpaBtn.disabled = true;
+}
+
+function focusInputWhenPanelReady(input) {
+  if (!input || input.disabled) return;
+
+  const focus = () => {
+    if (!input.disabled) input.focus();
+  };
+
+  requestAnimationFrame(focus);
+  setTimeout(focus, 80);
+  setTimeout(focus, 180);
 }
 
 function setMode(mode) {
@@ -287,11 +273,12 @@ function setMode(mode) {
   }
 
   if (mode === "ai") {
-    focusInputWhenPanelReady(messageInput, "ai");
+    focusInputWhenPanelReady(messageInput);
   }
 
   if (mode === "doc") {
-    focusInputWhenPanelReady(agentMessageInput, "doc");
+    if (docWriteBtn) docWriteBtn.blur();
+    focusInputWhenPanelReady(agentMessageInput);
   }
 }
 
@@ -996,27 +983,125 @@ function convertJobState(state) {
   return state || "상태 확인 중";
 }
 
-async function sendChat(message, options = {}) {
-  const targetBody = options.targetBody || aiBody;
-  const input = options.input || messageInput;
-  const submitButton = options.button || sendBtn;
-  const requestPayload = {
-    message,
-    provider: AI_PROVIDER,
-    stream: true,
-    ...(options.task ? { task: options.task } : {}),
-  };
+function formatFileSize(bytes) {
+  const size = Number(bytes || 0);
+  if (!size) return "0B";
+  if (size < 1024) return size + "B";
+  if (size < 1024 * 1024) return Math.round(size / 1024) + "KB";
+  return (size / 1024 / 1024).toFixed(1).replace(/\.0$/, "") + "MB";
+}
 
+function renderAgentFileChips() {
+  if (!agentFileChips) return;
+
+  agentFileChips.innerHTML = "";
+  agentFileChips.hidden = agentSelectedFiles.length === 0;
+
+  agentSelectedFiles.forEach((file, index) => {
+    const chip = document.createElement("span");
+    chip.className = "file-chip";
+    chip.title = file.name + " · " + formatFileSize(file.size);
+
+    const name = document.createElement("span");
+    name.className = "file-chip-name";
+    name.textContent = file.name;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "file-chip-remove";
+    removeBtn.type = "button";
+    removeBtn.setAttribute("aria-label", file.name + " 첨부 제거");
+    removeBtn.textContent = "×";
+    removeBtn.addEventListener("click", () => {
+      agentSelectedFiles.splice(index, 1);
+      syncAgentFileInput();
+      renderAgentFileChips();
+      focusInputWhenPanelReady(agentMessageInput);
+    });
+
+    chip.appendChild(name);
+    chip.appendChild(removeBtn);
+    agentFileChips.appendChild(chip);
+  });
+}
+
+function syncAgentFileInput() {
+  if (!agentFileInput || typeof DataTransfer === "undefined") return;
+
+  const transfer = new DataTransfer();
+  agentSelectedFiles.forEach((file) => transfer.items.add(file));
+  agentFileInput.files = transfer.files;
+}
+
+function addAgentFiles(files) {
+  const incomingFiles = Array.from(files || []);
+  if (!incomingFiles.length) return;
+
+  incomingFiles.forEach((file) => {
+    const duplicate = agentSelectedFiles.some((savedFile) =>
+      savedFile.name === file.name &&
+      savedFile.size === file.size &&
+      savedFile.lastModified === file.lastModified
+    );
+
+    if (!duplicate) agentSelectedFiles.push(file);
+  });
+
+  syncAgentFileInput();
+  renderAgentFileChips();
+  focusInputWhenPanelReady(agentMessageInput);
+}
+
+function clearAgentFiles() {
+  agentSelectedFiles = [];
+  if (agentFileInput) agentFileInput.value = "";
+  renderAgentFileChips();
+}
+
+function buildAgentMessage(message) {
+  if (!agentSelectedFiles.length) return message;
+
+  const fileList = agentSelectedFiles
+    .map((file) => "- " + file.name + " (" + formatFileSize(file.size) + ")")
+    .join("\n");
+
+  return "[첨부 파일]\n" + fileList + "\n\n[요청]\n" + message;
+}
+
+async function sendChatToTarget({
+  targetBody,
+  message,
+  sendButton,
+  input,
+  task = "chat",
+  attachments = [],
+}) {
   const thinkingBox = createThinkingBox(targetBody);
 
   try {
+    const body = {
+      message,
+      provider: AI_PROVIDER,
+      stream: true,
+    };
+
+    if (task !== "chat") body.task = task;
+    if (attachments.length) {
+      body.attachments = attachments.map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type || "",
+        lastModified: file.lastModified || 0,
+      }));
+      body.systemNote = "첨부 파일의 실제 본문 추출 API가 아직 프론트엔드에 연결되지 않았으면 파일 내용을 분석했다고 말하지 마세요. 파일명과 사용자의 요청만 기준으로 답변하세요.";
+    }
+
     const res = await fetch(AI_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer " + sessionToken,
       },
-      body: JSON.stringify(requestPayload),
+      body: JSON.stringify(body),
     });
 
     removeThinkingBox(thinkingBox);
@@ -1032,7 +1117,7 @@ async function sendChat(message, options = {}) {
       return;
     }
 
-    const botDiv = addMessage(targetBody, "bot", "", false, { skipSave: targetBody !== aiBody });
+    const botDiv = addMessage(targetBody, "bot", "");
     const reader = res.body.getReader();
     const decoder = new TextDecoder("utf-8");
 
@@ -1063,9 +1148,7 @@ async function sendChat(message, options = {}) {
     }
 
     const tail = decoder.decode();
-    if (tail) {
-      buffer += tail;
-    }
+    if (tail) buffer += tail;
 
     const finalParsed = parseStreamText(buffer);
     if (finalParsed) {
@@ -1080,38 +1163,48 @@ async function sendChat(message, options = {}) {
     }
   } catch (err) {
     removeThinkingBox(thinkingBox);
-    addMessage(targetBody, "bot", "호출 실패: " + getErrorMessage(err), false, { skipSave: targetBody !== aiBody });
+    addMessage(targetBody, "bot", "호출 실패: " + getErrorMessage(err));
   } finally {
-    if (submitButton) submitButton.disabled = false;
-    input?.focus();
+    if (sendButton) sendButton.disabled = false;
+    focusInputWhenPanelReady(input);
   }
 }
 
+async function sendChat(message) {
+  return sendChatToTarget({
+    targetBody: aiBody,
+    message,
+    sendButton: sendBtn,
+    input: messageInput,
+  });
+}
+
+async function sendAgentChat(message, files = []) {
+  return sendChatToTarget({
+    targetBody: agentBody,
+    message,
+    sendButton: agentSendBtn,
+    input: agentMessageInput,
+    task: "document",
+    attachments: files,
+  });
+}
 
 if (aiBtn) aiBtn.addEventListener("click", () => setMode("ai"));
 
 if (rpaBtn) rpaBtn.addEventListener("click", () => setMode("rpa"));
 
 if (directQuestionBtn) {
-  directQuestionBtn.addEventListener("click", () => {
-    directQuestionBtn.blur();
-    setMode("ai");
-  });
+  directQuestionBtn.addEventListener("click", () => setMode("ai"));
 }
 
 if (docWriteBtn) {
-  // 버튼 클릭만으로는 API를 호출하지 않고, 업무 AI Agent 화면만 엽니다.
-  docWriteBtn.addEventListener("click", () => {
-    docWriteBtn.blur();
-    setMode("doc");
-  });
+  // 버튼 클릭만으로는 API를 호출하지 않고, 문서 작성 화면만 엽니다.
+  docWriteBtn.addEventListener("click", () => setMode("doc"));
 }
 
 if (rpaEntryBtn) {
-  rpaEntryBtn.addEventListener("click", () => {
-    rpaEntryBtn.blur();
-    setMode("rpa");
-  });
+  rpaEntryBtn.addEventListener("click", () => setMode("rpa"));
 }
 
 if (aiBackBtn) {
@@ -1135,10 +1228,14 @@ if (reloadRpaBtn) {
 }
 
 
-function bindChatInput({ form, input, button, body, mode }) {
-  if (!form || !input || !button || !body) return;
+function autoResizeTextarea(input) {
+  if (!input) return;
+  input.style.height = "42px";
+  input.style.height = Math.min(input.scrollHeight, 80) + "px";
+}
 
-  input.addEventListener("keydown", (e) => {
+if (messageInput && chatForm) {
+  messageInput.addEventListener("keydown", (e) => {
     // Shift + Enter → 줄바꿈
     if (e.key === "Enter" && e.shiftKey) {
       return;
@@ -1147,49 +1244,77 @@ function bindChatInput({ form, input, button, body, mode }) {
     // Enter → 전송
     if (e.key === "Enter") {
       e.preventDefault();
-      form.requestSubmit();
+      chatForm.requestSubmit();
     }
   });
 
-  input.addEventListener("input", () => {
-    input.style.height = "42px";
-    input.style.height = Math.min(input.scrollHeight, 80) + "px";
-  });
+  messageInput.addEventListener("input", () => autoResizeTextarea(messageInput));
 
-  form.addEventListener("submit", async (e) => {
+  chatForm.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    if (currentMode !== mode) return;
+    if (currentMode !== "ai") return;
 
-    const message = input.value.trim();
+    const message = messageInput.value.trim();
     if (!message) return;
 
-    addMessage(body, "user", message, false, { skipSave: body !== aiBody });
+    addMessage(aiBody, "user", message);
 
-    input.value = "";
-    input.style.height = "42px";
-    button.disabled = true;
+    messageInput.value = "";
+    autoResizeTextarea(messageInput);
+    sendBtn.disabled = true;
 
-    await sendChat(message, {
-      targetBody: body,
-      input,
-      button,
-    });
+    await sendChat(message);
   });
 }
 
-bindChatInput({
-  form: chatForm,
-  input: messageInput,
-  button: sendBtn,
-  body: aiBody,
-  mode: "ai",
-});
+if (agentAttachBtn && agentFileInput) {
+  agentAttachBtn.addEventListener("click", () => {
+    agentFileInput.click();
+  });
+}
 
-bindChatInput({
-  form: agentForm,
-  input: agentMessageInput,
-  button: agentSendBtn,
-  body: agentBody,
-  mode: "doc",
-});
+if (agentFileInput) {
+  agentFileInput.addEventListener("change", () => {
+    addAgentFiles(agentFileInput.files);
+  });
+}
+
+if (agentMessageInput && agentForm) {
+  agentMessageInput.addEventListener("keydown", (e) => {
+    // Shift + Enter → 줄바꿈
+    if (e.key === "Enter" && e.shiftKey) {
+      return;
+    }
+
+    // Enter → 전송
+    if (e.key === "Enter") {
+      e.preventDefault();
+      agentForm.requestSubmit();
+    }
+  });
+
+  agentMessageInput.addEventListener("input", () => autoResizeTextarea(agentMessageInput));
+
+  agentForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    if (currentMode !== "doc") return;
+
+    const rawMessage = agentMessageInput.value.trim();
+    if (!rawMessage && !agentSelectedFiles.length) return;
+
+    const filesSnapshot = [...agentSelectedFiles];
+    const message = rawMessage || "첨부한 파일을 확인해 주세요.";
+    const requestMessage = filesSnapshot.length ? buildAgentMessage(message) : message;
+
+    addMessage(agentBody, "user", requestMessage);
+
+    agentMessageInput.value = "";
+    autoResizeTextarea(agentMessageInput);
+    agentSendBtn.disabled = true;
+    clearAgentFiles();
+
+    await sendAgentChat(requestMessage, filesSnapshot);
+  });
+}

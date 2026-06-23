@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DS ONE</title>
-  <link rel="stylesheet" href="./style.css?v=20260622_focus_fix" />
+  <link rel="stylesheet" href="./style.css?v=20260623_agent_file_upload" />
 </head>
 <body>
   <div class="wrap">
@@ -108,7 +108,6 @@
           <div class="chat-input-row">
             <textarea
               id="messageInput"
-              class="chat-message-input"
               placeholder="질문을 입력하세요"
               autocomplete="off"
               rows="1"
@@ -132,7 +131,7 @@
         </div>
 
         <div id="agentBody" class="body chat-body">
-          <section class="chat-welcome-card" aria-label="업무 AI 답변">
+          <section class="chat-welcome-card" aria-label="업무 AI 안내">
             <div class="welcome-avatar" aria-hidden="true">
               <img src="./robot.png" alt="" />
             </div>
@@ -143,15 +142,31 @@
           </section>
         </div>
 
-        <form id="agentForm" class="input-area chat-input-area">
-          <div class="chat-input-row">
-            <textarea
-              id="agentMessageInput"
-              class="chat-message-input"
-              placeholder="질문이나 업무 요청을 입력하세요"
-              autocomplete="off"
-              rows="1"
-            ></textarea>
+        <form id="agentForm" class="input-area chat-input-area agent-input-area">
+          <input
+            id="agentFileInput"
+            class="agent-file-input"
+            type="file"
+            multiple
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.hwp,.hwpx,image/*"
+          />
+
+          <div id="agentFileChips" class="file-chip-row" hidden aria-label="첨부 파일 목록"></div>
+
+          <div class="chat-input-row agent-input-row">
+            <div class="message-field agent-message-field">
+              <button id="agentAttachBtn" class="attach-btn" type="button" aria-label="파일 첨부" title="파일 첨부">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 1 1-2.83-2.83l8.49-8.48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+              <textarea
+                id="agentMessageInput"
+                placeholder="질문이나 업무 요청을 입력하세요"
+                autocomplete="off"
+                rows="1"
+              ></textarea>
+            </div>
             <button id="agentSendBtn" class="send-btn" type="submit">전송</button>
           </div>
           <p class="chat-disclaimer" aria-label="AI 답변 안내">
@@ -180,6 +195,6 @@
     </main>
   </div>
 
-  <script src="./app.js?v=20260622_focus_fix"></script>
+  <script src="./app.js?v=20260623_agent_file_upload"></script>
 </body>
 </html>
