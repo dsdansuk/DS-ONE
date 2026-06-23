@@ -2,12 +2,16 @@
 // GitHub Pages: https://dsdansuk.github.io/DS-chatbot/
 // Edge Functions:
 // - sso-login: 그룹웨어 SSO 진입 및 토큰 발급
-// - ai-api: 사내 AI / SideTalk 호출
-// - file-api: 첨부 파일 본문 추출 및 DEFAULT_AI_PROVIDER 기반 분석
+// - ai-api: 사내 지식 문의 / SideTalk 지식베이스 호출
+// - agent-api: 업무 AI Agent / SideTalk 일반 생성 호출
+// - file-api: 첨부 파일 본문 추출 및 SideTalk 기반 파일 분석
 // - rpa-api: UiPath RPA 호출
 
 const AI_API_URL =
   "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/ai-api";
+
+const AGENT_API_URL =
+  "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/agent-api";
 
 const FILE_API_URL =
   "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api";
@@ -16,7 +20,6 @@ const RPA_API_URL =
   "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api";
 
 const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
-const AI_PROVIDER = "sidetalk"; // vertex | sidetalk | openai
 const CHAT_HISTORY_STORAGE_PREFIX = "ds_chatbot_ai_history_v1_";
 const AUTH_CACHE_STORAGE_PREFIX = "ds_chatbot_auth_cache_v1_";
 const AUTH_CACHE_TTL_MS = 10 * 60 * 1000; // 10분
@@ -498,6 +501,35 @@ function getAllAiMessages() {
       };
     })
     .filter((msg) => msg.text.trim());
+}
+
+function getRecentChatMessages(targetBody, maxMessages = 10, maxChars = 6000) {
+  if (!targetBody) return [];
+
+  const messages = Array.from(targetBody.querySelectorAll(".msg"))
+    .filter((el) => !el.classList.contains("debug"))
+    .map((el) => {
+      const role = el.classList.contains("user") ? "user" : "assistant";
+      const text = String(el.textContent || "").trim();
+      return { role, text };
+    })
+    .filter((msg) => msg.text);
+
+  const recent = messages.slice(-maxMessages);
+  let total = 0;
+  const selected = [];
+
+  for (let i = recent.length - 1; i >= 0; i -= 1) {
+    const item = recent[i];
+    const remaining = maxChars - total;
+    if (remaining <= 0) break;
+
+    const text = item.text.slice(0, remaining);
+    selected.unshift({ role: item.role, text });
+    total += text.length;
+  }
+
+  return selected;
 }
 
 function saveChatHistory() {
@@ -1078,17 +1110,19 @@ async function sendChatToTarget({
   input,
   task = "chat",
   attachments = [],
+  apiUrl = AI_API_URL,
+  history = [],
 }) {
   const thinkingBox = createThinkingBox(targetBody);
 
   try {
     const body = {
       message,
-      provider: AI_PROVIDER,
       stream: true,
     };
 
     if (task !== "chat") body.task = task;
+    if (history.length) body.history = history;
     if (attachments.length) {
       body.attachments = attachments.map((file) => ({
         name: file.name,
@@ -1099,7 +1133,7 @@ async function sendChatToTarget({
       body.systemNote = "첨부 파일의 실제 본문 추출 API가 아직 프론트엔드에 연결되지 않았으면 파일 내용을 분석했다고 말하지 마세요. 파일명과 사용자의 요청만 기준으로 답변하세요.";
     }
 
-    const res = await fetch(AI_API_URL, {
+    const res = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1183,13 +1217,14 @@ async function sendChat(message) {
   });
 }
 
-async function sendAgentFileAnalysis(message, files = []) {
+async function sendAgentFileAnalysis(message, files = [], history = []) {
   const thinkingBox = createThinkingBox(agentBody);
 
   try {
     const formData = new FormData();
     formData.append("message", message);
     formData.append("stream", "true");
+    if (history.length) formData.append("history", JSON.stringify(history));
 
     files.forEach((file) => {
       formData.append("files", file, file.name);
@@ -1269,9 +1304,9 @@ async function sendAgentFileAnalysis(message, files = []) {
   }
 }
 
-async function sendAgentChat(message, files = []) {
+async function sendAgentChat(message, files = [], history = []) {
   if (files.length) {
-    return sendAgentFileAnalysis(message, files);
+    return sendAgentFileAnalysis(message, files, history);
   }
 
   return sendChatToTarget({
@@ -1279,6 +1314,8 @@ async function sendAgentChat(message, files = []) {
     message,
     sendButton: agentSendBtn,
     input: agentMessageInput,
+    apiUrl: AGENT_API_URL,
+    history,
   });
 }
 
@@ -1397,6 +1434,7 @@ if (agentMessageInput && agentForm) {
     if (!rawMessage && !agentSelectedFiles.length) return;
 
     const filesSnapshot = [...agentSelectedFiles];
+    const historySnapshot = getRecentChatMessages(agentBody);
     const message = rawMessage || "첨부한 파일을 분석해 주세요.";
     const displayMessage = filesSnapshot.length ? buildAgentMessage(message) : message;
 
@@ -1405,8 +1443,7 @@ if (agentMessageInput && agentForm) {
     agentMessageInput.value = "";
     autoResizeTextarea(agentMessageInput);
     agentSendBtn.disabled = true;
-    clearAgentFiles();
 
-    await sendAgentChat(message, filesSnapshot);
+    await sendAgentChat(message, filesSnapshot, historySnapshot);
   });
 }
