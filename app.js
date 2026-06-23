@@ -455,7 +455,39 @@ function appendPptDownloadButton(targetBody, ppt) {
 }
 
 function appendExcelDownloadButton(targetBody, excel) {
-  appendArtifactDownloadButton(targetBody, excel, { label: "Excel 다운로드", className: "excel-download-row" });
+  appendArtifactDownloadButton(targetBody, excel, { label: "엑셀 다운로드", className: "excel-download-row" });
+}
+
+function isArtifactLinkExpired(artifact, messageCreatedAt) {
+  if (!artifact || artifact.ok !== true || !artifact.downloadUrl) return true;
+
+  const expiresInMs = Number(artifact.expiresIn || 0) * 1000;
+  if (!expiresInMs) return false;
+
+  const createdAtMs = Date.parse(artifact.createdAt || artifact.created_at || messageCreatedAt || "");
+  if (!createdAtMs) return false;
+
+  // 새로고침 직후 링크가 사라지지 않도록 10초의 안전 여유를 둡니다.
+  return Date.now() - createdAtMs > Math.max(0, expiresInMs - 10 * 1000);
+}
+
+function appendSavedArtifactDownloads(targetBody, metadata = {}, messageCreatedAt = "") {
+  if (!targetBody || !metadata) return;
+
+  const ppt = metadata.ppt || null;
+  const excel = metadata.excel || null;
+
+  if (ppt?.ok && ppt.downloadUrl && !isArtifactLinkExpired(ppt, messageCreatedAt)) {
+    appendPptDownloadButton(targetBody, ppt);
+  }
+
+  if (excel?.ok && excel.downloadUrl && !isArtifactLinkExpired(excel, messageCreatedAt)) {
+    appendExcelDownloadButton(targetBody, excel);
+  }
+}
+
+function isArtifactMessageMetadata(metadata = {}) {
+  return Boolean(metadata?.artifact || metadata?.ppt?.ok || metadata?.excel?.ok);
 }
 
 function appendArtifactDownloadButton(targetBody, artifact, options = {}) {
@@ -1399,10 +1431,19 @@ async function initAgentSessionState() {
       agentBody.innerHTML = "";
       data.messages.forEach((msg) => {
         const role = msg.role === "user" ? "user" : "bot";
+        const metadata = msg.metadata || {};
+        const isArtifact = role === "bot" && isArtifactMessageMetadata(metadata);
+
         addMessage(agentBody, role, String(msg.content || msg.text || ""), false, {
           skipAgentSave: true,
-          hideCopy: Boolean(msg.metadata?.artifact),
+          hideCopy: isArtifact,
         });
+
+        // 새로고침 후에도 1시간 유효한 PPT/엑셀 다운로드 버튼을 다시 표시합니다.
+        // 다운로드 버튼은 메시지 본문 복사보다 파일 다운로드가 핵심 액션이므로 복사 버튼은 숨깁니다.
+        if (isArtifact) {
+          appendSavedArtifactDownloads(agentBody, metadata, metadata.artifactSavedAt || msg.created_at || msg.createdAt || "");
+        }
       });
       agentBody.scrollTop = agentBody.scrollHeight;
     }
@@ -1763,7 +1804,7 @@ async function sendChatToTarget({
       appendPptDownloadButton(targetBody, data.ppt);
       appendExcelDownloadButton(targetBody, data.excel);
       appendEvidenceBox(targetBody, data);
-      if (targetBody === agentBody) saveAgentMessage("assistant", answerText, { route: task || "agent-api", artifact: isArtifact, ppt: data.ppt || null, excel: data.excel || null });
+      if (targetBody === agentBody) saveAgentMessage("assistant", answerText, { route: task || "agent-api", artifact: isArtifact, artifactSavedAt: new Date().toISOString(), ppt: data.ppt || null, excel: data.excel || null });
       return;
     }
 
@@ -1890,7 +1931,7 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
       appendPptDownloadButton(agentBody, data.ppt);
       appendExcelDownloadButton(agentBody, data.excel);
       appendEvidenceBox(agentBody, data);
-      saveAgentMessage("assistant", answerText, { route: task || "file-api", artifact: isArtifact, ppt: data.ppt || null, excel: data.excel || null, fileIds: getAgentFileIds() });
+      saveAgentMessage("assistant", answerText, { route: task || "file-api", artifact: isArtifact, artifactSavedAt: new Date().toISOString(), ppt: data.ppt || null, excel: data.excel || null, fileIds: getAgentFileIds() });
       return;
     }
 

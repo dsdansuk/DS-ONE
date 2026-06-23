@@ -1655,8 +1655,10 @@ button {
   flex: 0 0 auto;
 }
 
+/* 엑셀 다운로드도 PPT 다운로드와 동일한 버튼 스타일을 사용합니다. */
 .excel-download-row .ppt-download-btn {
-  background: linear-gradient(135deg, #0f766e, #059669);
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+  color: #1d4ed8;
 }
 
 .evidence-row {
