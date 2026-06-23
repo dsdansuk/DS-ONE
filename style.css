@@ -1465,3 +1465,62 @@ button {
 #messageInput::placeholder {
   line-height: 20px;
 }
+
+/* =========================
+   PPT 다운로드 버튼
+   ========================= */
+
+.ppt-download-row {
+  margin-top: -4px;
+  margin-bottom: 10px;
+}
+
+.ppt-download-spacer {
+  width: 32px;
+  flex: 0 0 32px;
+}
+
+.ppt-download-wrap {
+  max-width: calc(100% - 42px);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.ppt-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  text-decoration: none;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.10);
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.ppt-download-btn:hover,
+.ppt-download-btn:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(37, 99, 235, 0.42);
+  box-shadow: 0 9px 18px rgba(37, 99, 235, 0.14);
+  outline: none;
+}
+
+.ppt-download-meta {
+  color: #94a3b8;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+}

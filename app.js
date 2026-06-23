@@ -1,4 +1,4 @@
-// DS Chatbot Frontend - 운영 분리 구조용 app.js
+// DS Chatbot Frontend - 운영 분리 구조용 app.js / PPT 초안 JSON 설계 지원
 // GitHub Pages: https://dsdansuk.github.io/DS-chatbot/
 // Edge Functions:
 // - sso-login: 그룹웨어 SSO 진입 및 토큰 발급
@@ -18,6 +18,8 @@ const FILE_API_URL =
 
 const RPA_API_URL =
   "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api";
+
+const PPT_DRAFT_TASK = "ppt_draft";
 
 const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
 const CHAT_HISTORY_STORAGE_PREFIX = "ds_chatbot_ai_history_v1_";
@@ -68,6 +70,8 @@ const rpaBackBtn = document.getElementById("rpaBackBtn");
 const docBackBtn = document.getElementById("docBackBtn");
 
 let agentSelectedFiles = [];
+let lastAgentRoute = "";
+let lastAgentFileUseAt = 0;
 
 
 function getAuthCacheKey() {
@@ -340,6 +344,50 @@ function addMessage(targetBody, type, text, debug = false, options = {}) {
   return div;
 }
 
+
+function appendPptDownloadButton(targetBody, ppt) {
+  if (!ppt || ppt.ok !== true || !ppt.downloadUrl) return;
+
+  const row = document.createElement("div");
+  row.className = "chat-row bot-row ppt-download-row";
+
+  const spacer = document.createElement("span");
+  spacer.className = "ppt-download-spacer";
+  spacer.setAttribute("aria-hidden", "true");
+
+  const wrap = document.createElement("div");
+  wrap.className = "ppt-download-wrap";
+
+  const link = document.createElement("a");
+  link.className = "ppt-download-btn";
+  link.href = ppt.downloadUrl;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "PPT 다운로드";
+
+  const meta = document.createElement("span");
+  meta.className = "ppt-download-meta";
+  meta.textContent = formatPptExpiresText(ppt.expiresIn);
+
+  wrap.appendChild(link);
+  wrap.appendChild(meta);
+  row.appendChild(spacer);
+  row.appendChild(wrap);
+  targetBody.appendChild(row);
+  targetBody.scrollTop = targetBody.scrollHeight;
+}
+
+function formatPptExpiresText(expiresIn) {
+  const seconds = Number(expiresIn || 0);
+  if (!seconds) return "임시 링크";
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  if (minutes >= 60) {
+    const hours = Math.round(minutes / 60);
+    return `${hours}시간 유효`;
+  }
+  return `${minutes}분 유효`;
+}
+
 function clearBody(targetBody) {
   targetBody.innerHTML = "";
 
@@ -348,13 +396,15 @@ function clearBody(targetBody) {
   }
 }
 
-function createThinkingBox(targetBody = aiBody) {
-  const steps = [
-    "질문을 이해하는 중",
-    "관련 내용을 확인하는 중",
-    "답변을 정리하는 중",
-    "곧 답변드릴게요",
-  ];
+function createThinkingBox(targetBody = aiBody, customSteps = null) {
+  const steps = Array.isArray(customSteps) && customSteps.length
+    ? customSteps
+    : [
+      "질문을 이해하는 중",
+      "관련 내용을 확인하는 중",
+      "답변을 정리하는 중",
+      "곧 답변드릴게요",
+    ];
 
   const wrap = document.createElement("div");
   wrap.className = "thinking";
@@ -1091,12 +1141,186 @@ function clearAgentFiles() {
   agentSelectedFiles = [];
   if (agentFileInput) agentFileInput.value = "";
   renderAgentFileChips();
+  lastAgentRoute = "";
+  lastAgentFileUseAt = 0;
 }
 
-function buildAgentMessage(message) {
-  if (!agentSelectedFiles.length) return message;
+function normalizeAgentText(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
 
-  const fileList = agentSelectedFiles
+function hasPattern(text, patterns) {
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function isShortText(text, maxLength = 45) {
+  return text.replace(/\s+/g, "").length <= maxLength;
+}
+
+function hasRecentFileConversation(history = []) {
+  const recent = Array.isArray(history) ? history.slice(-6) : [];
+
+  return recent.some((item) => {
+    const text = normalizeAgentText(item?.text || "");
+
+    return (
+      text.includes("[첨부 파일]") ||
+      text.includes("업로드한 파일") ||
+      text.includes("첨부한 파일") ||
+      text.includes("파일 기준") ||
+      text.includes("파일 내용") ||
+      text.includes("업로드된 파일") ||
+      text.includes("위 내용은 업로드된 파일") ||
+      text.includes("업로드하신")
+    );
+  });
+}
+
+function shouldUseFileApi(message, hasFiles, history = []) {
+  if (!hasFiles) return false;
+
+  const text = normalizeAgentText(message);
+
+  // 파일만 첨부하고 입력 없이 전송한 경우
+  if (!text) return true;
+
+  /**
+   * 1순위: 강한 파일 참조
+   * 아래 표현은 사용자가 업로드/첨부 파일을 직접 가리키는 경우입니다.
+   * 이 경우에는 이메일 초안/보고서 작성 요청이어도 file-api로 보내는 게 맞습니다.
+   *
+   * 예:
+   * - 이 파일 내용으로 메일 초안 써줘
+   * - 첨부한 자료 기준으로 보고서 작성해줘
+   * - 해당 문서에서 주요 성과 알려줘
+   */
+  const strongFileReferencePatterns = [
+    /(?:해당|이|위|앞)\s*(?:파일|자료|문서|내용|브로슈어)/i,
+    /(?:첨부한|첨부된|업로드한|업로드된)\s*(?:파일|자료|문서|내용|브로슈어)?/i,
+    /(?:파일|자료|문서|브로슈어)\s*(?:내용|기준|안에서|에서|상에서|내에서)/i,
+    /(?:pdf|pptx?|파워포인트|xlsx?|엑셀|docx?|워드|txt|csv)\s*(?:내용|기준|안에서|에서|상에서|내에서)/i,
+    /(?:파일|자료|문서|브로슈어)\s*(?:에\s*있는|에\s*나온|에\s*포함된|속의)/i,
+    /(?:이|해당)\s*(?:pdf|pptx?|파워포인트|xlsx?|엑셀|docx?|워드|txt|csv)/i,
+  ];
+
+  if (hasPattern(text, strongFileReferencePatterns)) {
+    return true;
+  }
+
+  /**
+   * 2순위: 명백한 일반 업무 요청
+   * 파일 칩이 남아 있어도 아래 요청은 agent-api로 보내야 합니다.
+   *
+   * 예:
+   * - 외부 업체에 github 파일 이관 가능한지 묻는 이메일 초안 써줘
+   * - 엑셀 함수 알려줘
+   * - 보고서 제목 추천해줘
+   * - 네이버 클라우드 이관 문의 메일 작성해줘
+   */
+  const generalWorkPatterns = [
+    /메일|이메일|공문|안내문|문구|인사말|초안|작성/i,
+    /제목\s*추천|아이디어|방법|설명|개념|코드|함수|쿼리|오류|에러|번역/i,
+    /github|깃허브|네이버\s*클라우드|ncp|aws|azure/i,
+    /외부\s*업체|업체|거래처|담당자|문의|가능한지|이관|마이그레이션/i,
+  ];
+
+  if (hasPattern(text, generalWorkPatterns)) {
+    return false;
+  }
+
+  /**
+   * 3순위: 약한 파일 참조 + 파일 작업 동사
+   * 단독으로는 위험하지만, "요약/분석/정리"와 함께 나오면 file-api로 보냅니다.
+   *
+   * 예:
+   * - 브로슈어 요약해줘
+   * - pdf 정리해줘
+   * - 엑셀 표로 정리해줘
+   */
+  const weakFileReferencePatterns = [
+    /첨부|업로드/i,
+    /브로슈어/i,
+    /pdf|pptx?|파워포인트|xlsx?|엑셀|docx?|워드|txt|csv/i,
+    /파일|자료|문서/i,
+  ];
+
+  const fileTaskPatterns = [
+    /요약|분석|정리|추출|검토|비교/i,
+    /표로|표\s*형태|목록화/i,
+    /핵심|주요\s*성과|성과|리스크|시사점|결론|근거/i,
+    /찾아|찾아서|뽑아|알려줘|확인해줘/i,
+  ];
+
+  const hasWeakFileReference = hasPattern(text, weakFileReferencePatterns);
+  const hasFileTask = hasPattern(text, fileTaskPatterns);
+
+  if (hasWeakFileReference && hasFileTask) {
+    return true;
+  }
+
+  /**
+   * 4순위: 애매한 후속 질문
+   * 직전에 파일 분석을 했고, 현재 질문이 짧은 분석성 질문이면 file-api로 보냅니다.
+   *
+   * 예:
+   * - 주요 성과는?
+   * - 핵심은?
+   * - 표로 정리해줘
+   * - 리스크는?
+   */
+  const recentFileContext = hasRecentFileConversation(history);
+
+  if (recentFileContext && hasFileTask && isShortText(text, 45)) {
+    return true;
+  }
+
+  /**
+   * 5순위: 파일 업로드 직후 짧은 요청
+   * 파일을 첨부하고 바로 "요약해줘", "분석해줘"처럼 짧게 요청하는 경우
+   */
+  if (hasFileTask && isShortText(text, 25)) {
+    return true;
+  }
+
+  return false;
+}
+
+
+function shouldUsePptDraft(message, hasFiles = false) {
+  const text = normalizeAgentText(message);
+  if (!text) return false;
+
+  const pptKeywordPatterns = [
+    /pptx?|파워포인트|프레젠테이션|슬라이드|발표자료/i,
+    /보고용\s*(?:자료|문서|덱|deck)/i,
+    /보고자료|제안서\s*자료/i,
+  ];
+
+  const pptActionPatterns = [
+    /만들|생성|작성|제작|구성|정리|변환|초안/i,
+    /(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드)/i,
+    /목차|추진\s*배경|현황|문제점|개선\s*방안|기대\s*효과/i,
+  ];
+
+  const fileBasedPptPatterns = [
+    /(?:이|해당|첨부한|업로드한|위)\s*(?:자료|파일|문서|내용)\s*(?:로|으로)/i,
+    /자료\s*기반|파일\s*기반|문서\s*기반/i,
+  ];
+
+  const hasPptKeyword = hasPattern(text, pptKeywordPatterns);
+  const hasPptAction = hasPattern(text, pptActionPatterns);
+  const hasFileBasedPpt = hasFiles && hasPattern(text, fileBasedPptPatterns) && hasPptAction;
+
+  return (hasPptKeyword && hasPptAction) || hasFileBasedPpt;
+}
+
+function buildAgentMessage(message, files = agentSelectedFiles) {
+  if (!files.length) return message;
+
+  const fileList = files
     .map((file) => "- " + file.name + " (" + formatFileSize(file.size) + ")")
     .join("\n");
 
@@ -1112,13 +1336,15 @@ async function sendChatToTarget({
   attachments = [],
   apiUrl = AI_API_URL,
   history = [],
+  stream = true,
+  thinkingSteps = null,
 }) {
-  const thinkingBox = createThinkingBox(targetBody);
+  const thinkingBox = createThinkingBox(targetBody, thinkingSteps);
 
   try {
     const body = {
       message,
-      stream: true,
+      stream,
     };
 
     if (task !== "chat") body.task = task;
@@ -1147,6 +1373,17 @@ async function sendChatToTarget({
     if (!res.ok) {
       const errorText = await res.text();
       addMessage(targetBody, "bot", "AI API 오류가 발생했습니다.\nHTTP " + res.status + "\n" + errorText, true);
+      return;
+    }
+
+    if (!stream) {
+      const contentType = res.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await res.json()
+        : { ok: true, answer: await res.text() };
+
+      addMessage(targetBody, "bot", data.answer || data.message || JSON.stringify(data, null, 2));
+      appendPptDownloadButton(targetBody, data.ppt);
       return;
     }
 
@@ -1217,13 +1454,16 @@ async function sendChat(message) {
   });
 }
 
-async function sendAgentFileAnalysis(message, files = [], history = []) {
-  const thinkingBox = createThinkingBox(agentBody);
+async function sendAgentFileAnalysis(message, files = [], history = [], options = {}) {
+  const useStream = options.stream !== false;
+  const task = options.task || "";
+  const thinkingBox = createThinkingBox(agentBody, options.thinkingSteps || null);
 
   try {
     const formData = new FormData();
     formData.append("message", message);
-    formData.append("stream", "true");
+    formData.append("stream", String(useStream));
+    if (task) formData.append("task", task);
     if (history.length) formData.append("history", JSON.stringify(history));
 
     files.forEach((file) => {
@@ -1243,6 +1483,17 @@ async function sendAgentFileAnalysis(message, files = [], history = []) {
     if (!res.ok) {
       const errorText = await res.text();
       addMessage(agentBody, "bot", "파일 분석 API 오류가 발생했습니다.\nHTTP " + res.status + "\n" + errorText, true);
+      return;
+    }
+
+    if (!useStream) {
+      const contentType = res.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await res.json()
+        : { ok: true, answer: await res.text() };
+
+      addMessage(agentBody, "bot", data.answer || data.message || JSON.stringify(data, null, 2));
+      appendPptDownloadButton(agentBody, data.ppt);
       return;
     }
 
@@ -1304,10 +1555,30 @@ async function sendAgentFileAnalysis(message, files = [], history = []) {
   }
 }
 
-async function sendAgentChat(message, files = [], history = []) {
-  if (files.length) {
-    return sendAgentFileAnalysis(message, files, history);
+async function sendAgentChat(message, files = [], history = [], options = {}) {
+  const task = options.task || "";
+  const isPptDraft = task === PPT_DRAFT_TASK;
+  const useFileApi = Boolean(options.useFileApi && files.length);
+  const thinkingSteps = isPptDraft
+    ? [
+      "자료와 요청을 확인하는 중",
+      "보고용 PPT 목차를 구성하는 중",
+      "표준 레이아웃에 맞게 JSON을 정리하는 중",
+      "슬라이드 구조를 검증하는 중",
+    ]
+    : null;
+
+  if (useFileApi) {
+    lastAgentRoute = "file-api";
+    lastAgentFileUseAt = Date.now();
+    return sendAgentFileAnalysis(message, files, history, {
+      task,
+      stream: !isPptDraft,
+      thinkingSteps,
+    });
   }
+
+  lastAgentRoute = "agent-api";
 
   return sendChatToTarget({
     targetBody: agentBody,
@@ -1316,6 +1587,9 @@ async function sendAgentChat(message, files = [], history = []) {
     input: agentMessageInput,
     apiUrl: AGENT_API_URL,
     history,
+    task,
+    stream: !isPptDraft,
+    thinkingSteps,
   });
 }
 
@@ -1436,7 +1710,11 @@ if (agentMessageInput && agentForm) {
     const filesSnapshot = [...agentSelectedFiles];
     const historySnapshot = getRecentChatMessages(agentBody);
     const message = rawMessage || "첨부한 파일을 분석해 주세요.";
-    const displayMessage = filesSnapshot.length ? buildAgentMessage(message) : message;
+    const usePptDraft = shouldUsePptDraft(message, filesSnapshot.length > 0);
+    const useFileApi = usePptDraft && filesSnapshot.length > 0
+      ? true
+      : shouldUseFileApi(message, filesSnapshot.length > 0, historySnapshot);
+    const displayMessage = useFileApi ? buildAgentMessage(message, filesSnapshot) : message;
 
     addMessage(agentBody, "user", displayMessage);
 
@@ -1444,6 +1722,9 @@ if (agentMessageInput && agentForm) {
     autoResizeTextarea(agentMessageInput);
     agentSendBtn.disabled = true;
 
-    await sendAgentChat(message, filesSnapshot, historySnapshot);
+    await sendAgentChat(message, filesSnapshot, historySnapshot, {
+      useFileApi,
+      task: usePptDraft ? PPT_DRAFT_TASK : "",
+    });
   });
 }
