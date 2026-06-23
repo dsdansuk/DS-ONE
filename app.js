@@ -1701,41 +1701,135 @@ function shouldUseFileApi(message, hasFiles, history = []) {
 }
 
 
-function shouldUsePptDraft(message, hasFiles = false) {
-  const text = normalizeAgentText(message);
-  if (!text) return false;
+function getInstructionPart(message) {
+  const raw = String(message || "").trim();
+  if (!raw) return "";
 
-  const pptKeywordPatterns = [
-    /pptx?|파워포인트|프레젠테이션|슬라이드|발표자료/i,
-    /보고용\s*(?:자료|문서|덱|deck)/i,
-    /보고자료|제안서\s*자료/i,
-  ];
+  /**
+   * Export routing must read the user's instruction, not the data payload.
+   * Example:
+   *   "아래 내용을 엑셀 파일로 만들어줘.\n\n컬럼:\n...\n데이터:\nPPT 템플릿 검토 / ..."
+   * The word "PPT" above is only a cell value, so it must not trigger PPT generation.
+   */
+  const blockMarkerPattern = /(^|\n)\s*(?:컬럼|열|데이터|자료|내용|목록|표\s*데이터|원본|입력|행)\s*:/i;
+  const markerMatch = raw.match(blockMarkerPattern);
 
-  const pptActionPatterns = [
-    /만들|생성|작성|제작|구성|정리|변환|초안/i,
-    /(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드)/i,
-    /목차|추진\s*배경|현황|문제점|개선\s*방안|기대\s*효과/i,
-  ];
+  if (markerMatch && typeof markerMatch.index === "number" && markerMatch.index > 0) {
+    return raw.slice(0, markerMatch.index).trim();
+  }
 
-  const fileBasedPptPatterns = [
-    /(?:이|해당|첨부한|업로드한|위)\s*(?:자료|파일|문서|내용)\s*(?:로|으로)/i,
-    /자료\s*기반|파일\s*기반|문서\s*기반/i,
-  ];
+  const lines = raw.split(/\r?\n/);
+  const firstBlankIndex = lines.findIndex((line, index) => index > 0 && !line.trim());
+  if (firstBlankIndex > 0) {
+    const head = lines.slice(0, firstBlankIndex).join("\n").trim();
+    if (head && looksLikeExportInstruction(head)) return head;
+  }
 
-  const hasPptKeyword = hasPattern(text, pptKeywordPatterns);
-  const hasPptAction = hasPattern(text, pptActionPatterns);
-  const hasFileBasedPpt = hasFiles && hasPattern(text, fileBasedPptPatterns) && hasPptAction;
-
-  return (hasPptKeyword && hasPptAction) || hasFileBasedPpt;
+  return raw;
 }
 
+function looksLikeExportInstruction(text) {
+  const normalized = normalizeAgentText(text);
+  if (!normalized) return false;
+
+  return /엑셀|xlsx?|excel|스프레드시트|pptx?|파워포인트|프레젠테이션|슬라이드|발표자료|보고자료/i.test(normalized) &&
+    /만들|생성|작성|제작|구성|정리|변환|다운로드|내려받|출력|파일로|로\s*줘/i.test(normalized);
+}
+
+function hasExplicitExcelExportRequest(text) {
+  const normalized = normalizeAgentText(text);
+  if (!normalized) return false;
+
+  const excelPatterns = [
+    /(?:엑셀|xlsx|excel|스프레드시트)\s*(?:파일)?\s*(?:로|으로)\s*(?:만들|생성|작성|정리|변환|다운로드|내려받|출력)/i,
+    /(?:엑셀|xlsx|excel|스프레드시트)\s*파일\s*(?:을|를)?\s*(?:만들|생성|작성|정리|다운로드|내려받|출력)/i,
+    /(?:표|목록|데이터|내용|자료|결과|위\s*내용|아래\s*내용).{0,30}(?:엑셀|xlsx|excel|스프레드시트)\s*(?:파일)?\s*(?:로|으로)/i,
+    /(?:엑셀|xlsx|excel)\s*(?:다운로드|내려받기|다운받기)\s*(?:버튼|링크|파일|가능|하게|할\s*수|만들|생성)/i,
+    /(?:다운로드|내려받|다운받).{0,20}(?:엑셀|xlsx|excel)\s*(?:파일)?/i,
+  ];
+
+  return hasPattern(normalized, excelPatterns);
+}
+
+function hasExplicitPptExportRequest(text) {
+  const normalized = normalizeAgentText(text);
+  if (!normalized) return false;
+
+  const pptPatterns = [
+    /(?:pptx?|파워포인트|프레젠테이션|슬라이드|발표자료|보고자료)\s*(?:파일)?\s*(?:로|으로)\s*(?:만들|생성|작성|제작|구성|정리|변환|다운로드|내려받|출력)/i,
+    /(?:pptx?|파워포인트|프레젠테이션)\s*파일\s*(?:을|를)?\s*(?:만들|생성|작성|제작|구성|다운로드|내려받|출력)/i,
+    /(?:발표자료|보고자료|제안서)\s*(?:를|을)?\s*(?:만들|생성|작성|제작|구성)/i,
+    /(?:pptx?|파워포인트|프레젠테이션)\s*초안/i,
+    /(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드).{0,30}(?:pptx?|파워포인트|프레젠테이션|슬라이드)/i,
+    /(?:pptx?|파워포인트|프레젠테이션|슬라이드).{0,30}(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드)/i,
+  ];
+
+  return hasPattern(normalized, pptPatterns);
+}
+
+function hasBothExportFormatsRequest(text) {
+  const normalized = normalizeAgentText(text);
+  if (!normalized) return false;
+
+  const bothFormatPatterns = [
+    /(?:엑셀|xlsx|excel|스프레드시트).{0,12}(?:과|와|및|랑|하고|,|\/|둘\s*다|모두).{0,12}(?:pptx?|파워포인트|프레젠테이션|슬라이드|발표자료)/i,
+    /(?:pptx?|파워포인트|프레젠테이션|슬라이드|발표자료).{0,12}(?:과|와|및|랑|하고|,|\/|둘\s*다|모두).{0,12}(?:엑셀|xlsx|excel|스프레드시트)/i,
+  ];
+
+  const exportActionPatterns = [
+    /만들|생성|작성|제작|정리|변환|다운로드|내려받|출력|파일로|파일\s*생성/i,
+  ];
+
+  return hasPattern(normalized, bothFormatPatterns) && hasPattern(normalized, exportActionPatterns);
+}
+
+function decideExportTask(message) {
+  const instructionText = getInstructionPart(message);
+  const normalizedInstruction = normalizeAgentText(instructionText);
+  const normalizedFullText = normalizeAgentText(message);
+
+  if (hasBothExportFormatsRequest(normalizedInstruction)) return "ambiguous_export";
+
+  const wantsExcelFromInstruction = hasExplicitExcelExportRequest(normalizedInstruction);
+  const wantsPptFromInstruction = hasExplicitPptExportRequest(normalizedInstruction);
+
+  if (wantsExcelFromInstruction && wantsPptFromInstruction) return "ambiguous_export";
+  if (wantsExcelFromInstruction) return EXCEL_DRAFT_TASK;
+  if (wantsPptFromInstruction) return PPT_DRAFT_TASK;
+
+  /**
+   * Fallback is intentionally strict. This catches short requests without
+   * block markers while avoiding values such as "PPT 템플릿 검토" in data rows.
+   */
+  if (hasBothExportFormatsRequest(normalizedFullText)) return "ambiguous_export";
+
+  const wantsExcelFromFullText = hasExplicitExcelExportRequest(normalizedFullText);
+  const wantsPptFromFullText = hasExplicitPptExportRequest(normalizedFullText);
+
+  if (wantsExcelFromFullText && wantsPptFromFullText) return "ambiguous_export";
+  if (wantsExcelFromFullText) return EXCEL_DRAFT_TASK;
+  if (wantsPptFromFullText) return PPT_DRAFT_TASK;
+
+  return "";
+}
+
+function buildAmbiguousExportAnswer() {
+  return [
+    "엑셀과 PPT 요청이 모두 감지되어 자동 생성 형식을 확정하지 않았습니다.",
+    "원하는 결과물을 한 가지로 지정해 주세요.",
+    "",
+    "예시",
+    "- 이 내용을 엑셀 파일로 만들어줘",
+    "- 이 내용을 PPT 파일로 만들어줘",
+  ].join("\n");
+}
+
+function shouldUsePptDraft(message, hasFiles = false) {
+  return decideExportTask(message) === PPT_DRAFT_TASK;
+}
 
 function shouldUseExcelDraft(message) {
-  const text = normalizeAgentText(message);
-  if (!text) return false;
-  const excelKeywordPatterns = [/xlsx?|엑셀|스프레드시트|spreadsheet/i, /다운로드\s*파일|파일로\s*(?:줘|만들|생성)/i];
-  const excelActionPatterns = [/만들|생성|작성|다운로드|변환|정리|표로|목록화/i];
-  return hasPattern(text, excelKeywordPatterns) && hasPattern(text, excelActionPatterns);
+  return decideExportTask(message) === EXCEL_DRAFT_TASK;
 }
 
 function shouldUseWebSearch(message) {
@@ -2239,15 +2333,29 @@ if (agentMessageInput && agentForm) {
     const historySnapshot = getRecentChatMessages(agentBody);
     const message = rawMessage || "첨부한 파일을 분석해 주세요.";
     const hasFiles = filesSnapshot.length > 0;
-    const usePptDraft = shouldUsePptDraft(message, hasFiles);
-    const useExcelDraft = shouldUseExcelDraft(message);
-    const useWebSearch = shouldUseWebSearch(message) && !hasFiles;
+    const exportTask = decideExportTask(message);
+
+    if (exportTask === "ambiguous_export") {
+      addMessage(agentBody, "user", message);
+      saveAgentMessage("user", message, { route: "agent-api" });
+      agentMessageInput.value = "";
+      autoResizeTextarea(agentMessageInput);
+
+      const answer = buildAmbiguousExportAnswer();
+      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
+      saveAgentMessage("assistant", answer, { route: "export-clarification" });
+      focusInputWhenPanelReady(agentMessageInput);
+      return;
+    }
+
+    const task = exportTask || (shouldUseWebSearch(message) && !hasFiles ? WEB_SEARCH_TASK : "");
+    const usePptDraft = task === PPT_DRAFT_TASK;
+    const useExcelDraft = task === EXCEL_DRAFT_TASK;
     const useFileApi = usePptDraft && hasFiles
       ? true
       : useExcelDraft && hasFiles
         ? true
         : shouldUseFileApi(message, hasFiles, historySnapshot);
-    const task = usePptDraft ? PPT_DRAFT_TASK : useExcelDraft ? EXCEL_DRAFT_TASK : useWebSearch ? WEB_SEARCH_TASK : "";
     const displayMessage = useFileApi ? buildAgentMessage(message, filesSnapshot) : message;
 
     addMessage(agentBody, "user", displayMessage);
