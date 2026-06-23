@@ -1627,23 +1627,39 @@ button {
   display: flex;
   justify-content: flex-start;
   align-items: center;
+  gap: 8px;
 }
 
 .knowledge-redirect-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  text-decoration: none;
   white-space: nowrap;
   writing-mode: horizontal-tb;
-  border: 1px solid rgba(37, 99, 235, 0.22);
-  background: #eff6ff;
-  color: #1d4ed8;
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 700;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.10);
   cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    border-color 0.16s ease;
 }
 
-.knowledge-redirect-btn:hover {
-  background: #dbeafe;
+.knowledge-redirect-btn:hover,
+.knowledge-redirect-btn:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(37, 99, 235, 0.42);
+  box-shadow: 0 9px 18px rgba(37, 99, 235, 0.14);
+  outline: none;
 }
 
 .file-chip.persisted::before {
