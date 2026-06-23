@@ -1059,6 +1059,9 @@ button {
 
 .chat-row.bot-row {
   align-items: flex-start;
+  flex-wrap: wrap;
+  column-gap: 8px;
+  row-gap: 3px;
 }
 
 .chat-row.user-row {
@@ -1579,9 +1582,11 @@ button {
 }
 
 .bot-message-actions {
-  align-self: flex-end;
-  margin: 2px 0 0 38px;
+  flex: 0 0 calc(100% - 40px);
+  margin: -2px 0 0 40px;
   display: flex;
+  justify-content: flex-start;
+  align-items: center;
   gap: 4px;
 }
 
@@ -1617,10 +1622,16 @@ button {
 }
 
 .knowledge-redirect-actions {
-  margin: 6px 0 0 38px;
+  flex: 0 0 calc(100% - 40px);
+  margin: -2px 0 0 40px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
 }
 
 .knowledge-redirect-btn {
+  white-space: nowrap;
+  writing-mode: horizontal-tb;
   border: 1px solid rgba(37, 99, 235, 0.22);
   background: #eff6ff;
   color: #1d4ed8;

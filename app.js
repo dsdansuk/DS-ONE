@@ -1645,15 +1645,25 @@ function shouldRedirectToKnowledge(message, hasFiles = false) {
   const text = normalizeAgentText(message);
   if (!text) return false;
 
+  // 파일 생성/문서 작성 요청은 사내 지식 문의로 보내면 안 됩니다.
+  // 예: "담당자"가 엑셀 컬럼명으로 들어간 경우를 오탐하지 않도록 먼저 제외합니다.
+  const productionPatterns = [
+    /엑셀|xlsx?|스프레드시트|표로|표\s*형태|다운로드|파일로|만들|생성|작성|초안|메일|이메일|보고서|요약|정리/i,
+    /아래\s*내용|컬럼|데이터|행|열/i,
+  ];
+
+  if (hasPattern(text, productionPatterns)) {
+    return false;
+  }
+
   const internalPatterns = [
     /연차|휴가|출장비|복리\s*후생|복지|근태|급여|인사\s*규정/i,
     /결재\s*(?:절차|규정|양식)|전결|품의|구매\s*절차/i,
     /보안\s*(?:규정|정책)|문서\s*반출|개인정보|사내\s*규정|업무\s*절차/i,
-    /담당\s*부서|담당자|규정상|회사\s*내규/i,
+    /담당\s*부서|규정상|회사\s*내규/i,
   ];
 
-  const creativePatterns = [/메일|이메일|초안|작성|문구|아이디어|번역|요약|보고서/i];
-  return hasPattern(text, internalPatterns) && !hasPattern(text, creativePatterns);
+  return hasPattern(text, internalPatterns);
 }
 
 function addKnowledgeRedirectMessage(originalMessage) {
@@ -2120,7 +2130,7 @@ if (agentMessageInput && agentForm) {
     agentMessageInput.value = "";
     autoResizeTextarea(agentMessageInput);
 
-    if (shouldRedirectToKnowledge(message, hasFiles)) {
+    if (!task && !useFileApi && shouldRedirectToKnowledge(message, hasFiles)) {
       addKnowledgeRedirectMessage(message);
       return;
     }
