@@ -1561,10 +1561,11 @@ async function sendAgentChat(message, files = [], history = [], options = {}) {
   const useFileApi = Boolean(options.useFileApi && files.length);
   const thinkingSteps = isPptDraft
     ? [
-      "자료와 요청을 확인하는 중",
+      "자료와 첨부파일을 확인하는 중",
+      "근거 데이터와 핵심 수치를 추출하는 중",
       "보고용 PPT 목차를 구성하는 중",
-      "표준 레이아웃에 맞게 JSON을 정리하는 중",
-      "슬라이드 구조를 검증하는 중",
+      "표준 레이아웃과 검증 기준을 적용하는 중",
+      "PPTX 생성 및 다운로드 링크를 준비하는 중",
     ]
     : null;
 
