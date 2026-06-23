@@ -312,10 +312,47 @@ function showComingSoonNotice() {
   }, 1400);
 }
 
+function renderMessageContent(div, text) {
+  div.textContent = "";
+  const lines = String(text || "").split(/\n/);
+
+  lines.forEach((line, lineIndex) => {
+    if (lineIndex > 0) div.appendChild(document.createElement("br"));
+    if (!line) return;
+    appendInlineMarkdown(div, line);
+  });
+}
+
+function appendInlineMarkdown(parent, line) {
+  const pattern = /\*\*(.+?)\*\*/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = pattern.exec(line)) !== null) {
+    if (match.index > lastIndex) {
+      parent.appendChild(document.createTextNode(line.slice(lastIndex, match.index)));
+    }
+
+    const strong = document.createElement("strong");
+    strong.textContent = match[1];
+    parent.appendChild(strong);
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < line.length) {
+    parent.appendChild(document.createTextNode(line.slice(lastIndex)));
+  }
+}
+
 function addMessage(targetBody, type, text, debug = false, options = {}) {
   const div = document.createElement("div");
   div.className = debug ? "msg bot debug" : "msg " + type;
-  div.textContent = text;
+
+  if (!debug && type === "bot") {
+    renderMessageContent(div, text);
+  } else {
+    div.textContent = text;
+  }
 
   if ((targetBody === aiBody || targetBody === agentBody) && !debug) {
     const row = document.createElement("div");
