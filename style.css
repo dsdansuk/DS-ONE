@@ -1572,3 +1572,93 @@ button {
 .chat-body .msg.bot strong {
   font-weight: 850;
 }
+
+/* 업무 AI Agent 운영 고도화: 답변 복사 / 다운로드 / 지식문의 이동 */
+.bot-row {
+  position: relative;
+}
+
+.bot-message-actions {
+  align-self: flex-end;
+  margin: 2px 0 0 38px;
+  display: flex;
+  gap: 4px;
+}
+
+.bot-copy-btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+
+.bot-copy-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.bot-copy-btn:hover {
+  background: #f8fafc;
+  border-color: rgba(37, 99, 235, 0.35);
+  color: #2563eb;
+}
+
+.bot-copy-btn.copied {
+  color: #0f766e;
+  border-color: rgba(15, 118, 110, 0.35);
+  transform: scale(0.96);
+}
+
+.knowledge-redirect-actions {
+  margin: 6px 0 0 38px;
+}
+
+.knowledge-redirect-btn {
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.knowledge-redirect-btn:hover {
+  background: #dbeafe;
+}
+
+.file-chip.persisted::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #22c55e;
+  flex: 0 0 auto;
+}
+
+.excel-download-row .ppt-download-btn {
+  background: linear-gradient(135deg, #0f766e, #059669);
+}
+
+.evidence-row {
+  margin-top: -2px;
+}
+
+.evidence-box {
+  max-width: calc(100% - 38px);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(248, 250, 252, 0.92);
+  color: #64748b;
+  border-radius: 10px;
+  padding: 5px 8px;
+  font-size: 11px;
+  line-height: 1.35;
+}

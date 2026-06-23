@@ -16,10 +16,15 @@ const AGENT_API_URL =
 const FILE_API_URL =
   "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api";
 
+// agent-api 안에서 세션/메시지/파일 상태도 함께 관리합니다.
+const AGENT_STATE_API_URL = AGENT_API_URL;
+
 const RPA_API_URL =
   "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api";
 
 const PPT_DRAFT_TASK = "ppt_draft";
+const EXCEL_DRAFT_TASK = "excel_draft";
+const WEB_SEARCH_TASK = "web_search";
 
 const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
 const CHAT_HISTORY_STORAGE_PREFIX = "ds_chatbot_ai_history_v1_";
@@ -70,6 +75,8 @@ const rpaBackBtn = document.getElementById("rpaBackBtn");
 const docBackBtn = document.getElementById("docBackBtn");
 
 let agentSelectedFiles = [];
+let agentSessionId = sessionStorage.getItem("ds_agent_session_id") || "";
+let agentStateReady = false;
 let lastAgentRoute = "";
 let lastAgentFileUseAt = 0;
 
@@ -137,6 +144,7 @@ function applyAuthenticatedProfile(profile) {
   userInfo.textContent = "로그인ID: " + currentLoginId;
   setHomeGreeting(displayUserName, true);
   restoreChatHistory();
+  initAgentSessionState();
   enableApp();
 }
 
@@ -356,6 +364,53 @@ function appendInlineMarkdown(parent, line) {
   }
 }
 
+
+function appendBotCopyAction(row, messageDiv, text, options = {}) {
+  if (!row || !messageDiv || options.hideCopy) return;
+
+  const actions = document.createElement("div");
+  actions.className = "bot-message-actions";
+
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.className = "bot-copy-btn";
+  copyBtn.title = "답변 복사";
+  copyBtn.setAttribute("aria-label", "답변 복사");
+  copyBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 8.5A2.5 2.5 0 0 1 10.5 6H18a2.5 2.5 0 0 1 2.5 2.5V16A2.5 2.5 0 0 1 18 18.5h-7.5A2.5 2.5 0 0 1 8 16V8.5Z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 15.5H5A2.5 2.5 0 0 1 2.5 13V5.5A2.5 2.5 0 0 1 5 3h7.5A2.5 2.5 0 0 1 15 5.5V6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
+  copyBtn.addEventListener("click", async () => {
+    const value = String(messageDiv.textContent || text || "").trim();
+    if (!value) return;
+
+    try {
+      await navigator.clipboard.writeText(value);
+      copyBtn.classList.add("copied");
+      copyBtn.setAttribute("aria-label", "복사 완료");
+      setTimeout(() => {
+        copyBtn.classList.remove("copied");
+        copyBtn.setAttribute("aria-label", "답변 복사");
+      }, 1200);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = value;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+  });
+
+  actions.appendChild(copyBtn);
+  row.appendChild(actions);
+}
+
+function setMessageContent(div, text) {
+  if (!div) return;
+  renderMessageContent(div, text);
+}
+
 function addMessage(targetBody, type, text, debug = false, options = {}) {
   const div = document.createElement("div");
   div.className = debug ? "msg bot debug" : "msg " + type;
@@ -379,6 +434,7 @@ function addMessage(targetBody, type, text, debug = false, options = {}) {
     }
 
     row.appendChild(div);
+    if (type === "bot") appendBotCopyAction(row, div, text, options);
     targetBody.appendChild(row);
   } else {
     targetBody.appendChild(div);
@@ -395,10 +451,18 @@ function addMessage(targetBody, type, text, debug = false, options = {}) {
 
 
 function appendPptDownloadButton(targetBody, ppt) {
-  if (!ppt || ppt.ok !== true || !ppt.downloadUrl) return;
+  appendArtifactDownloadButton(targetBody, ppt, { label: "PPT 다운로드", className: "ppt-download-row" });
+}
+
+function appendExcelDownloadButton(targetBody, excel) {
+  appendArtifactDownloadButton(targetBody, excel, { label: "Excel 다운로드", className: "excel-download-row" });
+}
+
+function appendArtifactDownloadButton(targetBody, artifact, options = {}) {
+  if (!artifact || artifact.ok !== true || !artifact.downloadUrl) return;
 
   const row = document.createElement("div");
-  row.className = "chat-row bot-row ppt-download-row";
+  row.className = "chat-row bot-row ppt-download-row " + (options.className || "");
 
   const spacer = document.createElement("span");
   spacer.className = "ppt-download-spacer";
@@ -409,19 +473,46 @@ function appendPptDownloadButton(targetBody, ppt) {
 
   const link = document.createElement("a");
   link.className = "ppt-download-btn";
-  link.href = ppt.downloadUrl;
+  link.href = artifact.downloadUrl;
   link.target = "_blank";
   link.rel = "noopener noreferrer";
-  link.textContent = "PPT 다운로드";
+  link.textContent = options.label || "다운로드";
 
   const meta = document.createElement("span");
   meta.className = "ppt-download-meta";
-  meta.textContent = formatPptExpiresText(ppt.expiresIn);
+  meta.textContent = formatPptExpiresText(artifact.expiresIn);
 
   wrap.appendChild(link);
   wrap.appendChild(meta);
   row.appendChild(spacer);
   row.appendChild(wrap);
+  targetBody.appendChild(row);
+  targetBody.scrollTop = targetBody.scrollHeight;
+}
+
+function appendEvidenceBox(targetBody, data) {
+  if (!targetBody || !data) return;
+
+  const parts = [];
+  if (Array.isArray(data.files) && data.files.length) {
+    const names = data.files.map((file) => file.original_name || file.name).filter(Boolean).slice(0, 3);
+    parts.push("근거: 업로드 파일 " + data.files.length + "개" + (names.length ? " · " + names.join(", ") : ""));
+  }
+  if (data.task === WEB_SEARCH_TASK || data.grounding) {
+    parts.push("근거: 웹 검색/최신 정보 라우팅");
+  }
+  if (!parts.length) return;
+
+  const row = document.createElement("div");
+  row.className = "chat-row bot-row evidence-row";
+  const spacer = document.createElement("span");
+  spacer.className = "ppt-download-spacer";
+  spacer.setAttribute("aria-hidden", "true");
+  const box = document.createElement("div");
+  box.className = "evidence-box";
+  box.textContent = parts.join(" / ");
+  row.appendChild(spacer);
+  row.appendChild(box);
   targetBody.appendChild(row);
   targetBody.scrollTop = targetBody.scrollHeight;
 }
@@ -1126,25 +1217,53 @@ function formatFileSize(bytes) {
   return (size / 1024 / 1024).toFixed(1).replace(/\.0$/, "") + "MB";
 }
 
+function getAttachmentName(item) {
+  return item?.name || item?.file?.name || "uploaded-file";
+}
+
+function getAttachmentSize(item) {
+  return Number(item?.size ?? item?.file?.size ?? item?.sizeBytes ?? 0);
+}
+
+function getAttachmentType(item) {
+  return item?.type || item?.mimeType || item?.file?.type || "";
+}
+
+function getAttachmentFile(item) {
+  return item instanceof File ? item : item?.file || null;
+}
+
+function getAttachmentId(item) {
+  return String(item?.id || item?.fileId || "");
+}
+
+function hasUnuploadedAgentFiles(files = agentSelectedFiles) {
+  return files.some((item) => Boolean(getAttachmentFile(item) && !getAttachmentId(item)));
+}
+
+function getAgentFileIds(files = agentSelectedFiles) {
+  return files.map(getAttachmentId).filter(Boolean);
+}
+
 function renderAgentFileChips() {
   if (!agentFileChips) return;
 
   agentFileChips.innerHTML = "";
   agentFileChips.hidden = agentSelectedFiles.length === 0;
 
-  agentSelectedFiles.forEach((file, index) => {
+  agentSelectedFiles.forEach((item, index) => {
     const chip = document.createElement("span");
-    chip.className = "file-chip";
-    chip.title = file.name + " · " + formatFileSize(file.size);
+    chip.className = "file-chip" + (getAttachmentId(item) ? " persisted" : "");
+    chip.title = getAttachmentName(item) + " · " + formatFileSize(getAttachmentSize(item));
 
     const name = document.createElement("span");
     name.className = "file-chip-name";
-    name.textContent = file.name;
+    name.textContent = getAttachmentName(item);
 
     const removeBtn = document.createElement("button");
     removeBtn.className = "file-chip-remove";
     removeBtn.type = "button";
-    removeBtn.setAttribute("aria-label", file.name + " 첨부 제거");
+    removeBtn.setAttribute("aria-label", getAttachmentName(item) + " 첨부 제거");
     removeBtn.textContent = "×";
     removeBtn.addEventListener("click", () => {
       agentSelectedFiles.splice(index, 1);
@@ -1163,7 +1282,10 @@ function syncAgentFileInput() {
   if (!agentFileInput || typeof DataTransfer === "undefined") return;
 
   const transfer = new DataTransfer();
-  agentSelectedFiles.forEach((file) => transfer.items.add(file));
+  agentSelectedFiles.forEach((item) => {
+    const file = getAttachmentFile(item);
+    if (file) transfer.items.add(file);
+  });
   agentFileInput.files = transfer.files;
 }
 
@@ -1172,13 +1294,23 @@ function addAgentFiles(files) {
   if (!incomingFiles.length) return;
 
   incomingFiles.forEach((file) => {
-    const duplicate = agentSelectedFiles.some((savedFile) =>
-      savedFile.name === file.name &&
-      savedFile.size === file.size &&
-      savedFile.lastModified === file.lastModified
+    const duplicate = agentSelectedFiles.some((saved) =>
+      getAttachmentName(saved) === file.name &&
+      getAttachmentSize(saved) === file.size &&
+      Number(saved?.lastModified || saved?.file?.lastModified || 0) === file.lastModified
     );
 
-    if (!duplicate) agentSelectedFiles.push(file);
+    if (!duplicate) {
+      agentSelectedFiles.push({
+        id: "",
+        file,
+        name: file.name,
+        size: file.size,
+        type: file.type || "",
+        lastModified: file.lastModified || 0,
+        persisted: false,
+      });
+    }
   });
 
   syncAgentFileInput();
@@ -1192,6 +1324,128 @@ function clearAgentFiles() {
   renderAgentFileChips();
   lastAgentRoute = "";
   lastAgentFileUseAt = 0;
+}
+
+function mergePersistedAgentFiles(files = []) {
+  if (!Array.isArray(files) || !files.length) return;
+
+  files.forEach((file) => {
+    const id = String(file.id || file.fileId || "");
+    const name = file.original_name || file.originalName || file.name || "uploaded-file";
+    const size = Number(file.size_bytes || file.sizeBytes || file.size || 0);
+    if (!id && !name) return;
+
+    const existingIndex = agentSelectedFiles.findIndex((item) => {
+      const sameId = id && getAttachmentId(item) === id;
+      const sameNameSize = getAttachmentName(item) === name && getAttachmentSize(item) === size;
+      return sameId || sameNameSize;
+    });
+
+    const next = {
+      id,
+      file: existingIndex >= 0 ? getAttachmentFile(agentSelectedFiles[existingIndex]) : null,
+      name,
+      size,
+      type: file.mime_type || file.mimeType || file.type || "",
+      extractionStatus: file.extraction_status || file.extractionStatus || "",
+      persisted: Boolean(id),
+      createdAt: file.created_at || file.createdAt || "",
+    };
+
+    if (existingIndex >= 0) {
+      agentSelectedFiles[existingIndex] = { ...agentSelectedFiles[existingIndex], ...next };
+    } else {
+      agentSelectedFiles.push(next);
+    }
+  });
+
+  syncAgentFileInput();
+  renderAgentFileChips();
+}
+
+async function agentStateRequest(payload) {
+  const res = await fetch(AGENT_STATE_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + sessionToken,
+    },
+    body: JSON.stringify(payload || {}),
+  });
+
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { ok: false, message: text };
+  }
+
+  if (!res.ok) throw new Error(data.message || "HTTP " + res.status);
+  return data;
+}
+
+async function initAgentSessionState() {
+  if (!sessionToken || agentStateReady) return;
+
+  try {
+    const data = await agentStateRequest({ action: "get_state", sessionId: agentSessionId });
+    if (!data.ok) return;
+
+    agentSessionId = data.session?.id || data.sessionId || agentSessionId || "";
+    if (agentSessionId) sessionStorage.setItem("ds_agent_session_id", agentSessionId);
+
+    if (Array.isArray(data.messages) && data.messages.length) {
+      agentBody.innerHTML = "";
+      data.messages.forEach((msg) => {
+        const role = msg.role === "user" ? "user" : "bot";
+        addMessage(agentBody, role, String(msg.content || msg.text || ""), false, {
+          skipAgentSave: true,
+          hideCopy: Boolean(msg.metadata?.artifact),
+        });
+      });
+      agentBody.scrollTop = agentBody.scrollHeight;
+    }
+
+    if (Array.isArray(data.files)) {
+      agentSelectedFiles = data.files.map((file) => ({
+        id: String(file.id || ""),
+        file: null,
+        name: file.original_name || file.originalName || file.name || "uploaded-file",
+        size: Number(file.size_bytes || file.sizeBytes || file.size || 0),
+        type: file.mime_type || file.mimeType || "",
+        extractionStatus: file.extraction_status || file.extractionStatus || "",
+        persisted: true,
+      }));
+      renderAgentFileChips();
+    }
+
+    agentStateReady = true;
+  } catch (err) {
+    console.warn("업무 AI Agent 세션 복원 실패:", err);
+    agentStateReady = true;
+  }
+}
+
+function saveAgentMessage(role, content, metadata = {}) {
+  const text = String(content || "").trim();
+  if (!text || !sessionToken) return;
+
+  agentStateRequest({
+    action: "save_message",
+    sessionId: agentSessionId,
+    role,
+    content: text,
+    route: metadata.route || lastAgentRoute || "",
+    metadata,
+  }).then((data) => {
+    if (data.session?.id) {
+      agentSessionId = data.session.id;
+      sessionStorage.setItem("ds_agent_session_id", agentSessionId);
+    }
+  }).catch((err) => {
+    console.warn("업무 AI Agent 메시지 저장 실패:", err);
+  });
 }
 
 function normalizeAgentText(value) {
@@ -1366,11 +1620,73 @@ function shouldUsePptDraft(message, hasFiles = false) {
   return (hasPptKeyword && hasPptAction) || hasFileBasedPpt;
 }
 
+
+function shouldUseExcelDraft(message) {
+  const text = normalizeAgentText(message);
+  if (!text) return false;
+  const excelKeywordPatterns = [/xlsx?|엑셀|스프레드시트|spreadsheet/i, /다운로드\s*파일|파일로\s*(?:줘|만들|생성)/i];
+  const excelActionPatterns = [/만들|생성|작성|다운로드|변환|정리|표로|목록화/i];
+  return hasPattern(text, excelKeywordPatterns) && hasPattern(text, excelActionPatterns);
+}
+
+function shouldUseWebSearch(message) {
+  const text = normalizeAgentText(message);
+  if (!text) return false;
+  const webPatterns = [
+    /최신|최근|현재|오늘|어제|이번\s*(?:주|달|분기|년도)/i,
+    /뉴스|기사|웹\s*검색|인터넷|검색해서|검색해/i,
+    /시장\s*동향|전망|트렌드|경쟁사|법규|고시|공시|환율|주가|가격|요금/i,
+  ];
+  return hasPattern(text, webPatterns);
+}
+
+function shouldRedirectToKnowledge(message, hasFiles = false) {
+  if (hasFiles) return false;
+  const text = normalizeAgentText(message);
+  if (!text) return false;
+
+  const internalPatterns = [
+    /연차|휴가|출장비|복리\s*후생|복지|근태|급여|인사\s*규정/i,
+    /결재\s*(?:절차|규정|양식)|전결|품의|구매\s*절차/i,
+    /보안\s*(?:규정|정책)|문서\s*반출|개인정보|사내\s*규정|업무\s*절차/i,
+    /담당\s*부서|담당자|규정상|회사\s*내규/i,
+  ];
+
+  const creativePatterns = [/메일|이메일|초안|작성|문구|아이디어|번역|요약|보고서/i];
+  return hasPattern(text, internalPatterns) && !hasPattern(text, creativePatterns);
+}
+
+function addKnowledgeRedirectMessage(originalMessage) {
+  const answer = "해당 질문은 사내 규정·업무 절차 확인이 필요한 내용으로 보입니다. 정확한 답변을 위해 [사내 지식 문의]에서 확인해 주세요.";
+  const div = addMessage(agentBody, "bot", answer, false, { hideCopy: true });
+  saveAgentMessage("assistant", answer, { route: "knowledge-redirect" });
+
+  const row = div.closest ? div.closest(".chat-row") : null;
+  if (!row) return;
+
+  const actions = document.createElement("div");
+  actions.className = "knowledge-redirect-actions";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "knowledge-redirect-btn";
+  btn.textContent = "사내 지식 문의로 이동";
+  btn.addEventListener("click", () => {
+    setMode("ai");
+    if (messageInput) {
+      messageInput.value = originalMessage || "";
+      autoResizeTextarea(messageInput);
+      focusInputWhenPanelReady(messageInput);
+    }
+  });
+  actions.appendChild(btn);
+  row.appendChild(actions);
+}
+
 function buildAgentMessage(message, files = agentSelectedFiles) {
   if (!files.length) return message;
 
   const fileList = files
-    .map((file) => "- " + file.name + " (" + formatFileSize(file.size) + ")")
+    .map((file) => "- " + getAttachmentName(file) + " (" + formatFileSize(getAttachmentSize(file)) + ")")
     .join("\n");
 
   return "[첨부 파일]\n" + fileList + "\n\n[요청]\n" + message;
@@ -1431,8 +1747,13 @@ async function sendChatToTarget({
         ? await res.json()
         : { ok: true, answer: await res.text() };
 
-      addMessage(targetBody, "bot", data.answer || data.message || JSON.stringify(data, null, 2));
+      const answerText = data.answer || data.message || JSON.stringify(data, null, 2);
+      const isArtifact = Boolean(data.ppt?.ok || data.excel?.ok || task === PPT_DRAFT_TASK || task === EXCEL_DRAFT_TASK);
+      addMessage(targetBody, "bot", answerText, false, { hideCopy: isArtifact });
       appendPptDownloadButton(targetBody, data.ppt);
+      appendExcelDownloadButton(targetBody, data.excel);
+      appendEvidenceBox(targetBody, data);
+      if (targetBody === agentBody) saveAgentMessage("assistant", answerText, { route: task || "agent-api", artifact: isArtifact, ppt: data.ppt || null, excel: data.excel || null });
       return;
     }
 
@@ -1462,7 +1783,7 @@ async function sendChatToTarget({
 
         if (parsed) {
           fullText += parsed;
-          botDiv.textContent = fullText;
+          setMessageContent(botDiv, fullText);
           targetBody.scrollTop = targetBody.scrollHeight;
           if (targetBody === aiBody) saveChatHistory();
         }
@@ -1477,13 +1798,17 @@ async function sendChatToTarget({
     const finalParsed = parseStreamText(buffer);
     if (finalParsed) {
       fullText += finalParsed;
-      botDiv.textContent = fullText;
+      setMessageContent(botDiv, fullText);
       if (targetBody === aiBody) saveChatHistory();
     }
 
     if (!fullText.trim()) {
-      botDiv.textContent = "답변 데이터는 수신했지만 화면에 표시할 텍스트를 찾지 못했습니다.";
+      setMessageContent(botDiv, "답변 데이터는 수신했지만 화면에 표시할 텍스트를 찾지 못했습니다.");
       if (targetBody === aiBody) saveChatHistory();
+    }
+
+    if (targetBody === agentBody && fullText.trim()) {
+      saveAgentMessage("assistant", fullText, { route: task || "agent-api" });
     }
   } catch (err) {
     removeThinkingBox(thinkingBox);
@@ -1512,11 +1837,18 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
     const formData = new FormData();
     formData.append("message", message);
     formData.append("stream", String(useStream));
+    if (agentSessionId) formData.append("sessionId", agentSessionId);
     if (task) formData.append("task", task);
     if (history.length) formData.append("history", JSON.stringify(history));
 
-    files.forEach((file) => {
-      formData.append("files", file, file.name);
+    const fileIds = getAgentFileIds(files);
+    if (fileIds.length) formData.append("fileIds", JSON.stringify(fileIds));
+
+    files.forEach((item) => {
+      const file = getAttachmentFile(item);
+      if (file && !getAttachmentId(item)) {
+        formData.append("files", file, file.name);
+      }
     });
 
     const res = await fetch(FILE_API_URL, {
@@ -1541,8 +1873,14 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
         ? await res.json()
         : { ok: true, answer: await res.text() };
 
-      addMessage(agentBody, "bot", data.answer || data.message || JSON.stringify(data, null, 2));
+      mergePersistedAgentFiles(data.files || []);
+      const answerText = data.answer || data.message || JSON.stringify(data, null, 2);
+      const isArtifact = Boolean(data.ppt?.ok || data.excel?.ok || task === PPT_DRAFT_TASK || task === EXCEL_DRAFT_TASK);
+      addMessage(agentBody, "bot", answerText, false, { hideCopy: isArtifact });
       appendPptDownloadButton(agentBody, data.ppt);
+      appendExcelDownloadButton(agentBody, data.excel);
+      appendEvidenceBox(agentBody, data);
+      saveAgentMessage("assistant", answerText, { route: task || "file-api", artifact: isArtifact, ppt: data.ppt || null, excel: data.excel || null, fileIds: getAgentFileIds() });
       return;
     }
 
@@ -1593,7 +1931,7 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
     }
 
     if (!fullText.trim()) {
-      botDiv.textContent = "파일 분석 응답은 수신했지만 화면에 표시할 텍스트를 찾지 못했습니다.";
+      setMessageContent(botDiv, "파일 분석 응답은 수신했지만 화면에 표시할 텍스트를 찾지 못했습니다.");
     }
   } catch (err) {
     removeThinkingBox(thinkingBox);
@@ -1607,6 +1945,8 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
 async function sendAgentChat(message, files = [], history = [], options = {}) {
   const task = options.task || "";
   const isPptDraft = task === PPT_DRAFT_TASK;
+  const isExcelDraft = task === EXCEL_DRAFT_TASK;
+  const isWebSearch = task === WEB_SEARCH_TASK;
   const useFileApi = Boolean(options.useFileApi && files.length);
   const thinkingSteps = isPptDraft
     ? [
@@ -1623,7 +1963,7 @@ async function sendAgentChat(message, files = [], history = [], options = {}) {
     lastAgentFileUseAt = Date.now();
     return sendAgentFileAnalysis(message, files, history, {
       task,
-      stream: !isPptDraft,
+      stream: false,
       thinkingSteps,
     });
   }
@@ -1638,7 +1978,7 @@ async function sendAgentChat(message, files = [], history = [], options = {}) {
     apiUrl: AGENT_API_URL,
     history,
     task,
-    stream: !isPptDraft,
+    stream: !(isPptDraft || isExcelDraft || isWebSearch),
     thinkingSteps,
   });
 }
@@ -1757,24 +2097,39 @@ if (agentMessageInput && agentForm) {
     const rawMessage = agentMessageInput.value.trim();
     if (!rawMessage && !agentSelectedFiles.length) return;
 
+    if (!agentSessionId) await initAgentSessionState();
+
     const filesSnapshot = [...agentSelectedFiles];
     const historySnapshot = getRecentChatMessages(agentBody);
     const message = rawMessage || "첨부한 파일을 분석해 주세요.";
-    const usePptDraft = shouldUsePptDraft(message, filesSnapshot.length > 0);
-    const useFileApi = usePptDraft && filesSnapshot.length > 0
+    const hasFiles = filesSnapshot.length > 0;
+    const usePptDraft = shouldUsePptDraft(message, hasFiles);
+    const useExcelDraft = shouldUseExcelDraft(message);
+    const useWebSearch = shouldUseWebSearch(message) && !hasFiles;
+    const useFileApi = usePptDraft && hasFiles
       ? true
-      : shouldUseFileApi(message, filesSnapshot.length > 0, historySnapshot);
+      : useExcelDraft && hasFiles
+        ? true
+        : shouldUseFileApi(message, hasFiles, historySnapshot);
+    const task = usePptDraft ? PPT_DRAFT_TASK : useExcelDraft ? EXCEL_DRAFT_TASK : useWebSearch ? WEB_SEARCH_TASK : "";
     const displayMessage = useFileApi ? buildAgentMessage(message, filesSnapshot) : message;
 
     addMessage(agentBody, "user", displayMessage);
+    saveAgentMessage("user", displayMessage, { route: useFileApi ? "file-api" : task || "agent-api", fileIds: getAgentFileIds(filesSnapshot) });
 
     agentMessageInput.value = "";
     autoResizeTextarea(agentMessageInput);
+
+    if (shouldRedirectToKnowledge(message, hasFiles)) {
+      addKnowledgeRedirectMessage(message);
+      return;
+    }
+
     agentSendBtn.disabled = true;
 
     await sendAgentChat(message, filesSnapshot, historySnapshot, {
       useFileApi,
-      task: usePptDraft ? PPT_DRAFT_TASK : "",
+      task,
     });
   });
 }
