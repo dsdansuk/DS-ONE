@@ -1623,7 +1623,7 @@ button {
 
 .knowledge-redirect-actions {
   flex: 0 0 calc(100% - 40px);
-  margin: -2px 0 0 40px;
+  margin: 3px 0 0 40px;
   display: flex;
   justify-content: flex-start;
   align-items: center;
