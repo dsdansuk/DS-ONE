@@ -3,10 +3,14 @@
 // Edge Functions:
 // - sso-login: 그룹웨어 SSO 진입 및 토큰 발급
 // - ai-api: 사내 AI / SideTalk 호출
+// - file-api: 첨부 파일 본문 추출 및 DEFAULT_AI_PROVIDER 기반 분석
 // - rpa-api: UiPath RPA 호출
 
 const AI_API_URL =
   "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/ai-api";
+
+const FILE_API_URL =
+  "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api";
 
 const RPA_API_URL =
   "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api";
@@ -1179,14 +1183,102 @@ async function sendChat(message) {
   });
 }
 
+async function sendAgentFileAnalysis(message, files = []) {
+  const thinkingBox = createThinkingBox(agentBody);
+
+  try {
+    const formData = new FormData();
+    formData.append("message", message);
+    formData.append("stream", "true");
+
+    files.forEach((file) => {
+      formData.append("files", file, file.name);
+    });
+
+    const res = await fetch(FILE_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + sessionToken,
+      },
+      body: formData,
+    });
+
+    removeThinkingBox(thinkingBox);
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      addMessage(agentBody, "bot", "파일 분석 API 오류가 발생했습니다.\nHTTP " + res.status + "\n" + errorText, true);
+      return;
+    }
+
+    if (!res.body) {
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const data = await res.json();
+        addMessage(agentBody, "bot", data.answer || data.message || JSON.stringify(data, null, 2), true);
+      } else {
+        addMessage(agentBody, "bot", "파일 분석 응답 본문이 없습니다.");
+      }
+      return;
+    }
+
+    const botDiv = addMessage(agentBody, "bot", "");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+
+    let fullText = "";
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      if (buffer.includes("\n\n") || buffer.includes("data: [DONE]") || !buffer.includes("data:")) {
+        const parsed = parseStreamText(buffer);
+
+        if (parsed) {
+          fullText += parsed;
+          botDiv.textContent = fullText;
+          agentBody.scrollTop = agentBody.scrollHeight;
+        }
+
+        buffer = "";
+      }
+    }
+
+    const tail = decoder.decode();
+    if (tail) buffer += tail;
+
+    const finalParsed = parseStreamText(buffer);
+    if (finalParsed) {
+      fullText += finalParsed;
+      botDiv.textContent = fullText;
+    }
+
+    if (!fullText.trim()) {
+      botDiv.textContent = "파일 분석 응답은 수신했지만 화면에 표시할 텍스트를 찾지 못했습니다.";
+    }
+  } catch (err) {
+    removeThinkingBox(thinkingBox);
+    addMessage(agentBody, "bot", "파일 분석 호출 실패: " + getErrorMessage(err));
+  } finally {
+    if (agentSendBtn) agentSendBtn.disabled = false;
+    focusInputWhenPanelReady(agentMessageInput);
+  }
+}
+
 async function sendAgentChat(message, files = []) {
+  if (files.length) {
+    return sendAgentFileAnalysis(message, files);
+  }
+
   return sendChatToTarget({
     targetBody: agentBody,
     message,
     sendButton: agentSendBtn,
     input: agentMessageInput,
-    task: "document",
-    attachments: files,
   });
 }
 
@@ -1305,16 +1397,16 @@ if (agentMessageInput && agentForm) {
     if (!rawMessage && !agentSelectedFiles.length) return;
 
     const filesSnapshot = [...agentSelectedFiles];
-    const message = rawMessage || "첨부한 파일을 확인해 주세요.";
-    const requestMessage = filesSnapshot.length ? buildAgentMessage(message) : message;
+    const message = rawMessage || "첨부한 파일을 분석해 주세요.";
+    const displayMessage = filesSnapshot.length ? buildAgentMessage(message) : message;
 
-    addMessage(agentBody, "user", requestMessage);
+    addMessage(agentBody, "user", displayMessage);
 
     agentMessageInput.value = "";
     autoResizeTextarea(agentMessageInput);
     agentSendBtn.disabled = true;
     clearAgentFiles();
 
-    await sendAgentChat(requestMessage, filesSnapshot);
+    await sendAgentChat(message, filesSnapshot);
   });
 }
