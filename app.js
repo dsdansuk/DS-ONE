@@ -24,12 +24,17 @@ const RPA_API_URL =
 
 // Skywork 로컬 Worker 테스트 전용 설정
 // - 운영 배포용이 아니라, 내 PC에서 Skywork Worker가 켜져 있을 때만 1회 테스트하는 용도입니다.
-// - 브라우저 개발자도구에서 localStorage.setItem("ds_skywork_local_test", "1") 실행 후 새로고침하면 활성화됩니다.
-// - 테스트 종료 후 localStorage.removeItem("ds_skywork_local_test") 실행 또는 값을 0으로 변경하세요.
+// - 크레딧 오사용을 막기 위해 실제 호출 전 confirm 확인창을 띄웁니다.
+// - 기본값은 테스트 활성화입니다. 비활성화하려면 개발자도구 Console에서 아래 명령을 실행하세요.
+//   localStorage.setItem("ds_skywork_local_test", "0"); location.reload();
+// - 다시 활성화하려면 아래 명령을 실행하세요.
+//   localStorage.setItem("ds_skywork_local_test", "1"); location.reload();
 const SKYWORK_LOCAL_WORKER_URL = "http://127.0.0.1:8787/generate-ppt";
 const SKYWORK_LOCAL_WORKER_TOKEN = "test-local-token-1234";
 const SKYWORK_LOCAL_TEST_STORAGE_KEY = "ds_skywork_local_test";
-const SKYWORK_LOCAL_ALLOWED_USERS = ["2024061"];
+const SKYWORK_LOCAL_TEST_DEFAULT_ENABLED = true;
+// 테스트 기간에는 비워두면 로그인 ID와 무관하게 허용합니다. 운영 반영 시 반드시 사번/ID를 제한하세요.
+const SKYWORK_LOCAL_ALLOWED_USERS = [];
 
 const PPT_DRAFT_TASK = "ppt_draft";
 const EXCEL_DRAFT_TASK = "excel_draft";
@@ -2251,9 +2256,12 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
 
 function isSkyworkLocalTestEnabled() {
   try {
-    return localStorage.getItem(SKYWORK_LOCAL_TEST_STORAGE_KEY) === "1";
+    const value = localStorage.getItem(SKYWORK_LOCAL_TEST_STORAGE_KEY);
+    if (value === "1") return true;
+    if (value === "0") return false;
+    return SKYWORK_LOCAL_TEST_DEFAULT_ENABLED;
   } catch {
-    return false;
+    return SKYWORK_LOCAL_TEST_DEFAULT_ENABLED;
   }
 }
 
@@ -2620,6 +2628,30 @@ if (agentMessageInput && agentForm) {
       agentSendBtn.disabled = true;
 
       await sendSkyworkLocalPptDraft(message);
+      return;
+    }
+
+    // Skywork 테스트 중에는 PPT 요청이 기존 내부 pptxgenjs 생성 프로세스로 빠지지 않도록 명확히 막습니다.
+    // 이 분기가 보인다면 localStorage에서 테스트를 끈 상태이거나 허용 사용자 조건에 걸린 것입니다.
+    if (usePptDraft && !hasFiles && !hasSensitivePptRequestText(message)) {
+      const answer = [
+        "**Skywork PPT 테스트가 비활성화되어 있습니다.**",
+        "기존 내부 PPT 생성 프로세스로 실행하지 않았습니다.",
+        "",
+        "**활성화 방법**",
+        "- 개발자도구 Console에서 아래 명령을 실행한 뒤 새로고침해 주세요.",
+        "- localStorage.setItem(\"ds_skywork_local_test\", \"1\"); location.reload();",
+      ].join("\n");
+
+      addMessage(agentBody, "user", message);
+      saveAgentMessage("user", message, { route: "skywork-local-disabled" });
+
+      agentMessageInput.value = "";
+      autoResizeTextarea(agentMessageInput);
+
+      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
+      saveAgentMessage("assistant", answer, { route: "skywork-local-disabled" });
+      focusInputWhenPanelReady(agentMessageInput);
       return;
     }
 
