@@ -1538,9 +1538,9 @@ async function initAgentSessionState() {
 
 function saveAgentMessage(role, content, metadata = {}) {
   const text = String(content || "").trim();
-  if (!text || !sessionToken) return;
+  if (!text || !sessionToken) return Promise.resolve(null);
 
-  agentStateRequest({
+  return agentStateRequest({
     action: "save_message",
     sessionId: agentSessionId,
     role,
@@ -1552,8 +1552,10 @@ function saveAgentMessage(role, content, metadata = {}) {
       agentSessionId = data.session.id;
       sessionStorage.setItem("ds_agent_session_id", agentSessionId);
     }
+    return data;
   }).catch((err) => {
     console.warn("업무 AI Agent 메시지 저장 실패:", err);
+    return null;
   });
 }
 
@@ -1881,7 +1883,7 @@ function buildPptUploadBlockedAnswer() {
     "",
     "**이용 방법**",
     "- 파일을 제거한 뒤 큰 틀이나 목차 중심으로 요청해 주세요.",
-    "- 예: 신규 업무 추진 계획에 대한 PPT 초안을 만들어줘",
+    "- 예: 매출 분석을 위한 AI 도입 PPT 초안을 만들어줘",
   ].join("\n");
 }
 
@@ -1942,11 +1944,11 @@ function shouldRedirectToKnowledge(message, hasFiles = false) {
   return hasPattern(text, internalPatterns);
 }
 
-function addKnowledgeRedirectMessage(originalMessage) {
+async function addKnowledgeRedirectMessage(originalMessage) {
   const answer = "해당 질문은 사내 규정·업무 절차 확인이 필요한 내용으로 보입니다. 정확한 답변을 위해 [사내 지식 문의]에서 확인해 주세요.";
   const div = addMessage(agentBody, "bot", answer, false, { hideCopy: true });
   applyKnowledgeRedirectAction(div, originalMessage);
-  saveAgentMessage("assistant", answer, { route: "knowledge-redirect", originalMessage });
+  await saveAgentMessage("assistant", answer, { route: "knowledge-redirect", originalMessage });
 }
 
 function buildAgentMessage(message, files = agentSelectedFiles) {
@@ -2408,13 +2410,13 @@ if (agentMessageInput && agentForm) {
 
     if (exportTask === "ambiguous_export") {
       addMessage(agentBody, "user", message);
-      saveAgentMessage("user", message, { route: "agent-api" });
+      await saveAgentMessage("user", message, { route: "agent-api" });
       agentMessageInput.value = "";
       autoResizeTextarea(agentMessageInput);
 
       const answer = buildAmbiguousExportAnswer();
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      saveAgentMessage("assistant", answer, { route: "export-clarification" });
+      await saveAgentMessage("assistant", answer, { route: "export-clarification" });
       focusInputWhenPanelReady(agentMessageInput);
       return;
     }
@@ -2428,13 +2430,13 @@ if (agentMessageInput && agentForm) {
       const answer = buildPptUploadBlockedAnswer();
 
       addMessage(agentBody, "user", displayMessage);
-      saveAgentMessage("user", displayMessage, { route: "ppt-security-block", fileIds: getAgentFileIds(filesSnapshot) });
+      await saveAgentMessage("user", displayMessage, { route: "ppt-security-block", fileIds: getAgentFileIds(filesSnapshot) });
 
       agentMessageInput.value = "";
       autoResizeTextarea(agentMessageInput);
 
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "uploaded-file" });
+      await saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "uploaded-file" });
       focusInputWhenPanelReady(agentMessageInput);
       return;
     }
@@ -2443,13 +2445,13 @@ if (agentMessageInput && agentForm) {
       const answer = buildPptSensitiveBlockedAnswer();
 
       addMessage(agentBody, "user", message);
-      saveAgentMessage("user", message, { route: "ppt-security-block" });
+      await saveAgentMessage("user", message, { route: "ppt-security-block" });
 
       agentMessageInput.value = "";
       autoResizeTextarea(agentMessageInput);
 
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "sensitive-text" });
+      await saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "sensitive-text" });
       focusInputWhenPanelReady(agentMessageInput);
       return;
     }
@@ -2460,13 +2462,13 @@ if (agentMessageInput && agentForm) {
     const displayMessage = useFileApi ? buildAgentMessage(message, filesSnapshot) : message;
 
     addMessage(agentBody, "user", displayMessage);
-    saveAgentMessage("user", displayMessage, { route: useFileApi ? "file-api" : task || "agent-api", fileIds: getAgentFileIds(filesSnapshot) });
+    await saveAgentMessage("user", displayMessage, { route: useFileApi ? "file-api" : task || "agent-api", fileIds: getAgentFileIds(filesSnapshot) });
 
     agentMessageInput.value = "";
     autoResizeTextarea(agentMessageInput);
 
     if (!task && !useFileApi && shouldRedirectToKnowledge(message, hasFiles)) {
-      addKnowledgeRedirectMessage(message);
+      await addKnowledgeRedirectMessage(message);
       return;
     }
 
