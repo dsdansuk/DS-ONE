@@ -22,6 +22,15 @@ const AGENT_STATE_API_URL = AGENT_API_URL;
 const RPA_API_URL =
   "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api";
 
+// Skywork 로컬 Worker 테스트 전용 설정
+// - 운영 배포용이 아니라, 내 PC에서 Skywork Worker가 켜져 있을 때만 1회 테스트하는 용도입니다.
+// - 브라우저 개발자도구에서 localStorage.setItem("ds_skywork_local_test", "1") 실행 후 새로고침하면 활성화됩니다.
+// - 테스트 종료 후 localStorage.removeItem("ds_skywork_local_test") 실행 또는 값을 0으로 변경하세요.
+const SKYWORK_LOCAL_WORKER_URL = "http://127.0.0.1:8787/generate-ppt";
+const SKYWORK_LOCAL_WORKER_TOKEN = "test-local-token-1234";
+const SKYWORK_LOCAL_TEST_STORAGE_KEY = "ds_skywork_local_test";
+const SKYWORK_LOCAL_ALLOWED_USERS = ["2024061"];
+
 const PPT_DRAFT_TASK = "ppt_draft";
 const EXCEL_DRAFT_TASK = "excel_draft";
 const WEB_SEARCH_TASK = "web_search";
@@ -561,8 +570,12 @@ function appendArtifactDownloadButton(targetBody, artifact, options = {}) {
   const link = document.createElement("a");
   link.className = "ppt-download-btn";
   link.href = artifact.downloadUrl;
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
+  if (String(artifact.downloadUrl || "").startsWith("blob:")) {
+    link.download = artifact.fileName || artifact.filename || "download.pptx";
+  } else {
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+  }
   link.textContent = options.label || "다운로드";
 
   const meta = document.createElement("span");
@@ -1538,9 +1551,9 @@ async function initAgentSessionState() {
 
 function saveAgentMessage(role, content, metadata = {}) {
   const text = String(content || "").trim();
-  if (!text || !sessionToken) return Promise.resolve(null);
+  if (!text || !sessionToken) return;
 
-  return agentStateRequest({
+  agentStateRequest({
     action: "save_message",
     sessionId: agentSessionId,
     role,
@@ -1552,10 +1565,8 @@ function saveAgentMessage(role, content, metadata = {}) {
       agentSessionId = data.session.id;
       sessionStorage.setItem("ds_agent_session_id", agentSessionId);
     }
-    return data;
   }).catch((err) => {
     console.warn("업무 AI Agent 메시지 저장 실패:", err);
-    return null;
   });
 }
 
@@ -1757,20 +1768,13 @@ function hasExplicitPptExportRequest(text) {
   const normalized = normalizeAgentText(text);
   if (!normalized) return false;
 
-  /**
-   * "PPT로 만들어줘", "PPT 파일 만들어줘"뿐 아니라
-   * 실제 사용자가 자주 쓰는 "보고용 ppt 만들어줘", "피피티 작성해줘"도
-   * PPT 생성 요청으로 인식해야 보안 차단 로직이 먼저 실행됩니다.
-   * 단순 정책 질문인 "PPT 생성 막아야 해?"는 오탐을 줄이기 위해
-   * 명령형 꼬리말(줘/주세요/달라/바랍니다 등)이 있는 패턴 위주로 감지합니다.
-   */
   const pptPatterns = [
-    /(?:pptx?|피피티|파워포인트|프레젠테이션|슬라이드|발표자료|보고자료|보고용\s*(?:pptx?|피피티|파워포인트|프레젠테이션|자료))\s*(?:파일|자료|초안|덱)?\s*(?:로|으로)\s*(?:만들|생성|작성|제작|구성|정리|변환|다운로드|내려받|출력)/i,
-    /(?:pptx?|피피티|파워포인트|프레젠테이션|슬라이드|발표자료|보고자료|보고용\s*(?:pptx?|피피티|파워포인트|프레젠테이션|자료))\s*(?:파일|자료|초안|덱)?\s*(?:을|를)?\s*(?:만들|생성|작성|제작|구성|정리|변환)(?:어|아|해)?\s*(?:줘|주세요|주십시오|달라|바랍니다|해줘|해주세요)/i,
-    /(?:발표자료|보고자료|보고용\s*자료|제안서)\s*(?:를|을)?\s*(?:만들|생성|작성|제작|구성)(?:어|아|해)?\s*(?:줘|주세요|주십시오|달라|바랍니다|해줘|해주세요)/i,
-    /(?:pptx?|피피티|파워포인트|프레젠테이션)\s*초안/i,
-    /(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드).{0,30}(?:pptx?|피피티|파워포인트|프레젠테이션|슬라이드)/i,
-    /(?:pptx?|피피티|파워포인트|프레젠테이션|슬라이드).{0,30}(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드)/i,
+    /(?:pptx?|파워포인트|프레젠테이션|슬라이드|발표자료|보고자료)\s*(?:파일)?\s*(?:로|으로)\s*(?:만들|생성|작성|제작|구성|정리|변환|다운로드|내려받|출력)/i,
+    /(?:pptx?|파워포인트|프레젠테이션)\s*파일\s*(?:을|를)?\s*(?:만들|생성|작성|제작|구성|다운로드|내려받|출력)/i,
+    /(?:발표자료|보고자료|제안서)\s*(?:를|을)?\s*(?:만들|생성|작성|제작|구성)/i,
+    /(?:pptx?|파워포인트|프레젠테이션)\s*초안/i,
+    /(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드).{0,30}(?:pptx?|파워포인트|프레젠테이션|슬라이드)/i,
+    /(?:pptx?|파워포인트|프레젠테이션|슬라이드).{0,30}(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드)/i,
   ];
 
   return hasPattern(normalized, pptPatterns);
@@ -1883,7 +1887,7 @@ function buildPptUploadBlockedAnswer() {
     "",
     "**이용 방법**",
     "- 파일을 제거한 뒤 큰 틀이나 목차 중심으로 요청해 주세요.",
-    "- 예: 매출 분석을 위한 AI 도입 PPT 초안을 만들어줘",
+    "- 예: 신규 업무 추진 계획에 대한 PPT 초안을 만들어줘",
   ].join("\n");
 }
 
@@ -1897,7 +1901,7 @@ function buildPptSensitiveBlockedAnswer() {
     "",
     "**이용 방법**",
     "- 구체적인 수치, 이름, 연락처, 계약 조건을 제거하고 요청해 주세요.",
-    "- 예: 매출 분석을 위한 AI 도입 PPT 큰 틀을 만들어줘",
+    "- 예: 신규 업무 추진 계획에 대한 PPT 초안을 만들어줘",
   ].join("\n");
 }
 
@@ -1944,11 +1948,11 @@ function shouldRedirectToKnowledge(message, hasFiles = false) {
   return hasPattern(text, internalPatterns);
 }
 
-async function addKnowledgeRedirectMessage(originalMessage) {
+function addKnowledgeRedirectMessage(originalMessage) {
   const answer = "해당 질문은 사내 규정·업무 절차 확인이 필요한 내용으로 보입니다. 정확한 답변을 위해 [사내 지식 문의]에서 확인해 주세요.";
   const div = addMessage(agentBody, "bot", answer, false, { hideCopy: true });
   applyKnowledgeRedirectAction(div, originalMessage);
-  await saveAgentMessage("assistant", answer, { route: "knowledge-redirect", originalMessage });
+  saveAgentMessage("assistant", answer, { route: "knowledge-redirect", originalMessage });
 }
 
 function buildAgentMessage(message, files = agentSelectedFiles) {
@@ -2245,6 +2249,157 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
   }
 }
 
+function isSkyworkLocalTestEnabled() {
+  try {
+    return localStorage.getItem(SKYWORK_LOCAL_TEST_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function isSkyworkLocalAllowedUser() {
+  const loginId = String(currentLoginId || "").trim();
+  const empNo = String(currentEmpNo || "").trim();
+  if (!SKYWORK_LOCAL_ALLOWED_USERS.length) return true;
+  return SKYWORK_LOCAL_ALLOWED_USERS.includes(loginId) || SKYWORK_LOCAL_ALLOWED_USERS.includes(empNo);
+}
+
+function shouldUseSkyworkLocalWorker(task, hasFiles, message) {
+  return task === PPT_DRAFT_TASK
+    && isSkyworkLocalTestEnabled()
+    && isSkyworkLocalAllowedUser()
+    && !hasFiles
+    && !hasSensitivePptRequestText(message);
+}
+
+function buildSkyworkLocalPrompt(message) {
+  return [
+    message,
+    "",
+    "요구사항:",
+    "- 한국어 PPT로 작성",
+    "- 실제 회사 내부자료, 개인정보, 구체적인 매출/원가/계약금액은 사용하지 않음",
+    "- 일반적인 큰 틀/초안 수준으로 작성",
+    "- 가능하면 5장 내외로 간결하게 구성",
+  ].join("\n");
+}
+
+async function sendSkyworkLocalPptDraft(message) {
+  const thinkingBox = createThinkingBox(agentBody, [
+    "Skywork 로컬 Worker 연결 확인 중",
+    "외부 전송 전 보안 기준 확인 중",
+    "고품질 PPT 초안을 생성하는 중",
+    "PPTX 파일 다운로드를 준비하는 중",
+  ]);
+
+  try {
+    const okToGenerate = window.confirm(
+      "Skywork 고품질 PPT 생성을 진행합니다.\n\n" +
+      "이 작업은 Skywork 크레딧을 사용할 수 있습니다.\n" +
+      "파일 첨부와 민감정보는 전송하지 않습니다.\n\n" +
+      "생성하시겠습니까?"
+    );
+
+    if (!okToGenerate) {
+      removeThinkingBox(thinkingBox);
+      const answer = "**PPT 생성을 취소했습니다.**\nSkywork 크레딧이 차감되지 않도록 생성을 진행하지 않았습니다.";
+      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
+      saveAgentMessage("assistant", answer, { route: "skywork-local-cancelled" });
+      return;
+    }
+
+    const res = await fetch(SKYWORK_LOCAL_WORKER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + SKYWORK_LOCAL_WORKER_TOKEN,
+      },
+      body: JSON.stringify({
+        prompt: buildSkyworkLocalPrompt(message),
+      }),
+    });
+
+    removeThinkingBox(thinkingBox);
+
+    if (!res.ok) {
+      let detail = "";
+      try {
+        const data = await res.json();
+        detail = data.detail || data.message || JSON.stringify(data);
+      } catch {
+        detail = await res.text();
+      }
+
+      const answer = [
+        "**Skywork PPT 생성에 실패했습니다.**",
+        "로컬 Worker 호출 또는 Skywork 생성 과정에서 오류가 발생했습니다.",
+        "",
+        "**확인할 사항**",
+        "- PowerShell에서 Worker가 켜져 있는지 확인해 주세요.",
+        "- 주소가 http://127.0.0.1:8787 인지 확인해 주세요.",
+        "- .env의 WORKER_API_TOKEN과 app.js의 토큰이 같은지 확인해 주세요.",
+        detail ? "" : "",
+        detail ? "**오류 내용**\n" + String(detail).slice(0, 600) : "",
+      ].filter(Boolean).join("\n");
+
+      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
+      saveAgentMessage("assistant", answer, { route: "skywork-local-error" });
+      return;
+    }
+
+    const blob = await res.blob();
+    if (!blob || blob.size < 1024) {
+      throw new Error("다운로드된 PPTX 파일 크기가 비정상적으로 작습니다.");
+    }
+
+    const fileUrl = URL.createObjectURL(blob);
+    const artifact = {
+      ok: true,
+      downloadUrl: fileUrl,
+      fileName: "skywork-ppt-draft.pptx",
+      expiresIn: 0,
+      provider: "skywork-local-worker",
+      createdAt: new Date().toISOString(),
+    };
+
+    const answer = [
+      "**Skywork PPT 초안이 생성되었습니다.**",
+      "아래 다운로드 버튼으로 파일을 받아 검토해 주세요.",
+      "",
+      "**테스트 기준**",
+      "- 파일 첨부 없이 요청 문장만 전송했습니다.",
+      "- 민감정보 포함 여부를 확인한 뒤 생성했습니다.",
+      "- 생성 결과는 AI 초안이므로 최종 검토 후 활용해 주세요.",
+    ].join("\n");
+
+    addMessage(agentBody, "bot", answer, false, { hideCopy: true });
+    appendPptDownloadButton(agentBody, artifact);
+    saveAgentMessage("assistant", answer, {
+      route: "skywork-local-worker",
+      artifact: true,
+      artifactSavedAt: new Date().toISOString(),
+      ppt: null,
+      note: "Blob URL은 새로고침 후 재사용할 수 없습니다.",
+    });
+  } catch (err) {
+    removeThinkingBox(thinkingBox);
+    const answer = [
+      "**Skywork PPT 생성에 실패했습니다.**",
+      getErrorMessage(err),
+      "",
+      "**확인할 사항**",
+      "- Worker PowerShell 창이 열려 있는지 확인해 주세요.",
+      "- 브라우저에서 로컬 주소 호출이 차단되지 않았는지 확인해 주세요.",
+      "- 먼저 PowerShell Invoke-WebRequest 테스트가 성공하는지 확인해 주세요.",
+    ].join("\n");
+    addMessage(agentBody, "bot", answer, false, { hideCopy: true });
+    saveAgentMessage("assistant", answer, { route: "skywork-local-exception" });
+  } finally {
+    if (agentSendBtn) agentSendBtn.disabled = false;
+    focusInputWhenPanelReady(agentMessageInput);
+  }
+}
+
 async function sendAgentChat(message, files = [], history = [], options = {}) {
   const task = options.task || "";
   const isPptDraft = task === PPT_DRAFT_TASK;
@@ -2410,13 +2565,13 @@ if (agentMessageInput && agentForm) {
 
     if (exportTask === "ambiguous_export") {
       addMessage(agentBody, "user", message);
-      await saveAgentMessage("user", message, { route: "agent-api" });
+      saveAgentMessage("user", message, { route: "agent-api" });
       agentMessageInput.value = "";
       autoResizeTextarea(agentMessageInput);
 
       const answer = buildAmbiguousExportAnswer();
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      await saveAgentMessage("assistant", answer, { route: "export-clarification" });
+      saveAgentMessage("assistant", answer, { route: "export-clarification" });
       focusInputWhenPanelReady(agentMessageInput);
       return;
     }
@@ -2430,13 +2585,13 @@ if (agentMessageInput && agentForm) {
       const answer = buildPptUploadBlockedAnswer();
 
       addMessage(agentBody, "user", displayMessage);
-      await saveAgentMessage("user", displayMessage, { route: "ppt-security-block", fileIds: getAgentFileIds(filesSnapshot) });
+      saveAgentMessage("user", displayMessage, { route: "ppt-security-block", fileIds: getAgentFileIds(filesSnapshot) });
 
       agentMessageInput.value = "";
       autoResizeTextarea(agentMessageInput);
 
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      await saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "uploaded-file" });
+      saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "uploaded-file" });
       focusInputWhenPanelReady(agentMessageInput);
       return;
     }
@@ -2445,14 +2600,26 @@ if (agentMessageInput && agentForm) {
       const answer = buildPptSensitiveBlockedAnswer();
 
       addMessage(agentBody, "user", message);
-      await saveAgentMessage("user", message, { route: "ppt-security-block" });
+      saveAgentMessage("user", message, { route: "ppt-security-block" });
 
       agentMessageInput.value = "";
       autoResizeTextarea(agentMessageInput);
 
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      await saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "sensitive-text" });
+      saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "sensitive-text" });
       focusInputWhenPanelReady(agentMessageInput);
+      return;
+    }
+
+    if (shouldUseSkyworkLocalWorker(task, hasFiles, message)) {
+      addMessage(agentBody, "user", message);
+      saveAgentMessage("user", message, { route: "skywork-local-worker" });
+
+      agentMessageInput.value = "";
+      autoResizeTextarea(agentMessageInput);
+      agentSendBtn.disabled = true;
+
+      await sendSkyworkLocalPptDraft(message);
       return;
     }
 
@@ -2462,13 +2629,13 @@ if (agentMessageInput && agentForm) {
     const displayMessage = useFileApi ? buildAgentMessage(message, filesSnapshot) : message;
 
     addMessage(agentBody, "user", displayMessage);
-    await saveAgentMessage("user", displayMessage, { route: useFileApi ? "file-api" : task || "agent-api", fileIds: getAgentFileIds(filesSnapshot) });
+    saveAgentMessage("user", displayMessage, { route: useFileApi ? "file-api" : task || "agent-api", fileIds: getAgentFileIds(filesSnapshot) });
 
     agentMessageInput.value = "";
     autoResizeTextarea(agentMessageInput);
 
     if (!task && !useFileApi && shouldRedirectToKnowledge(message, hasFiles)) {
-      await addKnowledgeRedirectMessage(message);
+      addKnowledgeRedirectMessage(message);
       return;
     }
 
