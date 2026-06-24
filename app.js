@@ -1828,6 +1828,70 @@ function shouldUsePptDraft(message, hasFiles = false) {
   return decideExportTask(message) === PPT_DRAFT_TASK;
 }
 
+
+function hasSensitivePptRequestText(message) {
+  const text = String(message || "").trim();
+  if (!text) return false;
+
+  const normalized = normalizeAgentText(text);
+  const compact = text.replace(/\s+/g, " ");
+
+  // 실제 개인정보 패턴: 숫자/식별자가 직접 들어온 경우만 차단합니다.
+  const directSensitivePatterns = [
+    /\d{6}\s*-?\s*[1-4]\d{6}/, // 주민등록번호 형태
+    /01[016789]\s*-?\s*\d{3,4}\s*-?\s*\d{4}/, // 휴대폰 번호
+    /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i, // 이메일 주소
+    /(?:계좌|카드)\s*(?:번호)?\s*[:：]?\s*\d{2,6}(?:[-\s]\d{2,6}){2,}/i,
+  ];
+
+  if (hasPattern(compact, directSensitivePatterns)) return true;
+
+  // 명시적 보안/기밀 키워드는 숫자가 없어도 차단합니다.
+  const explicitSecretPatterns = [
+    /대외비|극비|기밀|비공개|confidential|nda|비밀유지/i,
+    /개인정보|주민등록번호|계좌번호|카드번호/i,
+    /고객\s*명단|거래처\s*명단|임직원\s*명단|퇴사자\s*명단/i,
+    /연봉\s*현황|급여\s*현황|인사\s*평가|징계\s*내역/i,
+  ];
+
+  if (hasPattern(normalized, explicitSecretPatterns)) return true;
+
+  // 매출/비용 같은 단어만으로는 차단하지 않고, 구체적인 금액/수치가 함께 있을 때만 차단합니다.
+  const hasBusinessSensitiveKeyword = /(매출|영업이익|순이익|원가|마진|수익률|손익|계약금액|견적금액|단가|예산|투자금|인건비|급여|연봉)/i.test(normalized);
+  const hasConcreteNumber = /(?:\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(?:원|만원|억|억원|조|조원|달러|usd|krw|%|퍼센트|명|건|개|대)/i.test(normalized);
+
+  return hasBusinessSensitiveKeyword && hasConcreteNumber;
+}
+
+function buildPptUploadBlockedAnswer() {
+  return [
+    "**PPT 생성을 중단했습니다.**",
+    "첨부파일이 있는 경우 보안 정책상 PPT를 생성하지 않습니다.",
+    "",
+    "**이유**",
+    "- 업로드 파일의 내용이 외부 PPT 생성 과정에 전달될 수 있어 차단했습니다.",
+    "- 사내 자료, 견적서, 개인정보, 대외비가 포함될 가능성을 방지하기 위한 조치입니다.",
+    "",
+    "**이용 방법**",
+    "- 파일을 제거한 뒤 큰 틀이나 목차 중심으로 요청해 주세요.",
+    "- 예: 매출 분석을 위한 AI 도입 PPT 초안을 만들어줘",
+  ].join("\n");
+}
+
+function buildPptSensitiveBlockedAnswer() {
+  return [
+    "**PPT 생성을 중단했습니다.**",
+    "요청 내용에 민감정보로 볼 수 있는 구체적인 데이터가 포함되어 있습니다.",
+    "",
+    "**이유**",
+    "- 금액, 개인정보, 계약·인사·기밀 정보는 외부 PPT 생성 과정에 전달하지 않습니다.",
+    "",
+    "**이용 방법**",
+    "- 구체적인 수치, 이름, 연락처, 계약 조건을 제거하고 요청해 주세요.",
+    "- 예: 매출 분석을 위한 AI 도입 PPT 큰 틀을 만들어줘",
+  ].join("\n");
+}
+
 function shouldUseExcelDraft(message) {
   return decideExportTask(message) === EXCEL_DRAFT_TASK;
 }
@@ -2351,11 +2415,41 @@ if (agentMessageInput && agentForm) {
     const task = exportTask || (shouldUseWebSearch(message) && !hasFiles ? WEB_SEARCH_TASK : "");
     const usePptDraft = task === PPT_DRAFT_TASK;
     const useExcelDraft = task === EXCEL_DRAFT_TASK;
-    const useFileApi = usePptDraft && hasFiles
+
+    if (usePptDraft && hasFiles) {
+      const displayMessage = buildAgentMessage(message, filesSnapshot);
+      const answer = buildPptUploadBlockedAnswer();
+
+      addMessage(agentBody, "user", displayMessage);
+      saveAgentMessage("user", displayMessage, { route: "ppt-security-block", fileIds: getAgentFileIds(filesSnapshot) });
+
+      agentMessageInput.value = "";
+      autoResizeTextarea(agentMessageInput);
+
+      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
+      saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "uploaded-file" });
+      focusInputWhenPanelReady(agentMessageInput);
+      return;
+    }
+
+    if (usePptDraft && hasSensitivePptRequestText(message)) {
+      const answer = buildPptSensitiveBlockedAnswer();
+
+      addMessage(agentBody, "user", message);
+      saveAgentMessage("user", message, { route: "ppt-security-block" });
+
+      agentMessageInput.value = "";
+      autoResizeTextarea(agentMessageInput);
+
+      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
+      saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "sensitive-text" });
+      focusInputWhenPanelReady(agentMessageInput);
+      return;
+    }
+
+    const useFileApi = useExcelDraft && hasFiles
       ? true
-      : useExcelDraft && hasFiles
-        ? true
-        : shouldUseFileApi(message, hasFiles, historySnapshot);
+      : shouldUseFileApi(message, hasFiles, historySnapshot);
     const displayMessage = useFileApi ? buildAgentMessage(message, filesSnapshot) : message;
 
     addMessage(agentBody, "user", displayMessage);
