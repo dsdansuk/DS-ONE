@@ -37,15 +37,19 @@ const PPT_DRAFT_TASK = "ppt_draft";
 const EXCEL_DRAFT_TASK = "excel_draft";
 const WEB_SEARCH_TASK = "web_search";
 
-// Skywork PPT 생성 시 사용할 DS단석 CI/브랜드 디자인 지침입니다.
-// 운영 구조에서는 agent-api가 이 메시지를 받아 safe_prompt로 넘기며,
-// 로컬 테스트 모드에서도 동일한 지침을 사용합니다.
+// Skywork 로컬 테스트 모드에서만 사용할 DS단석 CI/브랜드 디자인 지침입니다.
+// 운영 Pull Worker 구조에서는 민감정보 차단 로직과 모델 지침을 분리하기 위해
+// 프론트가 이 지침을 agent-api로 보내지 않고, agent-api가 서버 내부에서 safe_prompt에만 추가합니다.
 const SKYWORK_PPT_CI_DESIGN_GUIDELINES = [
   "",
   "브랜드/CI 디자인 지침:",
-  "- Skywork 지식베이스에 등록된 logo.png를 회사 로고로 사용해 주세요.",
-  "- logo.png는 1장 표지와 2장 이후 모든 본문 슬라이드에 일관되게 배치해 주세요.",
-  "- 본문 슬라이드의 로고 위치, 크기, 여백은 전체 슬라이드에서 동일하게 유지해 주세요.",
+  "- Skywork 지식베이스에 등록된 logo.png는 DS단석 회사 로고 이미지입니다.",
+  "- PPT 생성 시 logo.png 파일을 실제 이미지로 삽입해 주세요.",
+  "- 절대 'Logo', 'LOGO', 'logo.png', 'CORPORE' 같은 텍스트를 로고 대신 입력하지 마세요.",
+  "- logo.png 이미지를 사용할 수 없는 경우에는 로고 텍스트를 임의로 만들지 말고 로고 영역을 비워 주세요.",
+  "- 표지에는 회사 로고를 상단 좌측 또는 우측에 작고 정돈되게 배치해 주세요.",
+  "- 2장 이후 본문 슬라이드에는 모든 슬라이드의 동일한 위치에 같은 크기로 logo.png를 배치해 주세요.",
+  "- 로고 위치, 크기, 여백은 모든 본문 슬라이드에서 동일해야 합니다.",
   "- 로고는 임의로 늘리거나 찌그러뜨리거나 색상 변경, 그림자, 과도한 효과를 적용하지 마세요.",
   "- 전체 PPT는 하나의 기업 보고서 템플릿처럼 보이도록 디자인을 통일해 주세요.",
   "- 1장 표지는 별도 표지 디자인을 허용하되, CI 색상과 로고 사용 원칙은 동일하게 유지해 주세요.",
@@ -2568,7 +2572,7 @@ function buildSkyworkPptRequestPrompt(message) {
     "",
     "요구사항:",
     "- 한국어 PPT로 작성",
-    "- 실제 회사 내부자료, 개인정보, 구체적인 매출/원가/계약금액은 사용하지 않음",
+    "- 실제 회사 내부자료, 임직원·고객 식별 정보, 구체적인 재무·계약 수치는 사용하지 않음",
     "- 일반적인 큰 틀/초안 수준으로 작성",
     "- 가능하면 5장 내외로 간결하게 구성",
     SKYWORK_PPT_CI_DESIGN_GUIDELINES,
@@ -2723,14 +2727,12 @@ async function sendAgentChat(message, files = [], history = [], options = {}) {
 
   lastAgentRoute = "agent-api";
 
-  // Skywork Pull Worker 운영 모드에서는 실제 PPT 생성용 safe_prompt가 agent-api에서 만들어집니다.
-  // 프론트에서는 사용자가 입력한 원문은 대화에 그대로 저장하고,
-  // agent-api로 보내는 PPT 생성 요청에만 CI/로고/통일 배경 디자인 지침을 추가합니다.
-  const outboundMessage = isPptDraft ? buildSkyworkPptRequestPrompt(message) : message;
-
+  // 운영 Pull Worker 구조에서는 민감정보 검사 대상과 모델용 내부 지침을 분리합니다.
+  // 프론트는 사용자 원문만 agent-api로 보내고, CI/로고/디자인 지침은 agent-api 내부에서 safe_prompt에만 추가합니다.
+  // 이렇게 해야 내부 지침의 보안 키워드 때문에 정상 PPT 요청이 오탐 차단되지 않습니다.
   return sendChatToTarget({
     targetBody: agentBody,
-    message: outboundMessage,
+    message,
     sendButton: agentSendBtn,
     input: agentMessageInput,
     apiUrl: AGENT_API_URL,
