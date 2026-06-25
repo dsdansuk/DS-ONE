@@ -98,6 +98,106 @@ let lastAgentFileUseAt = 0;
 // 중복 메시지가 쌓이거나 불필요한 상태조회가 반복되는 것을 막습니다.
 const activePptJobPolls = new Set();
 
+// PPT 생성 중에는 AI Agent 입력/전송/첨부를 잠가 사용자가 중복 요청을 보내지 않게 합니다.
+// 실제 중복 생성은 agent-api + DB unique index에서 한 번 더 막지만,
+// 화면에서도 생성 중 상태가 풀리지 않도록 프론트 상태를 별도로 유지합니다.
+let isAgentPptGenerating = false;
+let activeAgentPptJobId = "";
+const AGENT_DEFAULT_PLACEHOLDER = agentMessageInput?.getAttribute("placeholder") || "질문이나 업무 요청을 입력하세요";
+const AGENT_PPT_GENERATING_PLACEHOLDER = "PPT 생성 중입니다. 완료 후 다시 요청할 수 있습니다.";
+const AGENT_PPT_JOB_LOCK_STORAGE_PREFIX = "ds_agent_active_ppt_job_v1_";
+const AGENT_PPT_JOB_LOCK_TTL_MS = Math.max(PPT_JOB_POLL_MAX_MS, 30 * 60 * 1000);
+
+function getAgentPptJobLockStorageKey() {
+  const userKey = currentLoginId || currentEmpNo || "unknown";
+  return AGENT_PPT_JOB_LOCK_STORAGE_PREFIX + userKey;
+}
+
+function persistAgentPptJobLock(jobId) {
+  if (!jobId || (!currentLoginId && !currentEmpNo)) return;
+
+  try {
+    localStorage.setItem(
+      getAgentPptJobLockStorageKey(),
+      JSON.stringify({
+        jobId: String(jobId),
+        savedAt: Date.now(),
+      })
+    );
+  } catch (err) {
+    console.warn("PPT 작업 잠금 상태 저장 실패:", err);
+  }
+}
+
+function clearAgentPptJobLock() {
+  if (!currentLoginId && !currentEmpNo) return;
+
+  try {
+    localStorage.removeItem(getAgentPptJobLockStorageKey());
+  } catch (err) {
+    console.warn("PPT 작업 잠금 상태 제거 실패:", err);
+  }
+}
+
+function restoreAgentPptJobLock() {
+  if (!currentLoginId && !currentEmpNo) return;
+
+  try {
+    const raw = localStorage.getItem(getAgentPptJobLockStorageKey());
+    if (!raw) return;
+
+    const saved = JSON.parse(raw);
+    const jobId = String(saved.jobId || "");
+    const savedAt = Number(saved.savedAt || 0);
+
+    if (!jobId || !savedAt || Date.now() - savedAt > AGENT_PPT_JOB_LOCK_TTL_MS) {
+      localStorage.removeItem(getAgentPptJobLockStorageKey());
+      return;
+    }
+
+    setAgentPptGenerating(true, jobId, { persist: false });
+  } catch (err) {
+    console.warn("PPT 작업 잠금 상태 복원 실패:", err);
+    clearAgentPptJobLock();
+  }
+}
+
+function syncAgentPptGeneratingControls() {
+  const locked = Boolean(isAgentPptGenerating);
+
+  if (agentMessageInput) {
+    agentMessageInput.disabled = locked;
+    agentMessageInput.placeholder = locked
+      ? AGENT_PPT_GENERATING_PLACEHOLDER
+      : AGENT_DEFAULT_PLACEHOLDER;
+  }
+
+  if (agentSendBtn) agentSendBtn.disabled = locked;
+  if (agentAttachBtn) agentAttachBtn.disabled = locked;
+  if (agentFileInput) agentFileInput.disabled = locked;
+}
+
+function setAgentPptGenerating(isGenerating, jobId = "", options = {}) {
+  const locked = Boolean(isGenerating);
+  isAgentPptGenerating = locked;
+  activeAgentPptJobId = locked ? String(jobId || activeAgentPptJobId || "") : "";
+
+  if (locked && options.persist !== false) {
+    persistAgentPptJobLock(activeAgentPptJobId);
+  } else if (!locked && options.clearPersisted !== false) {
+    clearAgentPptJobLock();
+  }
+
+  syncAgentPptGeneratingControls();
+}
+
+function unlockAgentPptGeneratingIfJob(jobId) {
+  const currentJobId = String(jobId || "");
+  if (!currentJobId || !activeAgentPptJobId || activeAgentPptJobId === currentJobId) {
+    setAgentPptGenerating(false);
+  }
+}
+
 
 function getAuthCacheKey() {
   if (!sessionToken) return "";
@@ -162,6 +262,7 @@ function applyAuthenticatedProfile(profile) {
   userInfo.textContent = "로그인ID: " + currentLoginId;
   setHomeGreeting(displayUserName, true);
   restoreChatHistory();
+  restoreAgentPptJobLock();
   initAgentSessionState();
   enableApp();
 }
@@ -254,9 +355,7 @@ async function bootstrap() {
 function enableApp() {
   if (messageInput) messageInput.disabled = false;
   if (sendBtn) sendBtn.disabled = false;
-  if (agentMessageInput) agentMessageInput.disabled = false;
-  if (agentSendBtn) agentSendBtn.disabled = false;
-  if (agentAttachBtn) agentAttachBtn.disabled = false;
+  syncAgentPptGeneratingControls();
 
   if (directQuestionBtn) directQuestionBtn.disabled = false;
   if (docWriteBtn) docWriteBtn.disabled = false;
@@ -264,7 +363,7 @@ function enableApp() {
   if (aiBtn) aiBtn.disabled = false;
   if (rpaBtn) rpaBtn.disabled = false;
 
-  if (currentMode === "doc") focusInputWhenPanelReady(agentMessageInput);
+  if (currentMode === "doc" && !isAgentPptGenerating) focusInputWhenPanelReady(agentMessageInput);
 }
 
 function disableApp() {
@@ -273,6 +372,7 @@ function disableApp() {
   if (agentMessageInput) agentMessageInput.disabled = true;
   if (agentSendBtn) agentSendBtn.disabled = true;
   if (agentAttachBtn) agentAttachBtn.disabled = true;
+  if (agentFileInput) agentFileInput.disabled = true;
   if (reloadRpaBtn) reloadRpaBtn.disabled = true;
 
   if (directQuestionBtn) directQuestionBtn.disabled = true;
@@ -315,7 +415,8 @@ function setMode(mode) {
 
   if (mode === "doc") {
     if (docWriteBtn) docWriteBtn.blur();
-    focusInputWhenPanelReady(agentMessageInput);
+    syncAgentPptGeneratingControls();
+    if (!isAgentPptGenerating) focusInputWhenPanelReady(agentMessageInput);
   }
 }
 
@@ -1540,6 +1641,7 @@ async function initAgentSessionState() {
         }
 
         if (role === "bot" && metadata?.pptJob?.id && !completedPptJobIds.has(metadata.pptJob.id) && hasPendingPptJob({ pptJob: metadata.pptJob })) {
+          setAgentPptGenerating(true, metadata.pptJob.id);
           setTimeout(() => pollPptJobUntilDone(metadata.pptJob, metadata.originalMessage || lastRestoredUserMessage), 500);
         }
 
@@ -2005,6 +2107,10 @@ async function pollPptJobUntilDone(job, originalMessage = "") {
   if (!job?.id) return;
   const jobId = String(job.id);
 
+  // PPT 생성 중에는 화면 이탈/탭 전환/세션 복원으로 enableApp()이 다시 호출되어도
+  // 입력창과 전송 버튼이 풀리지 않도록 먼저 잠금 상태를 적용합니다.
+  setAgentPptGenerating(true, jobId);
+
   // 같은 작업에 대한 polling은 한 번만 수행합니다.
   // 화면을 나갔다가 다시 들어오거나 세션 복원 메시지가 여러 개 있어도
   // 새 Skywork 생성 요청을 보내지 않고 기존 job 상태만 이어서 확인합니다.
@@ -2030,6 +2136,7 @@ async function pollPptJobUntilDone(job, originalMessage = "") {
           pptJob: { id: jobId },
           originalMessage,
         });
+        unlockAgentPptGeneratingIfJob(jobId);
         return;
       }
 
@@ -2047,6 +2154,7 @@ async function pollPptJobUntilDone(job, originalMessage = "") {
           pptJob: data.pptJob || { id: jobId, status: "completed" },
           originalMessage,
         });
+        unlockAgentPptGeneratingIfJob(jobId);
         return;
       }
 
@@ -2058,6 +2166,7 @@ async function pollPptJobUntilDone(job, originalMessage = "") {
           pptJob: data.pptJob || { id: jobId, status },
           originalMessage,
         });
+        unlockAgentPptGeneratingIfJob(jobId);
         return;
       }
 
@@ -2075,6 +2184,7 @@ async function pollPptJobUntilDone(job, originalMessage = "") {
       pptJob: { id: jobId },
       originalMessage,
     });
+    unlockAgentPptGeneratingIfJob(jobId);
   } finally {
     activePptJobPolls.delete(jobId);
   }
@@ -2222,8 +2332,17 @@ async function sendChatToTarget({
     removeThinkingBox(thinkingBox);
     addMessage(targetBody, "bot", "호출 실패: " + getErrorMessage(err));
   } finally {
-    if (sendButton) sendButton.disabled = false;
-    focusInputWhenPanelReady(input);
+    if (sendButton) {
+      if (sendButton === agentSendBtn && isAgentPptGenerating) {
+        syncAgentPptGeneratingControls();
+      } else {
+        sendButton.disabled = false;
+      }
+    }
+
+    if (!(input === agentMessageInput && isAgentPptGenerating)) {
+      focusInputWhenPanelReady(input);
+    }
   }
 }
 
@@ -2367,8 +2486,12 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
     removeThinkingBox(thinkingBox);
     addMessage(agentBody, "bot", "파일 분석 호출 실패: " + getErrorMessage(err));
   } finally {
-    if (agentSendBtn) agentSendBtn.disabled = false;
-    focusInputWhenPanelReady(agentMessageInput);
+    if (isAgentPptGenerating) {
+      syncAgentPptGeneratingControls();
+    } else {
+      if (agentSendBtn) agentSendBtn.disabled = false;
+      focusInputWhenPanelReady(agentMessageInput);
+    }
   }
 }
 
@@ -2652,12 +2775,23 @@ if (messageInput && chatForm) {
 
 if (agentAttachBtn && agentFileInput) {
   agentAttachBtn.addEventListener("click", () => {
+    if (isAgentPptGenerating) {
+      syncAgentPptGeneratingControls();
+      return;
+    }
+
     agentFileInput.click();
   });
 }
 
 if (agentFileInput) {
   agentFileInput.addEventListener("change", () => {
+    if (isAgentPptGenerating) {
+      agentFileInput.value = "";
+      syncAgentPptGeneratingControls();
+      return;
+    }
+
     addAgentFiles(agentFileInput.files);
   });
 }
@@ -2682,6 +2816,11 @@ if (agentMessageInput && agentForm) {
     e.preventDefault();
 
     if (currentMode !== "doc") return;
+
+    if (isAgentPptGenerating) {
+      syncAgentPptGeneratingControls();
+      return;
+    }
 
     const rawMessage = agentMessageInput.value.trim();
     if (!rawMessage && !agentSelectedFiles.length) return;
