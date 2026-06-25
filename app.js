@@ -93,6 +93,11 @@ let agentStateReady = false;
 let lastAgentRoute = "";
 let lastAgentFileUseAt = 0;
 
+// PPT Pull Worker 작업 중복 상태조회 방지용입니다.
+// 뒤로가기/새로고침 복원 시 같은 job_id에 대해 polling이 여러 번 시작되어
+// 중복 메시지가 쌓이거나 불필요한 상태조회가 반복되는 것을 막습니다.
+const activePptJobPolls = new Set();
+
 
 function getAuthCacheKey() {
   if (!sessionToken) return "";
@@ -1998,69 +2003,82 @@ function hasPendingPptJob(data) {
 
 async function pollPptJobUntilDone(job, originalMessage = "") {
   if (!job?.id) return;
-  const jobId = job.id;
+  const jobId = String(job.id);
+
+  // 같은 작업에 대한 polling은 한 번만 수행합니다.
+  // 화면을 나갔다가 다시 들어오거나 세션 복원 메시지가 여러 개 있어도
+  // 새 Skywork 생성 요청을 보내지 않고 기존 job 상태만 이어서 확인합니다.
+  if (activePptJobPolls.has(jobId)) return;
+  activePptJobPolls.add(jobId);
+
   const startedAt = Date.now();
   const pollMs = Math.max(3000, Number(job.pollAfterMs || PPT_JOB_POLL_INTERVAL_MS));
   const statusDiv = addMessage(agentBody, "bot", "PPT 생성 상태를 확인하는 중입니다. 완료되면 다운로드 버튼이 표시됩니다.", false, { hideCopy: true });
 
-  while (Date.now() - startedAt < PPT_JOB_POLL_MAX_MS) {
-    await sleep(pollMs);
+  try {
+    while (Date.now() - startedAt < PPT_JOB_POLL_MAX_MS) {
+      await sleep(pollMs);
 
-    let data;
-    try {
-      data = await agentStateRequest({ action: "get_ppt_job", jobId });
-    } catch (err) {
-      setMessageContent(statusDiv, "PPT 생성 상태 조회 중 오류가 발생했습니다.\n" + getErrorMessage(err));
-      await saveAgentMessage("assistant", "PPT 생성 상태 조회 중 오류가 발생했습니다.\n" + getErrorMessage(err), {
-        route: "skywork-pull-status-error",
-        pptJob: { id: jobId },
-        originalMessage,
-      });
-      return;
+      let data;
+      try {
+        data = await agentStateRequest({ action: "get_ppt_job", jobId });
+      } catch (err) {
+        const errorAnswer = "PPT 생성 상태 조회 중 오류가 발생했습니다.
+" + getErrorMessage(err);
+        setMessageContent(statusDiv, errorAnswer);
+        await saveAgentMessage("assistant", errorAnswer, {
+          route: "skywork-pull-status-error",
+          pptJob: { id: jobId },
+          originalMessage,
+        });
+        return;
+      }
+
+      const status = String(data?.pptJob?.status || data?.status || "").toLowerCase();
+
+      if (data?.ppt?.ok) {
+        const answer = data.answer || "Skywork PPT 초안이 생성되었습니다. 아래 다운로드 버튼으로 파일을 받아 검토해 주세요.";
+        setMessageContent(statusDiv, answer);
+        appendPptDownloadButton(agentBody, data.ppt);
+        await saveAgentMessage("assistant", answer, {
+          route: "skywork-pull-completed",
+          artifact: true,
+          artifactSavedAt: new Date().toISOString(),
+          ppt: data.ppt || null,
+          pptJob: data.pptJob || { id: jobId, status: "completed" },
+          originalMessage,
+        });
+        return;
+      }
+
+      if (["failed", "cancelled"].includes(status) || data?.failed) {
+        const answer = data.answer || "Skywork PPT 생성에 실패했습니다.";
+        setMessageContent(statusDiv, answer);
+        await saveAgentMessage("assistant", answer, {
+          route: "skywork-pull-failed",
+          pptJob: data.pptJob || { id: jobId, status },
+          originalMessage,
+        });
+        return;
+      }
+
+      if (status === "running") {
+        setMessageContent(statusDiv, "Skywork PPT를 생성 중입니다. 완료되면 다운로드 버튼이 표시됩니다.");
+      } else {
+        setMessageContent(statusDiv, "Skywork PPT 생성 작업이 대기 중입니다. Worker가 순서대로 처리합니다.");
+      }
     }
 
-    const status = String(data?.pptJob?.status || data?.status || "").toLowerCase();
-
-    if (data?.ppt?.ok) {
-      const answer = data.answer || "Skywork PPT 초안이 생성되었습니다. 아래 다운로드 버튼으로 파일을 받아 검토해 주세요.";
-      setMessageContent(statusDiv, answer);
-      appendPptDownloadButton(agentBody, data.ppt);
-      await saveAgentMessage("assistant", answer, {
-        route: "skywork-pull-completed",
-        artifact: true,
-        artifactSavedAt: new Date().toISOString(),
-        ppt: data.ppt || null,
-        pptJob: data.pptJob || { id: jobId, status: "completed" },
-        originalMessage,
-      });
-      return;
-    }
-
-    if (["failed", "cancelled"].includes(status) || data?.failed) {
-      const answer = data.answer || "Skywork PPT 생성에 실패했습니다.";
-      setMessageContent(statusDiv, answer);
-      await saveAgentMessage("assistant", answer, {
-        route: "skywork-pull-failed",
-        pptJob: data.pptJob || { id: jobId, status },
-        originalMessage,
-      });
-      return;
-    }
-
-    if (status === "running") {
-      setMessageContent(statusDiv, "Skywork PPT를 생성 중입니다. 완료되면 다운로드 버튼이 표시됩니다.");
-    } else {
-      setMessageContent(statusDiv, "Skywork PPT 생성 작업이 대기 중입니다. Worker가 순서대로 처리합니다.");
-    }
+    const timeoutMessage = "PPT 생성 상태 확인 시간이 초과되었습니다. 잠시 후 같은 대화로 돌아오면 완료 여부를 다시 확인할 수 있습니다.";
+    setMessageContent(statusDiv, timeoutMessage);
+    await saveAgentMessage("assistant", timeoutMessage, {
+      route: "skywork-pull-poll-timeout",
+      pptJob: { id: jobId },
+      originalMessage,
+    });
+  } finally {
+    activePptJobPolls.delete(jobId);
   }
-
-  const timeoutMessage = "PPT 생성 상태 확인 시간이 초과되었습니다. 잠시 후 같은 대화로 돌아오면 완료 여부를 다시 확인할 수 있습니다.";
-  setMessageContent(statusDiv, timeoutMessage);
-  await saveAgentMessage("assistant", timeoutMessage, {
-    route: "skywork-pull-poll-timeout",
-    pptJob: { id: jobId },
-    originalMessage,
-  });
 }
 
 async function sendChatToTarget({
