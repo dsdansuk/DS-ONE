@@ -22,18 +22,15 @@ const AGENT_STATE_API_URL = AGENT_API_URL;
 const RPA_API_URL =
   "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api";
 
-// Skywork 로컬 Worker 테스트 전용 설정
-// - 운영 배포용이 아니라, 내 PC에서 Skywork Worker가 켜져 있을 때만 1회 테스트하는 용도입니다.
-// - 크레딧 오사용을 막기 위해 실제 호출 전 confirm 확인창을 띄웁니다.
-// - 기본값은 테스트 활성화입니다. 비활성화하려면 개발자도구 Console에서 아래 명령을 실행하세요.
-//   localStorage.setItem("ds_skywork_local_test", "0"); location.reload();
-// - 다시 활성화하려면 아래 명령을 실행하세요.
-//   localStorage.setItem("ds_skywork_local_test", "1"); location.reload();
-const SKYWORK_LOCAL_WORKER_URL = "http://127.0.0.1:8787/generate-ppt";
-const SKYWORK_LOCAL_WORKER_TOKEN = "test-local-token-1234";
+// Skywork Worker 운영 설정
+// - 운영에서는 브라우저가 NCP Worker를 직접 호출하지 않고, Supabase agent-api가 중계합니다.
+// - 아래 로컬 직접 호출 값은 개발자 PC/NCP 단독 통신 테스트용입니다.
+// - 운영 배포본에는 Worker URL과 Token을 프론트엔드에 노출하지 않는 것이 원칙입니다.
+const SKYWORK_LOCAL_WORKER_URL = "";
+const SKYWORK_LOCAL_WORKER_TOKEN = "";
 const SKYWORK_LOCAL_TEST_STORAGE_KEY = "ds_skywork_local_test";
-const SKYWORK_LOCAL_TEST_DEFAULT_ENABLED = true;
-// 테스트 기간에는 비워두면 로그인 ID와 무관하게 허용합니다. 운영 반영 시 반드시 사번/ID를 제한하세요.
+const SKYWORK_LOCAL_TEST_DEFAULT_ENABLED = false;
+// 직접 호출 테스트가 꼭 필요한 경우에만 허용 사용자 ID/사번을 제한해서 사용하세요.
 const SKYWORK_LOCAL_ALLOWED_USERS = [];
 
 const PPT_DRAFT_TASK = "ppt_draft";
@@ -1556,9 +1553,9 @@ async function initAgentSessionState() {
 
 function saveAgentMessage(role, content, metadata = {}) {
   const text = String(content || "").trim();
-  if (!text || !sessionToken) return;
+  if (!text || !sessionToken) return Promise.resolve(null);
 
-  agentStateRequest({
+  return agentStateRequest({
     action: "save_message",
     sessionId: agentSessionId,
     role,
@@ -1570,8 +1567,10 @@ function saveAgentMessage(role, content, metadata = {}) {
       agentSessionId = data.session.id;
       sessionStorage.setItem("ds_agent_session_id", agentSessionId);
     }
+    return data;
   }).catch((err) => {
     console.warn("업무 AI Agent 메시지 저장 실패:", err);
+    return null;
   });
 }
 
@@ -1774,12 +1773,12 @@ function hasExplicitPptExportRequest(text) {
   if (!normalized) return false;
 
   const pptPatterns = [
-    /(?:pptx?|파워포인트|프레젠테이션|슬라이드|발표자료|보고자료)\s*(?:파일)?\s*(?:로|으로)\s*(?:만들|생성|작성|제작|구성|정리|변환|다운로드|내려받|출력)/i,
-    /(?:pptx?|파워포인트|프레젠테이션)\s*파일\s*(?:을|를)?\s*(?:만들|생성|작성|제작|구성|다운로드|내려받|출력)/i,
-    /(?:발표자료|보고자료|제안서)\s*(?:를|을)?\s*(?:만들|생성|작성|제작|구성)/i,
-    /(?:pptx?|파워포인트|프레젠테이션)\s*초안/i,
-    /(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드).{0,30}(?:pptx?|파워포인트|프레젠테이션|슬라이드)/i,
-    /(?:pptx?|파워포인트|프레젠테이션|슬라이드).{0,30}(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드)/i,
+    /(?:pptx?|피피티|파워포인트|프레젠테이션|슬라이드|발표자료|보고자료|보고용\s*(?:pptx?|피피티|파워포인트|프레젠테이션|자료))\s*(?:파일|자료|초안|덱)?\s*(?:로|으로)\s*(?:만들|생성|작성|제작|구성|정리|변환|다운로드|내려받|출력)/i,
+    /(?:pptx?|피피티|파워포인트|프레젠테이션|슬라이드|발표자료|보고자료|보고용\s*(?:pptx?|피피티|파워포인트|프레젠테이션|자료))\s*(?:파일|자료|초안|덱)?\s*(?:을|를)?\s*(?:만들|생성|작성|제작|구성|정리|변환)(?:어|아|해)?\s*(?:줘|주세요|주십시오|달라|바랍니다|해줘|해주세요)/i,
+    /(?:발표자료|보고자료|보고용\s*자료|제안서)\s*(?:를|을)?\s*(?:만들|생성|작성|제작|구성)/i,
+    /(?:pptx?|피피티|파워포인트|프레젠테이션)\s*초안/i,
+    /(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드).{0,30}(?:pptx?|피피티|파워포인트|프레젠테이션|슬라이드)/i,
+    /(?:pptx?|피피티|파워포인트|프레젠테이션|슬라이드).{0,30}(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드)/i,
   ];
 
   return hasPattern(normalized, pptPatterns);
@@ -2272,8 +2271,13 @@ function isSkyworkLocalAllowedUser() {
   return SKYWORK_LOCAL_ALLOWED_USERS.includes(loginId) || SKYWORK_LOCAL_ALLOWED_USERS.includes(empNo);
 }
 
+function hasSkyworkLocalWorkerConfig() {
+  return Boolean(String(SKYWORK_LOCAL_WORKER_URL || "").trim() && String(SKYWORK_LOCAL_WORKER_TOKEN || "").trim());
+}
+
 function shouldUseSkyworkLocalWorker(task, hasFiles, message) {
   return task === PPT_DRAFT_TASK
+    && hasSkyworkLocalWorkerConfig()
     && isSkyworkLocalTestEnabled()
     && isSkyworkLocalAllowedUser()
     && !hasFiles
@@ -2396,9 +2400,9 @@ async function sendSkyworkLocalPptDraft(message) {
       getErrorMessage(err),
       "",
       "**확인할 사항**",
-      "- Worker PowerShell 창이 열려 있는지 확인해 주세요.",
-      "- 브라우저에서 로컬 주소 호출이 차단되지 않았는지 확인해 주세요.",
-      "- 먼저 PowerShell Invoke-WebRequest 테스트가 성공하는지 확인해 주세요.",
+      "- NCP 서버에서 Worker가 실행 중인지 확인해 주세요.",
+      "- ACG에서 Worker 포트가 필요한 IP에만 허용되어 있는지 확인해 주세요.",
+      "- 먼저 PowerShell curl 테스트가 성공하는지 확인해 주세요.",
     ].join("\n");
     addMessage(agentBody, "bot", answer, false, { hideCopy: true });
     saveAgentMessage("assistant", answer, { route: "skywork-local-exception" });
@@ -2573,13 +2577,13 @@ if (agentMessageInput && agentForm) {
 
     if (exportTask === "ambiguous_export") {
       addMessage(agentBody, "user", message);
-      saveAgentMessage("user", message, { route: "agent-api" });
+      await saveAgentMessage("user", message, { route: "agent-api" });
       agentMessageInput.value = "";
       autoResizeTextarea(agentMessageInput);
 
       const answer = buildAmbiguousExportAnswer();
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      saveAgentMessage("assistant", answer, { route: "export-clarification" });
+      await saveAgentMessage("assistant", answer, { route: "export-clarification" });
       focusInputWhenPanelReady(agentMessageInput);
       return;
     }
@@ -2593,13 +2597,13 @@ if (agentMessageInput && agentForm) {
       const answer = buildPptUploadBlockedAnswer();
 
       addMessage(agentBody, "user", displayMessage);
-      saveAgentMessage("user", displayMessage, { route: "ppt-security-block", fileIds: getAgentFileIds(filesSnapshot) });
+      await saveAgentMessage("user", displayMessage, { route: "ppt-security-block", fileIds: getAgentFileIds(filesSnapshot) });
 
       agentMessageInput.value = "";
       autoResizeTextarea(agentMessageInput);
 
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "uploaded-file" });
+      await saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "uploaded-file" });
       focusInputWhenPanelReady(agentMessageInput);
       return;
     }
@@ -2608,20 +2612,20 @@ if (agentMessageInput && agentForm) {
       const answer = buildPptSensitiveBlockedAnswer();
 
       addMessage(agentBody, "user", message);
-      saveAgentMessage("user", message, { route: "ppt-security-block" });
+      await saveAgentMessage("user", message, { route: "ppt-security-block" });
 
       agentMessageInput.value = "";
       autoResizeTextarea(agentMessageInput);
 
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "sensitive-text" });
+      await saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "sensitive-text" });
       focusInputWhenPanelReady(agentMessageInput);
       return;
     }
 
     if (shouldUseSkyworkLocalWorker(task, hasFiles, message)) {
       addMessage(agentBody, "user", message);
-      saveAgentMessage("user", message, { route: "skywork-local-worker" });
+      await saveAgentMessage("user", message, { route: "skywork-local-worker" });
 
       agentMessageInput.value = "";
       autoResizeTextarea(agentMessageInput);
@@ -2631,37 +2635,13 @@ if (agentMessageInput && agentForm) {
       return;
     }
 
-    // Skywork 테스트 중에는 PPT 요청이 기존 내부 pptxgenjs 생성 프로세스로 빠지지 않도록 명확히 막습니다.
-    // 이 분기가 보인다면 localStorage에서 테스트를 끈 상태이거나 허용 사용자 조건에 걸린 것입니다.
-    if (usePptDraft && !hasFiles && !hasSensitivePptRequestText(message)) {
-      const answer = [
-        "**Skywork PPT 테스트가 비활성화되어 있습니다.**",
-        "기존 내부 PPT 생성 프로세스로 실행하지 않았습니다.",
-        "",
-        "**활성화 방법**",
-        "- 개발자도구 Console에서 아래 명령을 실행한 뒤 새로고침해 주세요.",
-        "- localStorage.setItem(\"ds_skywork_local_test\", \"1\"); location.reload();",
-      ].join("\n");
-
-      addMessage(agentBody, "user", message);
-      saveAgentMessage("user", message, { route: "skywork-local-disabled" });
-
-      agentMessageInput.value = "";
-      autoResizeTextarea(agentMessageInput);
-
-      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      saveAgentMessage("assistant", answer, { route: "skywork-local-disabled" });
-      focusInputWhenPanelReady(agentMessageInput);
-      return;
-    }
-
     const useFileApi = useExcelDraft && hasFiles
       ? true
       : shouldUseFileApi(message, hasFiles, historySnapshot);
     const displayMessage = useFileApi ? buildAgentMessage(message, filesSnapshot) : message;
 
     addMessage(agentBody, "user", displayMessage);
-    saveAgentMessage("user", displayMessage, { route: useFileApi ? "file-api" : task || "agent-api", fileIds: getAgentFileIds(filesSnapshot) });
+    await saveAgentMessage("user", displayMessage, { route: useFileApi ? "file-api" : task || "agent-api", fileIds: getAgentFileIds(filesSnapshot) });
 
     agentMessageInput.value = "";
     autoResizeTextarea(agentMessageInput);
