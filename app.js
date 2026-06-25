@@ -44,6 +44,8 @@ const AUTH_CACHE_TTL_MS = 10 * 60 * 1000; // 10분
 
 const RPA_STATUS_POLL_INTERVAL_MS = 30 * 1000; // 30초
 const RPA_STATUS_POLL_MAX_MS = 10 * 60 * 1000; // 최대 10분
+const PPT_JOB_POLL_INTERVAL_MS = 10 * 1000; // 10초
+const PPT_JOB_POLL_MAX_MS = 20 * 60 * 1000; // 최대 20분
 
 let sessionToken = sessionStorage.getItem("sso_session_token") || "";
 let currentMode = "home";
@@ -1500,6 +1502,15 @@ async function initAgentSessionState() {
     if (Array.isArray(data.messages) && data.messages.length) {
       agentBody.innerHTML = "";
       let lastRestoredUserMessage = "";
+      const completedPptJobIds = new Set();
+
+      data.messages.forEach((msg) => {
+        const metadata = msg.metadata || {};
+        const jobId = metadata?.pptJob?.id;
+        if (jobId && (metadata?.ppt?.ok || metadata.route === "skywork-pull-completed")) {
+          completedPptJobIds.add(jobId);
+        }
+      });
 
       data.messages.forEach((msg) => {
         const role = msg.role === "user" ? "user" : "bot";
@@ -1521,6 +1532,10 @@ async function initAgentSessionState() {
         // 다운로드 버튼은 메시지 본문 복사보다 파일 다운로드가 핵심 액션이므로 복사 버튼은 숨깁니다.
         if (isArtifact) {
           appendSavedArtifactDownloads(agentBody, metadata, metadata.artifactSavedAt || msg.created_at || msg.createdAt || "");
+        }
+
+        if (role === "bot" && metadata?.pptJob?.id && !completedPptJobIds.has(metadata.pptJob.id) && hasPendingPptJob({ pptJob: metadata.pptJob })) {
+          setTimeout(() => pollPptJobUntilDone(metadata.pptJob, metadata.originalMessage || lastRestoredUserMessage), 500);
         }
 
         // 사내 규정/업무 절차 안내 메시지는 복사 버튼을 숨기고 이동 버튼만 복원합니다.
@@ -1969,6 +1984,85 @@ function buildAgentMessage(message, files = agentSelectedFiles) {
   return "[첨부 파일]\n" + fileList + "\n\n[요청]\n" + message;
 }
 
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function hasPendingPptJob(data) {
+  const job = data?.pptJob || null;
+  if (!job?.id) return false;
+  const status = String(job.status || "queued").toLowerCase();
+  return !["completed", "failed", "cancelled"].includes(status);
+}
+
+async function pollPptJobUntilDone(job, originalMessage = "") {
+  if (!job?.id) return;
+  const jobId = job.id;
+  const startedAt = Date.now();
+  const pollMs = Math.max(3000, Number(job.pollAfterMs || PPT_JOB_POLL_INTERVAL_MS));
+  const statusDiv = addMessage(agentBody, "bot", "PPT 생성 상태를 확인하는 중입니다. 완료되면 다운로드 버튼이 표시됩니다.", false, { hideCopy: true });
+
+  while (Date.now() - startedAt < PPT_JOB_POLL_MAX_MS) {
+    await sleep(pollMs);
+
+    let data;
+    try {
+      data = await agentStateRequest({ action: "get_ppt_job", jobId });
+    } catch (err) {
+      setMessageContent(statusDiv, "PPT 생성 상태 조회 중 오류가 발생했습니다.\n" + getErrorMessage(err));
+      await saveAgentMessage("assistant", "PPT 생성 상태 조회 중 오류가 발생했습니다.\n" + getErrorMessage(err), {
+        route: "skywork-pull-status-error",
+        pptJob: { id: jobId },
+        originalMessage,
+      });
+      return;
+    }
+
+    const status = String(data?.pptJob?.status || data?.status || "").toLowerCase();
+
+    if (data?.ppt?.ok) {
+      const answer = data.answer || "Skywork PPT 초안이 생성되었습니다. 아래 다운로드 버튼으로 파일을 받아 검토해 주세요.";
+      setMessageContent(statusDiv, answer);
+      appendPptDownloadButton(agentBody, data.ppt);
+      await saveAgentMessage("assistant", answer, {
+        route: "skywork-pull-completed",
+        artifact: true,
+        artifactSavedAt: new Date().toISOString(),
+        ppt: data.ppt || null,
+        pptJob: data.pptJob || { id: jobId, status: "completed" },
+        originalMessage,
+      });
+      return;
+    }
+
+    if (["failed", "cancelled"].includes(status) || data?.failed) {
+      const answer = data.answer || "Skywork PPT 생성에 실패했습니다.";
+      setMessageContent(statusDiv, answer);
+      await saveAgentMessage("assistant", answer, {
+        route: "skywork-pull-failed",
+        pptJob: data.pptJob || { id: jobId, status },
+        originalMessage,
+      });
+      return;
+    }
+
+    if (status === "running") {
+      setMessageContent(statusDiv, "Skywork PPT를 생성 중입니다. 완료되면 다운로드 버튼이 표시됩니다.");
+    } else {
+      setMessageContent(statusDiv, "Skywork PPT 생성 작업이 대기 중입니다. Worker가 순서대로 처리합니다.");
+    }
+  }
+
+  const timeoutMessage = "PPT 생성 상태 확인 시간이 초과되었습니다. 잠시 후 같은 대화로 돌아오면 완료 여부를 다시 확인할 수 있습니다.";
+  setMessageContent(statusDiv, timeoutMessage);
+  await saveAgentMessage("assistant", timeoutMessage, {
+    route: "skywork-pull-poll-timeout",
+    pptJob: { id: jobId },
+    originalMessage,
+  });
+}
+
 async function sendChatToTarget({
   targetBody,
   message,
@@ -2033,14 +2127,18 @@ async function sendChatToTarget({
       appendEvidenceBox(targetBody, data);
       if (isKnowledgeRedirect) applyKnowledgeRedirectAction(messageDiv, message);
       if (targetBody === agentBody) {
-        saveAgentMessage("assistant", answerText, {
+        await saveAgentMessage("assistant", answerText, {
           route: isKnowledgeRedirect ? "knowledge-redirect" : task || "agent-api",
           artifact: isArtifact,
           artifactSavedAt: new Date().toISOString(),
           ppt: data.ppt || null,
           excel: data.excel || null,
+          pptJob: data.pptJob || null,
           originalMessage: isKnowledgeRedirect ? message : undefined,
         });
+        if (hasPendingPptJob(data)) {
+          pollPptJobUntilDone(data.pptJob, message);
+        }
       }
       return;
     }
@@ -2175,15 +2273,19 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
       appendExcelDownloadButton(agentBody, data.excel);
       appendEvidenceBox(agentBody, data);
       if (isKnowledgeRedirect) applyKnowledgeRedirectAction(messageDiv, message);
-      saveAgentMessage("assistant", answerText, {
+      await saveAgentMessage("assistant", answerText, {
         route: isKnowledgeRedirect ? "knowledge-redirect" : task || "file-api",
         artifact: isArtifact,
         artifactSavedAt: new Date().toISOString(),
         ppt: data.ppt || null,
         excel: data.excel || null,
+        pptJob: data.pptJob || null,
         fileIds: getAgentFileIds(),
         originalMessage: isKnowledgeRedirect ? message : undefined,
       });
+      if (hasPendingPptJob(data)) {
+        pollPptJobUntilDone(data.pptJob, message);
+      }
       return;
     }
 
