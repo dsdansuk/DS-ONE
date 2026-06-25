@@ -2023,8 +2023,7 @@ async function pollPptJobUntilDone(job, originalMessage = "") {
       try {
         data = await agentStateRequest({ action: "get_ppt_job", jobId });
       } catch (err) {
-        const errorAnswer = "PPT 생성 상태 조회 중 오류가 발생했습니다.
-" + getErrorMessage(err);
+        const errorAnswer = "PPT 생성 상태 조회 중 오류가 발생했습니다." + getErrorMessage(err);
         setMessageContent(statusDiv, errorAnswer);
         await saveAgentMessage("assistant", errorAnswer, {
           route: "skywork-pull-status-error",
