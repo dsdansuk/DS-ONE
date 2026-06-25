@@ -37,6 +37,28 @@ const PPT_DRAFT_TASK = "ppt_draft";
 const EXCEL_DRAFT_TASK = "excel_draft";
 const WEB_SEARCH_TASK = "web_search";
 
+// Skywork PPT 생성 시 사용할 DS단석 CI/브랜드 디자인 지침입니다.
+// 운영 구조에서는 agent-api가 이 메시지를 받아 safe_prompt로 넘기며,
+// 로컬 테스트 모드에서도 동일한 지침을 사용합니다.
+const SKYWORK_PPT_CI_DESIGN_GUIDELINES = [
+  "",
+  "브랜드/CI 디자인 지침:",
+  "- Skywork 지식베이스에 등록된 logo.png를 회사 로고로 사용해 주세요.",
+  "- logo.png는 1장 표지와 2장 이후 모든 본문 슬라이드에 일관되게 배치해 주세요.",
+  "- 본문 슬라이드의 로고 위치, 크기, 여백은 전체 슬라이드에서 동일하게 유지해 주세요.",
+  "- 로고는 임의로 늘리거나 찌그러뜨리거나 색상 변경, 그림자, 과도한 효과를 적용하지 마세요.",
+  "- 전체 PPT는 하나의 기업 보고서 템플릿처럼 보이도록 디자인을 통일해 주세요.",
+  "- 1장 표지는 별도 표지 디자인을 허용하되, CI 색상과 로고 사용 원칙은 동일하게 유지해 주세요.",
+  "- 2장부터 마지막 장까지는 동일한 배경 스타일, 동일한 상단 제목 영역, 동일한 하단 푸터, 동일한 페이지 번호 위치를 사용해 주세요.",
+  "- 슬라이드마다 배경색, 장식 요소, 헤더/푸터 위치가 들쑥날쑥 달라지지 않도록 해 주세요.",
+  "- 본문 레이아웃은 표, 카드, KPI, 프로세스 등으로 달라도 되지만 전체 배경과 톤앤매너는 동일해야 합니다.",
+  "- CI 컬러는 DS Red #EC1846 RGB(236,24,70), DS Gray #4C585F RGB(76,88,95), DS LT Gray #D8DCDA RGB(216,220,218), DS Gold Pantone 875 C, DS Silver Pantone 877 C를 참고해 주세요.",
+  "- DS Red는 핵심 강조와 포인트 컬러로 제한적으로 사용하고, DS Gray는 본문/제목 텍스트에 사용해 주세요.",
+  "- DS LT Gray는 배경 보조색 또는 구분 영역에 사용하고, DS Gold/DS Silver는 고급스러운 포인트로만 절제해서 사용해 주세요.",
+  "- 과도한 그라데이션, 임의 아이콘 남발, 슬라이드별 다른 템플릿 혼용은 피해주세요.",
+  "- 최종 결과는 깔끔한 대기업 경영진 보고서 스타일이어야 합니다.",
+].join("\n");
+
 const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
 const CHAT_HISTORY_STORAGE_PREFIX = "ds_chatbot_ai_history_v1_";
 const AUTH_CACHE_STORAGE_PREFIX = "ds_chatbot_auth_cache_v1_";
@@ -2526,7 +2548,7 @@ function shouldUseSkyworkLocalWorker(task, hasFiles, message) {
     && !hasSensitivePptRequestText(message);
 }
 
-function buildSkyworkLocalPrompt(message) {
+function buildSkyworkPptRequestPrompt(message) {
   return [
     message,
     "",
@@ -2535,7 +2557,12 @@ function buildSkyworkLocalPrompt(message) {
     "- 실제 회사 내부자료, 개인정보, 구체적인 매출/원가/계약금액은 사용하지 않음",
     "- 일반적인 큰 틀/초안 수준으로 작성",
     "- 가능하면 5장 내외로 간결하게 구성",
+    SKYWORK_PPT_CI_DESIGN_GUIDELINES,
   ].join("\n");
+}
+
+function buildSkyworkLocalPrompt(message) {
+  return buildSkyworkPptRequestPrompt(message);
 }
 
 async function sendSkyworkLocalPptDraft(message) {
@@ -2682,9 +2709,14 @@ async function sendAgentChat(message, files = [], history = [], options = {}) {
 
   lastAgentRoute = "agent-api";
 
+  // Skywork Pull Worker 운영 모드에서는 실제 PPT 생성용 safe_prompt가 agent-api에서 만들어집니다.
+  // 프론트에서는 사용자가 입력한 원문은 대화에 그대로 저장하고,
+  // agent-api로 보내는 PPT 생성 요청에만 CI/로고/통일 배경 디자인 지침을 추가합니다.
+  const outboundMessage = isPptDraft ? buildSkyworkPptRequestPrompt(message) : message;
+
   return sendChatToTarget({
     targetBody: agentBody,
-    message,
+    message: outboundMessage,
     sendButton: agentSendBtn,
     input: agentMessageInput,
     apiUrl: AGENT_API_URL,
