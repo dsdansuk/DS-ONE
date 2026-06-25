@@ -1558,6 +1558,12 @@ function clearAgentFiles() {
   lastAgentFileUseAt = 0;
 }
 
+function clearAgentComposerInput() {
+  if (!agentMessageInput) return;
+  agentMessageInput.value = "";
+  autoResizeTextarea(agentMessageInput);
+}
+
 function mergePersistedAgentFiles(files = []) {
   if (!Array.isArray(files) || !files.length) return;
 
@@ -2270,6 +2276,9 @@ async function sendChatToTarget({
       const answerText = data.answer || data.message || JSON.stringify(data, null, 2);
       const isArtifact = Boolean(data.ppt?.ok || data.excel?.ok || task === PPT_DRAFT_TASK || task === EXCEL_DRAFT_TASK);
       const isKnowledgeRedirect = targetBody === agentBody && isKnowledgeRedirectText(answerText);
+      if (targetBody === agentBody && task === PPT_DRAFT_TASK && hasPendingPptJob(data)) {
+        setAgentPptGenerating(true, data.pptJob.id);
+      }
       const messageDiv = addMessage(targetBody, "bot", answerText, false, { hideCopy: isArtifact || isKnowledgeRedirect });
       appendPptDownloadButton(targetBody, data.ppt);
       appendExcelDownloadButton(targetBody, data.excel);
@@ -2287,6 +2296,8 @@ async function sendChatToTarget({
         });
         if (hasPendingPptJob(data)) {
           pollPptJobUntilDone(data.pptJob, message);
+        } else if (task === PPT_DRAFT_TASK) {
+          unlockAgentPptGeneratingIfJob(data?.pptJob?.id || "");
         }
       }
       return;
@@ -2353,6 +2364,9 @@ async function sendChatToTarget({
   } catch (err) {
     removeThinkingBox(thinkingBox);
     addMessage(targetBody, "bot", "호출 실패: " + getErrorMessage(err));
+    if (targetBody === agentBody && task === PPT_DRAFT_TASK) {
+      unlockAgentPptGeneratingIfJob("");
+    }
   } finally {
     if (sendButton) {
       if (sendButton === agentSendBtn && isAgentPptGenerating) {
@@ -2867,9 +2881,8 @@ if (agentMessageInput && agentForm) {
 
     if (exportTask === "ambiguous_export") {
       addMessage(agentBody, "user", message);
+      clearAgentComposerInput();
       await saveAgentMessage("user", message, { route: "agent-api" });
-      agentMessageInput.value = "";
-      autoResizeTextarea(agentMessageInput);
 
       const answer = buildAmbiguousExportAnswer();
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
@@ -2887,10 +2900,8 @@ if (agentMessageInput && agentForm) {
       const answer = buildPptUploadBlockedAnswer();
 
       addMessage(agentBody, "user", displayMessage);
+      clearAgentComposerInput();
       await saveAgentMessage("user", displayMessage, { route: "ppt-security-block", fileIds: getAgentFileIds(filesSnapshot) });
-
-      agentMessageInput.value = "";
-      autoResizeTextarea(agentMessageInput);
 
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
       await saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "uploaded-file" });
@@ -2902,10 +2913,8 @@ if (agentMessageInput && agentForm) {
       const answer = buildPptSensitiveBlockedAnswer();
 
       addMessage(agentBody, "user", message);
+      clearAgentComposerInput();
       await saveAgentMessage("user", message, { route: "ppt-security-block" });
-
-      agentMessageInput.value = "";
-      autoResizeTextarea(agentMessageInput);
 
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
       await saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "sensitive-text" });
@@ -2915,11 +2924,9 @@ if (agentMessageInput && agentForm) {
 
     if (shouldUseSkyworkLocalWorker(task, hasFiles, message)) {
       addMessage(agentBody, "user", message);
-      await saveAgentMessage("user", message, { route: "skywork-local-worker" });
-
-      agentMessageInput.value = "";
-      autoResizeTextarea(agentMessageInput);
+      clearAgentComposerInput();
       agentSendBtn.disabled = true;
+      await saveAgentMessage("user", message, { route: "skywork-local-worker" });
 
       await sendSkyworkLocalPptDraft(message);
       return;
@@ -2931,10 +2938,13 @@ if (agentMessageInput && agentForm) {
     const displayMessage = useFileApi ? buildAgentMessage(message, filesSnapshot) : message;
 
     addMessage(agentBody, "user", displayMessage);
-    await saveAgentMessage("user", displayMessage, { route: useFileApi ? "file-api" : task || "agent-api", fileIds: getAgentFileIds(filesSnapshot) });
+    clearAgentComposerInput();
 
-    agentMessageInput.value = "";
-    autoResizeTextarea(agentMessageInput);
+    if (usePptDraft) {
+      setAgentPptGenerating(true, "pending");
+    }
+
+    await saveAgentMessage("user", displayMessage, { route: useFileApi ? "file-api" : task || "agent-api", fileIds: getAgentFileIds(filesSnapshot) });
 
     if (!task && !useFileApi && shouldRedirectToKnowledge(message, hasFiles)) {
       addKnowledgeRedirectMessage(message);
