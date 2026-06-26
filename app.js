@@ -2387,18 +2387,40 @@ function autoResizeTextarea(input) {
   input.style.height = Math.min(input.scrollHeight, 80) + "px";
 }
 
+function isPlainEnterSubmitEvent(e) {
+  if (!e || e.key !== "Enter") return false;
+
+  // 한글/중문/일문 IME 조합 중 Enter는 글자 확정 용도이므로 전송하지 않습니다.
+  // keyCode 229는 일부 브라우저/그룹웨어 WebView에서 조합 중 입력으로 전달됩니다.
+  if (e.isComposing || e.keyCode === 229) return false;
+
+  // Shift + Enter는 줄바꿈으로 유지합니다.
+  if (e.shiftKey) return false;
+
+  return true;
+}
+
+function submitChatForm(form) {
+  if (!form) return;
+
+  // 최신 브라우저는 requestSubmit을 사용해 submit 버튼/HTML5 검증 흐름을 그대로 탑니다.
+  if (typeof form.requestSubmit === "function") {
+    form.requestSubmit();
+    return;
+  }
+
+  // 일부 구형 사내 브라우저/WebView에서는 requestSubmit 미지원으로 Enter 전송이 실패할 수 있어
+  // submit 이벤트를 직접 발생시키는 안전한 fallback을 둡니다.
+  const submitEvent = new Event("submit", { bubbles: true, cancelable: true });
+  form.dispatchEvent(submitEvent);
+}
+
 if (messageInput && chatForm) {
   messageInput.addEventListener("keydown", (e) => {
-    // Shift + Enter → 줄바꿈
-    if (e.key === "Enter" && e.shiftKey) {
-      return;
-    }
+    if (!isPlainEnterSubmitEvent(e)) return;
 
-    // Enter → 전송
-    if (e.key === "Enter") {
-      e.preventDefault();
-      chatForm.requestSubmit();
-    }
+    e.preventDefault();
+    submitChatForm(chatForm);
   });
 
   messageInput.addEventListener("input", () => autoResizeTextarea(messageInput));
@@ -2446,16 +2468,10 @@ if (agentFileInput) {
 
 if (agentMessageInput && agentForm) {
   agentMessageInput.addEventListener("keydown", (e) => {
-    // Shift + Enter → 줄바꿈
-    if (e.key === "Enter" && e.shiftKey) {
-      return;
-    }
+    if (!isPlainEnterSubmitEvent(e)) return;
 
-    // Enter → 전송
-    if (e.key === "Enter") {
-      e.preventDefault();
-      agentForm.requestSubmit();
-    }
+    e.preventDefault();
+    submitChatForm(agentForm);
   });
 
   agentMessageInput.addEventListener("input", () => autoResizeTextarea(agentMessageInput));
