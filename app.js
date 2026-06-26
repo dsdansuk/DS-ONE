@@ -808,11 +808,54 @@ function getErrorMessage(err) {
   return String(err || "알 수 없는 오류");
 }
 
+function parseMaybeJsonText(value, fallback = "") {
+  const text = String(value || "").trim();
+  if (!text) return fallback || "";
+
+  const looksJson =
+    (text.startsWith("{") && text.endsWith("}")) ||
+    (text.startsWith("[") && text.endsWith("]"));
+
+  if (!looksJson) return text;
+
+  try {
+    const parsed = JSON.parse(text);
+    return getApiAnswerText(parsed, fallback || text);
+  } catch {
+    return text;
+  }
+}
+
+function parseStreamPayloadText(data) {
+  if (typeof data === "string") return parseMaybeJsonText(data, data);
+  if (!data || typeof data !== "object") return "";
+
+  const candidates = [
+    data.chunk,
+    data.answer,
+    data.message?.content,
+    data.delta?.content,
+    data.choices?.[0]?.delta?.content,
+    data.choices?.[0]?.message?.content,
+    data.content,
+    data.text,
+    data.message,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null) continue;
+    const text = parseMaybeJsonText(candidate, "");
+    if (text) return text;
+  }
+
+  return "";
+}
+
 function parseStreamText(text) {
   if (!text) return "";
 
   if (!text.includes("data:")) {
-    return text;
+    return parseMaybeJsonText(text, text);
   }
 
   let output = "";
@@ -827,22 +870,61 @@ function parseStreamText(text) {
 
     try {
       const data = JSON.parse(payload);
-      output +=
-        data.chunk ||
-        data.message?.content ||
-        data.delta?.content ||
-        data.choices?.[0]?.delta?.content ||
-        data.choices?.[0]?.message?.content ||
-        data.answer ||
-        data.content ||
-        data.text ||
-        "";
+      output += parseStreamPayloadText(data);
     } catch {
-      output += payload;
+      output += parseMaybeJsonText(payload, payload);
     }
   }
 
   return output;
+}
+
+async function readResponseData(res) {
+  const contentType = res.headers.get("content-type") || "";
+  const text = await res.text();
+
+  if (contentType.includes("application/json")) {
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch {
+      return { ok: false, message: text || "JSON 응답 파싱 실패" };
+    }
+  }
+
+  try {
+    const parsed = text ? JSON.parse(text) : {};
+    if (parsed && typeof parsed === "object") return parsed;
+  } catch {
+    // plain text response
+  }
+
+  return { ok: res.ok, answer: text || "" };
+}
+
+function getApiAnswerText(data, fallback = "") {
+  if (typeof data === "string") {
+    return parseMaybeJsonText(data, fallback) || fallback || "";
+  }
+
+  if (!data || typeof data !== "object") return fallback || "";
+
+  const candidates = [
+    data.answer,
+    data.message?.content,
+    data.choices?.[0]?.message?.content,
+    data.choices?.[0]?.delta?.content,
+    data.content,
+    data.text,
+    data.message,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null) continue;
+    const text = parseMaybeJsonText(candidate, "");
+    if (text) return text;
+  }
+
+  return fallback || "답변을 생성하지 못했습니다.";
 }
 
 async function apiJson(url, options = {}) {
@@ -2131,18 +2213,41 @@ async function sendChatToTarget({
     removeThinkingBox(thinkingBox);
 
     if (!res.ok) {
-      const errorText = await res.text();
-      addMessage(targetBody, "bot", "AI API 오류가 발생했습니다.\nHTTP " + res.status + "\n" + errorText, true);
+      const data = await readResponseData(res);
+      const answerText = getApiAnswerText(data, "HTTP " + res.status);
+      addMessage(targetBody, "bot", "AI API 오류가 발생했습니다.\n" + answerText, true);
+      return;
+    }
+
+    const responseContentType = res.headers.get("content-type") || "";
+
+    // stream=true로 요청했더라도 서버가 보안 차단/정책 응답을 JSON으로 반환할 수 있습니다.
+    // 이 경우 JSON 전체를 화면에 노출하지 않고 answer/message만 표시합니다.
+    if (stream && responseContentType.includes("application/json")) {
+      const data = await readResponseData(res);
+      const answerText = getApiAnswerText(data, "답변을 생성하지 못했습니다.");
+      const isArtifact = Boolean(data.excel?.ok || task === EXCEL_DRAFT_TASK);
+      const isKnowledgeRedirect = targetBody === agentBody && isKnowledgeRedirectText(answerText);
+      const messageDiv = addMessage(targetBody, "bot", answerText, false, { hideCopy: isArtifact || isKnowledgeRedirect });
+      appendExcelDownloadButton(targetBody, data.excel);
+      appendEvidenceBox(targetBody, data);
+      if (isKnowledgeRedirect) applyKnowledgeRedirectAction(messageDiv, message);
+      if (targetBody === agentBody) {
+        await saveAgentMessage("assistant", answerText, {
+          route: isKnowledgeRedirect ? "knowledge-redirect" : task || "agent-api",
+          artifact: isArtifact,
+          artifactSavedAt: isArtifact ? new Date().toISOString() : undefined,
+          excel: data.excel || null,
+          originalMessage: isKnowledgeRedirect ? message : undefined,
+        });
+      }
       return;
     }
 
     if (!stream) {
-      const contentType = res.headers.get("content-type") || "";
-      const data = contentType.includes("application/json")
-        ? await res.json()
-        : { ok: true, answer: await res.text() };
+      const data = await readResponseData(res);
 
-      const answerText = data.answer || data.message || JSON.stringify(data, null, 2);
+      const answerText = getApiAnswerText(data, "답변을 생성하지 못했습니다.");
       const isArtifact = Boolean(data.excel?.ok || task === EXCEL_DRAFT_TASK);
       const isKnowledgeRedirect = targetBody === agentBody && isKnowledgeRedirectText(answerText);
       if (targetBody === agentBody && task === PPT_DRAFT_TASK && hasPendingPptJob(data)) {
@@ -2291,19 +2396,40 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
     removeThinkingBox(thinkingBox);
 
     if (!res.ok) {
-      const errorText = await res.text();
-      addMessage(agentBody, "bot", "파일 분석 API 오류가 발생했습니다.\nHTTP " + res.status + "\n" + errorText, true);
+      const data = await readResponseData(res);
+      const answerText = getApiAnswerText(data, "HTTP " + res.status);
+      addMessage(agentBody, "bot", "파일 분석 API 오류가 발생했습니다.\n" + answerText, true);
+      return;
+    }
+
+    const responseContentType = res.headers.get("content-type") || "";
+
+    if (useStream && responseContentType.includes("application/json")) {
+      const data = await readResponseData(res);
+      mergePersistedAgentFiles(data.files || []);
+      const answerText = getApiAnswerText(data, "파일 분석 답변을 생성하지 못했습니다.");
+      const isArtifact = Boolean(data.excel?.ok || task === EXCEL_DRAFT_TASK);
+      const isKnowledgeRedirect = isKnowledgeRedirectText(answerText);
+      const messageDiv = addMessage(agentBody, "bot", answerText, false, { hideCopy: isArtifact || isKnowledgeRedirect });
+      appendExcelDownloadButton(agentBody, data.excel);
+      appendEvidenceBox(agentBody, data);
+      if (isKnowledgeRedirect) applyKnowledgeRedirectAction(messageDiv, message);
+      await saveAgentMessage("assistant", answerText, {
+        route: isKnowledgeRedirect ? "knowledge-redirect" : task || "file-api",
+        artifact: isArtifact,
+        artifactSavedAt: isArtifact ? new Date().toISOString() : undefined,
+        excel: data.excel || null,
+        fileIds: getAgentFileIds(),
+        originalMessage: isKnowledgeRedirect ? message : undefined,
+      });
       return;
     }
 
     if (!useStream) {
-      const contentType = res.headers.get("content-type") || "";
-      const data = contentType.includes("application/json")
-        ? await res.json()
-        : { ok: true, answer: await res.text() };
+      const data = await readResponseData(res);
 
       mergePersistedAgentFiles(data.files || []);
-      const answerText = data.answer || data.message || JSON.stringify(data, null, 2);
+      const answerText = getApiAnswerText(data, "파일 분석 답변을 생성하지 못했습니다.");
       const isArtifact = Boolean(data.excel?.ok || task === EXCEL_DRAFT_TASK);
       const isKnowledgeRedirect = isKnowledgeRedirectText(answerText);
       const messageDiv = addMessage(agentBody, "bot", answerText, false, { hideCopy: isArtifact || isKnowledgeRedirect });
@@ -2328,7 +2454,7 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
       const contentType = res.headers.get("content-type") || "";
       if (contentType.includes("application/json")) {
         const data = await res.json();
-        addMessage(agentBody, "bot", data.answer || data.message || JSON.stringify(data, null, 2), true);
+        addMessage(agentBody, "bot", getApiAnswerText(data, "파일 분석 응답 본문이 없습니다."), true);
       } else {
         addMessage(agentBody, "bot", "파일 분석 응답 본문이 없습니다.");
       }
@@ -2353,7 +2479,7 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
 
         if (parsed) {
           fullText += parsed;
-          botDiv.textContent = fullText;
+          setMessageContent(botDiv, fullText);
           agentBody.scrollTop = agentBody.scrollHeight;
         }
 
@@ -2367,7 +2493,7 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
     const finalParsed = parseStreamText(buffer);
     if (finalParsed) {
       fullText += finalParsed;
-      botDiv.textContent = fullText;
+      setMessageContent(botDiv, fullText);
     }
 
     if (!fullText.trim()) {
