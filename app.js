@@ -1735,6 +1735,62 @@ function hasRecentFileConversation(history = []) {
   });
 }
 
+
+function buildAgentMessage(message, files = []) {
+  const text = String(message || "").trim() || "첨부한 파일을 분석해 주세요.";
+  const list = Array.isArray(files) ? files : [];
+
+  if (!list.length) return text;
+
+  const fileLines = list.map((item, index) => {
+    const name = getAttachmentName(item);
+    const size = formatFileSize(getAttachmentSize(item));
+    return `${index + 1}. ${name} (${size})`;
+  });
+
+  return [text, "", "[첨부 파일]", ...fileLines].join("\n");
+}
+
+function shouldRedirectToKnowledge(message, hasFiles = false) {
+  if (hasFiles) return false;
+
+  const text = normalizeAgentText(message);
+  if (!text) return false;
+
+  // 문서 작성·요약·번역·메일 초안 등 업무 AI Agent가 처리해야 하는 산출물 요청은
+  // 사내 지식 문의로 돌리지 않습니다.
+  const workOutputPatterns = [
+    /메일|이메일|공문|공지|안내문|보고서|기안|품의서|회의록|요약|정리|번역|검토|초안|문장|표현|다듬|작성|써\s*줘|써줘|만들어\s*줘|만들어줘|수정|엑셀|pptx?|피피티|파워포인트|슬라이드|제안서/i,
+  ];
+  if (hasPattern(text, workOutputPatterns)) return false;
+
+  const explicitKnowledgePatterns = [
+    /사내\s*지식\s*문의|지식\s*베이스|사내\s*자료\s*기준/i,
+    /사내\s*(규정|규칙|내규|규정집|기준|정책)/i,
+    /업무\s*(절차|프로세스|매뉴얼|가이드|기준)/i,
+    /(담당\s*부서|담당자|소관\s*부서|문의\s*부서)/i,
+    /(신청|승인|결재|품의|구매|계약|정산|경비|출장|휴가|연차|근태|복리후생|보안|개인정보).{0,12}(절차|규정|기준|방법|어디|누구|담당|문의)/i,
+    /(절차|규정|기준|방법|담당).{0,12}(알려|확인|문의|어디|누구|뭐야|무엇)/i,
+  ];
+
+  return hasPattern(text, explicitKnowledgePatterns);
+}
+
+function addKnowledgeRedirectMessage(originalMessage = "") {
+  const answer = [
+    "사내 규정이나 업무 절차에 대한 질문은 정확한 답변을 위해 사내 지식 문의에서 확인해 주세요.",
+    "아래 버튼을 누르면 질문 내용을 그대로 가져갈 수 있습니다.",
+  ].join("\n");
+
+  const messageDiv = addMessage(agentBody, "bot", answer, false, { hideCopy: true });
+  applyKnowledgeRedirectAction(messageDiv, originalMessage);
+
+  saveAgentMessage("assistant", answer, {
+    route: "knowledge-redirect",
+    originalMessage,
+  });
+}
+
 function shouldUseFileApi(message, hasFiles, history = []) {
   if (!hasFiles) return false;
 
