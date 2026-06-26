@@ -155,7 +155,6 @@ function setCachedAuth(profile) {
       })
     );
   } catch (err) {
-    console.warn("인증 캐시 저장 실패:", err);
   }
 }
 
@@ -198,7 +197,6 @@ function setCachedDisplayName(name) {
       })
     );
   } catch (err) {
-    console.warn("사용자명 캐시 저장 실패:", err);
   }
 }
 
@@ -987,7 +985,6 @@ function saveChatHistory() {
   try {
     localStorage.setItem(getChatHistoryKey(), JSON.stringify(payload));
   } catch (err) {
-    console.warn("AI 채팅 내역 저장 실패:", err);
   }
 }
 
@@ -1020,7 +1017,6 @@ function restoreChatHistory() {
 
     aiBody.scrollTop = aiBody.scrollHeight;
   } catch (err) {
-    console.warn("AI 채팅 내역 복원 실패:", err);
     localStorage.removeItem(key);
   }
 }
@@ -1106,7 +1102,6 @@ async function refreshRpaStatus() {
     renderRunningRpaNotice();
     syncRpaPollingByCurrentJobs();
   } catch (err) {
-    console.warn("RPA 상태 조회 실패:", err);
   }
 }
 
@@ -1738,7 +1733,6 @@ async function initAgentSessionState() {
 
     agentStateReady = true;
   } catch (err) {
-    console.warn("업무 AI Agent 세션 복원 실패:", err);
     agentStateReady = true;
   } finally {
     agentStateLoading = false;
@@ -1763,7 +1757,6 @@ function saveAgentMessage(role, content, metadata = {}) {
     }
     return data;
   }).catch((err) => {
-    console.warn("업무 AI Agent 메시지 저장 실패:", err);
     return null;
   });
 }
