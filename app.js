@@ -32,6 +32,9 @@ const AUTH_CACHE_STORAGE_PREFIX = DS_STORAGE.authCachePrefix || "ds_chatbot_auth
 const AUTH_CACHE_TTL_MS = Number(DS_STORAGE.authCacheTtlMs || 10 * 60 * 1000);
 const DISPLAY_NAME_CACHE_KEY = DS_STORAGE.displayNameCacheKey || "ds_chatbot_last_display_name_v1";
 const DISPLAY_NAME_CACHE_TTL_MS = Number(DS_STORAGE.displayNameCacheTtlMs || 7 * 24 * 60 * 60 * 1000);
+const AGENT_HISTORY_CACHE_PREFIX = DS_STORAGE.agentHistoryCachePrefix || "ds_one_agent_history_v1_";
+const AGENT_HISTORY_CACHE_TTL_MS = Number(DS_STORAGE.agentHistoryCacheTtlMs || 60 * 60 * 1000);
+const AGENT_HISTORY_CACHE_MAX_MESSAGES = Number(DS_STORAGE.agentHistoryCacheMaxMessages || 20);
 const DEFAULT_HOME_GREETING = DS_UI.defaultHomeGreeting || "필요한 업무를 선택해 주세요";
 
 const RPA_STATUS_POLL_INTERVAL_MS = Number(DS_UI.rpaStatusPollIntervalMs || 30 * 1000);
@@ -84,6 +87,8 @@ let agentStateLoading = false;
 let lastAgentRoute = "";
 let lastAgentFileUseAt = 0;
 let agentSubmitInProgress = false;
+let agentConversationRenderedFromCache = false;
+let agentCacheSaveTimer = null;
 
 function isDocModeActive() {
   return currentMode === "doc" || Boolean(docPanel?.classList.contains("active"));
@@ -135,6 +140,101 @@ function resetAgentMessagesKeepingWelcome() {
 
   if (card && agentBody.firstElementChild !== card) {
     agentBody.prepend(card);
+  }
+}
+
+function getAgentHistoryCacheKey() {
+  const userKey = currentEmpNo || currentLoginId || agentSessionId || getSessionTokenCachePart();
+  if (!userKey) return "";
+  return AGENT_HISTORY_CACHE_PREFIX + String(userKey).replace(/[^a-zA-Z0-9_.:-]/g, "_");
+}
+
+function getSessionTokenCachePart() {
+  if (!sessionToken) return "";
+  const parts = sessionToken.split(".");
+  return String(parts[1] || parts[0] || sessionToken).slice(0, 24);
+}
+
+function getAgentConversationMessages(maxMessages = AGENT_HISTORY_CACHE_MAX_MESSAGES) {
+  if (!agentBody) return [];
+
+  return Array.from(agentBody.querySelectorAll(".chat-row .msg"))
+    .filter((el) => !el.classList.contains("debug"))
+    .map((el) => {
+      const role = el.classList.contains("user") ? "user" : "assistant";
+      const text = String(el.textContent || "").trim();
+      return { role, text };
+    })
+    .filter((msg) => msg.text)
+    .slice(-maxMessages);
+}
+
+function saveAgentConversationCacheNow() {
+  const key = getAgentHistoryCacheKey();
+  if (!key) return;
+
+  const messages = getAgentConversationMessages();
+
+  try {
+    if (!messages.length) {
+      sessionStorage.removeItem(key);
+      return;
+    }
+
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        savedAt: Date.now(),
+        sessionId: agentSessionId || "",
+        messages,
+      })
+    );
+  } catch {
+  }
+}
+
+function saveAgentConversationCacheDebounced() {
+  window.clearTimeout(agentCacheSaveTimer);
+  agentCacheSaveTimer = window.setTimeout(saveAgentConversationCacheNow, 120);
+}
+
+function restoreAgentConversationFromCache() {
+  if (!agentBody || hasAgentVisibleConversation()) return false;
+
+  const key = getAgentHistoryCacheKey();
+  if (!key) return false;
+
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return false;
+
+    const payload = JSON.parse(raw);
+    const savedAt = Number(payload.savedAt || 0);
+    const messages = Array.isArray(payload.messages) ? payload.messages : [];
+
+    if (!savedAt || Date.now() - savedAt > AGENT_HISTORY_CACHE_TTL_MS) {
+      sessionStorage.removeItem(key);
+      return false;
+    }
+
+    if (!messages.length) return false;
+
+    resetAgentMessagesKeepingWelcome();
+
+    messages.forEach((msg) => {
+      const role = msg.role === "user" ? "user" : "bot";
+      addMessage(agentBody, role, String(msg.text || ""), false, {
+        skipAgentSave: true,
+        skipAgentCache: true,
+      });
+    });
+
+    agentConversationRenderedFromCache = true;
+    agentBody.scrollTop = agentBody.scrollHeight;
+    return true;
+  } catch {
+    sessionStorage.removeItem(key);
+    return false;
   }
 }
 
@@ -427,6 +527,7 @@ function setMode(mode) {
   if (mode === "doc") {
     if (docWriteBtn) docWriteBtn.blur();
     ensureAgentWelcomeCard();
+    restoreAgentConversationFromCache();
     syncAgentPptGeneratingControls();
     if (!isAgentPptGenerating) focusInputWhenPanelReady(agentMessageInput);
     scheduleAgentSessionRestore();
@@ -596,6 +697,10 @@ function applyKnowledgeRedirectAction(messageDiv, originalMessage = "") {
 function setMessageContent(div, text) {
   if (!div) return;
   renderMessageContent(div, text);
+
+  if (agentBody && div.closest && div.closest("#agentBody")) {
+    saveAgentConversationCacheDebounced();
+  }
 }
 
 function addMessage(targetBody, type, text, debug = false, options = {}) {
@@ -631,6 +736,11 @@ function addMessage(targetBody, type, text, debug = false, options = {}) {
 
   if (targetBody === aiBody && !debug && !options.skipSave) {
     saveChatHistory();
+  }
+
+  if (targetBody === agentBody && !debug && !options.skipAgentCache) {
+    agentConversationRenderedFromCache = false;
+    saveAgentConversationCacheDebounced();
   }
 
   return div;
@@ -1716,12 +1826,13 @@ async function initAgentSessionState() {
     if (Array.isArray(data.messages) && data.messages.length) {
       // 사용자가 이미 화면에서 메시지를 입력/전송한 경우, 늦게 도착한 세션 복원 응답이
       // 현재 대화를 지워버리지 않도록 복원 렌더링을 생략합니다.
-      if (hasAgentVisibleConversation() || agentSubmitInProgress) {
+      if ((hasAgentVisibleConversation() && !agentConversationRenderedFromCache) || agentSubmitInProgress) {
         agentStateReady = true;
         return;
       }
 
       resetAgentMessagesKeepingWelcome();
+      agentConversationRenderedFromCache = false;
       let lastRestoredUserMessage = "";
       const completedPptJobIds = new Set();
 
@@ -1761,6 +1872,11 @@ async function initAgentSessionState() {
         }
       });
       agentBody.scrollTop = agentBody.scrollHeight;
+      saveAgentConversationCacheNow();
+    } else if (agentConversationRenderedFromCache) {
+      resetAgentMessagesKeepingWelcome();
+      agentConversationRenderedFromCache = false;
+      saveAgentConversationCacheNow();
     }
 
     if (Array.isArray(data.files)) {
@@ -1800,6 +1916,7 @@ function saveAgentMessage(role, content, metadata = {}) {
       agentSessionId = data.session.id;
       sessionStorage.setItem("ds_agent_session_id", agentSessionId);
     }
+    saveAgentConversationCacheDebounced();
     return data;
   }).catch((err) => {
     return null;
@@ -2304,6 +2421,7 @@ async function sendChatToTarget({
           setMessageContent(botDiv, fullText);
           targetBody.scrollTop = targetBody.scrollHeight;
           if (targetBody === aiBody) saveChatHistory();
+          if (targetBody === agentBody) saveAgentConversationCacheDebounced();
         }
 
         buffer = "";
@@ -2318,11 +2436,13 @@ async function sendChatToTarget({
       fullText += finalParsed;
       setMessageContent(botDiv, fullText);
       if (targetBody === aiBody) saveChatHistory();
+      if (targetBody === agentBody) saveAgentConversationCacheDebounced();
     }
 
     if (!fullText.trim()) {
       setMessageContent(botDiv, "답변 데이터는 수신했지만 화면에 표시할 텍스트를 찾지 못했습니다.");
       if (targetBody === aiBody) saveChatHistory();
+      if (targetBody === agentBody) saveAgentConversationCacheDebounced();
     }
 
     if (targetBody === agentBody && fullText.trim()) {
@@ -2476,6 +2596,7 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
           fullText += parsed;
           setMessageContent(botDiv, fullText);
           agentBody.scrollTop = agentBody.scrollHeight;
+          saveAgentConversationCacheDebounced();
         }
 
         buffer = "";
@@ -2489,6 +2610,7 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
     if (finalParsed) {
       fullText += finalParsed;
       setMessageContent(botDiv, fullText);
+      saveAgentConversationCacheDebounced();
     }
 
     if (!fullText.trim()) {

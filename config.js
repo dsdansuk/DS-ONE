@@ -19,6 +19,9 @@ window.DS_ONE_CONFIG = Object.freeze({
     authCacheTtlMs: 10 * 60 * 1000,
     displayNameCacheKey: "ds_chatbot_last_display_name_v1",
     displayNameCacheTtlMs: 7 * 24 * 60 * 60 * 1000,
+    agentHistoryCachePrefix: "ds_one_agent_history_v1_",
+    agentHistoryCacheTtlMs: 60 * 60 * 1000,
+    agentHistoryCacheMaxMessages: 20,
   }),
   ui: Object.freeze({
     defaultHomeGreeting: "필요한 업무를 선택해 주세요",
