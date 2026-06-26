@@ -83,6 +83,16 @@ let agentSessionId = sessionStorage.getItem("ds_agent_session_id") || "";
 let agentStateReady = false;
 let lastAgentRoute = "";
 let lastAgentFileUseAt = 0;
+let agentSubmitInProgress = false;
+
+function isDocModeActive() {
+  return currentMode === "doc" || Boolean(docPanel?.classList.contains("active"));
+}
+
+function hasAgentVisibleConversation() {
+  if (!agentBody) return false;
+  return Boolean(agentBody.querySelector(".chat-row .msg.user, .chat-row .msg.bot, .msg.user, .msg.bot"));
+}
 
 // PPTX 생성 작업 큐는 제거되었지만, 과거 세션 메타데이터 호환을 위해 빈 Set만 유지합니다.
 const activePptJobPolls = new Set();
@@ -1594,6 +1604,13 @@ async function initAgentSessionState() {
     if (agentSessionId) sessionStorage.setItem("ds_agent_session_id", agentSessionId);
 
     if (Array.isArray(data.messages) && data.messages.length) {
+      // 사용자가 이미 화면에서 메시지를 입력/전송한 경우, 늦게 도착한 세션 복원 응답이
+      // 현재 대화를 지워버리지 않도록 복원 렌더링을 생략합니다.
+      if (hasAgentVisibleConversation() || agentSubmitInProgress) {
+        agentStateReady = true;
+        return;
+      }
+
       agentBody.innerHTML = "";
       let lastRestoredUserMessage = "";
       const completedPptJobIds = new Set();
@@ -2403,14 +2420,9 @@ function isPlainEnterSubmitEvent(e) {
 function submitChatForm(form) {
   if (!form) return;
 
-  // 최신 브라우저는 requestSubmit을 사용해 submit 버튼/HTML5 검증 흐름을 그대로 탑니다.
-  if (typeof form.requestSubmit === "function") {
-    form.requestSubmit();
-    return;
-  }
-
-  // 일부 구형 사내 브라우저/WebView에서는 requestSubmit 미지원으로 Enter 전송이 실패할 수 있어
-  // submit 이벤트를 직접 발생시키는 안전한 fallback을 둡니다.
+  // 그룹웨어 iframe/WebView 환경에서는 requestSubmit()이 무시되거나
+  // submit 버튼 클릭 흐름이 안정적으로 전달되지 않는 경우가 있어
+  // 우리 코드가 등록한 submit 핸들러를 직접 실행하는 방식으로 통일합니다.
   const submitEvent = new Event("submit", { bubbles: true, cancelable: true });
   form.dispatchEvent(submitEvent);
 }
@@ -2466,46 +2478,48 @@ if (agentFileInput) {
   });
 }
 
-if (agentMessageInput && agentForm) {
-  agentMessageInput.addEventListener("keydown", (e) => {
-    if (!isPlainEnterSubmitEvent(e)) return;
+async function handleAgentFormSubmit() {
+  if (!agentMessageInput || !agentForm) return;
 
-    e.preventDefault();
-    submitChatForm(agentForm);
-  });
+  if (!isDocModeActive()) {
+    return;
+  }
 
-  agentMessageInput.addEventListener("input", () => autoResizeTextarea(agentMessageInput));
+  if (agentSubmitInProgress) {
+    return;
+  }
 
-  agentForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  if (isAgentPptGenerating) {
+    syncAgentPptGeneratingControls();
+    return;
+  }
 
-    if (currentMode !== "doc") return;
+  const rawMessage = agentMessageInput.value.trim();
+  if (!rawMessage && !agentSelectedFiles.length) {
+    focusInputWhenPanelReady(agentMessageInput);
+    return;
+  }
 
-    if (isAgentPptGenerating) {
-      syncAgentPptGeneratingControls();
-      return;
-    }
+  agentSubmitInProgress = true;
+  if (agentSendBtn) agentSendBtn.disabled = true;
 
-    const rawMessage = agentMessageInput.value.trim();
-    if (!rawMessage && !agentSelectedFiles.length) return;
+  const filesSnapshot = [...agentSelectedFiles];
+  const historySnapshot = getRecentChatMessages(agentBody);
+  const message = rawMessage || "첨부한 파일을 분석해 주세요.";
+  const hasFiles = filesSnapshot.length > 0;
+  const exportTask = decideExportTask(message);
 
-    if (!agentSessionId) await initAgentSessionState();
-
-    const filesSnapshot = [...agentSelectedFiles];
-    const historySnapshot = getRecentChatMessages(agentBody);
-    const message = rawMessage || "첨부한 파일을 분석해 주세요.";
-    const hasFiles = filesSnapshot.length > 0;
-    const exportTask = decideExportTask(message);
-
+  try {
+    // 사용자 입력은 네트워크 세션 복원보다 먼저 화면에 표시합니다.
+    // 그래야 agent-api 세션 복원/저장 요청이 느리거나 실패해도 사용자가 전송 여부를 즉시 알 수 있습니다.
     if (exportTask === "ambiguous_export") {
       addMessage(agentBody, "user", message);
       clearAgentComposerInput();
-      await saveAgentMessage("user", message, { route: "agent-api" });
+      saveAgentMessage("user", message, { route: "agent-api" });
 
       const answer = buildAmbiguousExportAnswer();
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      await saveAgentMessage("assistant", answer, { route: "export-clarification" });
-      focusInputWhenPanelReady(agentMessageInput);
+      saveAgentMessage("assistant", answer, { route: "export-clarification" });
       return;
     }
 
@@ -2515,17 +2529,22 @@ if (agentMessageInput && agentForm) {
 
     // PPT 요청은 더 이상 차단하거나 외부 PPT 생성 Worker로 보내지 않습니다.
     // agent-api에 일반 문서 작성 요청으로 전달하여 슬라이드 구성안 텍스트만 제공합니다.
-
     const useFileApi = usePptDraft
       ? false
       : (useExcelDraft && hasFiles ? true : shouldUseFileApi(message, hasFiles, historySnapshot));
-    const displayMessage = (useFileApi || (usePptDraft && hasFiles)) ? buildAgentMessage(message, filesSnapshot) : message;
+
+    const displayMessage = (useFileApi || (usePptDraft && hasFiles))
+      ? buildAgentMessage(message, filesSnapshot)
+      : message;
 
     addMessage(agentBody, "user", displayMessage);
     clearAgentComposerInput();
 
-
-    await saveAgentMessage("user", displayMessage, { route: useFileApi ? "file-api" : task || "agent-api", fileIds: getAgentFileIds(filesSnapshot) });
+    // 세션/메시지 저장 실패가 실제 AI 호출을 막지 않도록 분리합니다.
+    saveAgentMessage("user", displayMessage, {
+      route: useFileApi ? "file-api" : task || "agent-api",
+      fileIds: getAgentFileIds(filesSnapshot),
+    });
 
     if (usePptDraft && hasFiles && !useFileApi) {
       clearAgentFiles();
@@ -2536,11 +2555,39 @@ if (agentMessageInput && agentForm) {
       return;
     }
 
-    agentSendBtn.disabled = true;
-
     await sendAgentChat(message, filesSnapshot, historySnapshot, {
       useFileApi,
       task,
     });
+  } catch (err) {
+    addMessage(agentBody, "bot", "업무 AI Agent 처리 중 오류가 발생했습니다.\n" + getErrorMessage(err), true);
+  } finally {
+    agentSubmitInProgress = false;
+    if (agentSendBtn && !isAgentPptGenerating) agentSendBtn.disabled = false;
+    focusInputWhenPanelReady(agentMessageInput);
+  }
+}
+
+if (agentMessageInput && agentForm) {
+  agentMessageInput.addEventListener("keydown", (e) => {
+    if (!isPlainEnterSubmitEvent(e)) return;
+
+    e.preventDefault();
+    handleAgentFormSubmit();
+  });
+
+  agentMessageInput.addEventListener("input", () => autoResizeTextarea(agentMessageInput));
+
+  if (agentSendBtn) {
+    agentSendBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      handleAgentFormSubmit();
+    });
+  }
+
+  agentForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    handleAgentFormSubmit();
   });
 }
+
