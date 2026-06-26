@@ -1074,7 +1074,7 @@ button {
 }
 
 .welcome-copy p {
-  margin: 0;
+  margin: 3px 0 0;
   color: #334155;
   font-size: 12.8px;
   line-height: 1.35;
