@@ -1,4 +1,4 @@
-// DS Chatbot Frontend - 운영 분리 구조용 app.js / PPT 초안 JSON 설계 지원
+// DS Chatbot Frontend - 운영 분리 구조용 app.js / PPTX 생성 제거, 슬라이드 구성안 전용
 // GitHub Pages: https://dsdansuk.github.io/DS-chatbot/
 // Edge Functions:
 // - sso-login: 그룹웨어 SSO 진입 및 토큰 발급
@@ -22,46 +22,11 @@ const AGENT_STATE_API_URL = AGENT_API_URL;
 const RPA_API_URL =
   "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api";
 
-// Skywork Worker 운영 설정
-// - 운영에서는 브라우저가 NCP Worker를 직접 호출하지 않고, Supabase agent-api가 중계합니다.
-// - 아래 로컬 직접 호출 값은 개발자 PC/NCP 단독 통신 테스트용입니다.
-// - 운영 배포본에는 Worker URL과 Token을 프론트엔드에 노출하지 않는 것이 원칙입니다.
-const SKYWORK_LOCAL_WORKER_URL = "";
-const SKYWORK_LOCAL_WORKER_TOKEN = "";
-const SKYWORK_LOCAL_TEST_STORAGE_KEY = "ds_skywork_local_test";
-const SKYWORK_LOCAL_TEST_DEFAULT_ENABLED = false;
-// 직접 호출 테스트가 꼭 필요한 경우에만 허용 사용자 ID/사번을 제한해서 사용하세요.
-const SKYWORK_LOCAL_ALLOWED_USERS = [];
-
+// PPTX/Skywork 파일 생성 기능은 운영 정책상 제거했습니다.
+// PPT 요청은 agent-api에서 슬라이드 구성안 텍스트로만 처리합니다.
 const PPT_DRAFT_TASK = "ppt_draft";
 const EXCEL_DRAFT_TASK = "excel_draft";
 const WEB_SEARCH_TASK = "web_search";
-
-// Skywork 로컬 테스트 모드에서만 사용할 DS단석 CI/브랜드 디자인 지침입니다.
-// 운영 Pull Worker 구조에서는 민감정보 차단 로직과 모델 지침을 분리하기 위해
-// 프론트가 이 지침을 agent-api로 보내지 않고, agent-api가 서버 내부에서 safe_prompt에만 추가합니다.
-const SKYWORK_PPT_CI_DESIGN_GUIDELINES = [
-  "",
-  "브랜드/CI 디자인 지침:",
-  "- Skywork 지식베이스에 등록된 logo.png는 DS단석 회사 로고 이미지입니다.",
-  "- PPT 생성 시 logo.png 파일을 실제 이미지로 삽입해 주세요.",
-  "- 절대 'Logo', 'LOGO', 'logo.png', 'CORPORE' 같은 텍스트를 로고 대신 입력하지 마세요.",
-  "- logo.png 이미지를 사용할 수 없는 경우에는 로고 텍스트를 임의로 만들지 말고 로고 영역을 비워 주세요.",
-  "- 표지에는 회사 로고를 상단 좌측 또는 우측에 작고 정돈되게 배치해 주세요.",
-  "- 2장 이후 본문 슬라이드에는 모든 슬라이드의 동일한 위치에 같은 크기로 logo.png를 배치해 주세요.",
-  "- 로고 위치, 크기, 여백은 모든 본문 슬라이드에서 동일해야 합니다.",
-  "- 로고는 임의로 늘리거나 찌그러뜨리거나 색상 변경, 그림자, 과도한 효과를 적용하지 마세요.",
-  "- 전체 PPT는 하나의 기업 보고서 템플릿처럼 보이도록 디자인을 통일해 주세요.",
-  "- 1장 표지는 별도 표지 디자인을 허용하되, CI 색상과 로고 사용 원칙은 동일하게 유지해 주세요.",
-  "- 2장부터 마지막 장까지는 동일한 배경 스타일, 동일한 상단 제목 영역, 동일한 하단 푸터, 동일한 페이지 번호 위치를 사용해 주세요.",
-  "- 슬라이드마다 배경색, 장식 요소, 헤더/푸터 위치가 들쑥날쑥 달라지지 않도록 해 주세요.",
-  "- 본문 레이아웃은 표, 카드, KPI, 프로세스 등으로 달라도 되지만 전체 배경과 톤앤매너는 동일해야 합니다.",
-  "- CI 컬러는 DS Red #EC1846 RGB(236,24,70), DS Gray #4C585F RGB(76,88,95), DS LT Gray #D8DCDA RGB(216,220,218), DS Gold Pantone 875 C, DS Silver Pantone 877 C를 참고해 주세요.",
-  "- DS Red는 핵심 강조와 포인트 컬러로 제한적으로 사용하고, DS Gray는 본문/제목 텍스트에 사용해 주세요.",
-  "- DS LT Gray는 배경 보조색 또는 구분 영역에 사용하고, DS Gold/DS Silver는 고급스러운 포인트로만 절제해서 사용해 주세요.",
-  "- 과도한 그라데이션, 임의 아이콘 남발, 슬라이드별 다른 템플릿 혼용은 피해주세요.",
-  "- 최종 결과는 깔끔한 대기업 경영진 보고서 스타일이어야 합니다.",
-].join("\n");
 
 const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
 const CHAT_HISTORY_STORAGE_PREFIX = "ds_chatbot_ai_history_v1_";
@@ -119,18 +84,14 @@ let agentStateReady = false;
 let lastAgentRoute = "";
 let lastAgentFileUseAt = 0;
 
-// PPT Pull Worker 작업 중복 상태조회 방지용입니다.
-// 뒤로가기/새로고침 복원 시 같은 job_id에 대해 polling이 여러 번 시작되어
-// 중복 메시지가 쌓이거나 불필요한 상태조회가 반복되는 것을 막습니다.
+// PPTX 생성 작업 큐는 제거되었지만, 과거 세션 메타데이터 호환을 위해 빈 Set만 유지합니다.
 const activePptJobPolls = new Set();
 
-// PPT 생성 중에는 AI Agent 입력/전송/첨부를 잠가 사용자가 중복 요청을 보내지 않게 합니다.
-// 실제 중복 생성은 agent-api + DB unique index에서 한 번 더 막지만,
-// 화면에서도 생성 중 상태가 풀리지 않도록 프론트 상태를 별도로 유지합니다.
+// PPTX 생성 잠금은 제거되었습니다. 아래 상태값은 과거 저장 세션 호환용입니다.
 let isAgentPptGenerating = false;
 let activeAgentPptJobId = "";
 const AGENT_DEFAULT_PLACEHOLDER = agentMessageInput?.getAttribute("placeholder") || "질문이나 업무 요청을 입력하세요";
-const AGENT_PPT_GENERATING_PLACEHOLDER = "PPT 생성 중입니다. 완료 후 다시 요청할 수 있습니다.";
+const AGENT_PPT_GENERATING_PLACEHOLDER = "슬라이드 구성안을 작성하는 중입니다.";
 const AGENT_PPT_JOB_LOCK_STORAGE_PREFIX = "ds_agent_active_ppt_job_v1_";
 const AGENT_PPT_JOB_LOCK_TTL_MS = Math.max(PPT_JOB_POLL_MAX_MS, 30 * 60 * 1000);
 
@@ -189,7 +150,8 @@ function restoreAgentPptJobLock() {
 }
 
 function syncAgentPptGeneratingControls() {
-  const locked = Boolean(isAgentPptGenerating);
+  // PPTX 생성 작업이 제거되어 PPT 전용 입력 잠금은 사용하지 않습니다.
+  const locked = false;
 
   if (agentMessageInput) {
     agentMessageInput.disabled = locked;
@@ -204,16 +166,10 @@ function syncAgentPptGeneratingControls() {
 }
 
 function setAgentPptGenerating(isGenerating, jobId = "", options = {}) {
-  const locked = Boolean(isGenerating);
-  isAgentPptGenerating = locked;
-  activeAgentPptJobId = locked ? String(jobId || activeAgentPptJobId || "") : "";
-
-  if (locked && options.persist !== false) {
-    persistAgentPptJobLock(activeAgentPptJobId);
-  } else if (!locked && options.clearPersisted !== false) {
-    clearAgentPptJobLock();
-  }
-
+  // PPTX 생성/폴링이 제거되어 더 이상 입력을 잠그지 않습니다.
+  isAgentPptGenerating = false;
+  activeAgentPptJobId = "";
+  clearAgentPptJobLock();
   syncAgentPptGeneratingControls();
 }
 
@@ -651,7 +607,9 @@ function addMessage(targetBody, type, text, debug = false, options = {}) {
 
 
 function appendPptDownloadButton(targetBody, ppt) {
-  appendArtifactDownloadButton(targetBody, ppt, { label: "PPT 다운로드", className: "ppt-download-row" });
+  // 운영 정책상 PPTX 파일 생성/다운로드는 비활성화했습니다.
+  // 과거 저장 메시지에 ppt 메타데이터가 남아 있어도 버튼을 표시하지 않습니다.
+  return;
 }
 
 function appendExcelDownloadButton(targetBody, excel) {
@@ -674,12 +632,7 @@ function isArtifactLinkExpired(artifact, messageCreatedAt) {
 function appendSavedArtifactDownloads(targetBody, metadata = {}, messageCreatedAt = "") {
   if (!targetBody || !metadata) return;
 
-  const ppt = metadata.ppt || null;
   const excel = metadata.excel || null;
-
-  if (ppt?.ok && ppt.downloadUrl && !isArtifactLinkExpired(ppt, messageCreatedAt)) {
-    appendPptDownloadButton(targetBody, ppt);
-  }
 
   if (excel?.ok && excel.downloadUrl && !isArtifactLinkExpired(excel, messageCreatedAt)) {
     appendExcelDownloadButton(targetBody, excel);
@@ -687,7 +640,7 @@ function appendSavedArtifactDownloads(targetBody, metadata = {}, messageCreatedA
 }
 
 function isArtifactMessageMetadata(metadata = {}) {
-  return Boolean(metadata?.artifact || metadata?.ppt?.ok || metadata?.excel?.ok);
+  return Boolean(metadata?.artifact || metadata?.excel?.ok);
 }
 
 function appendArtifactDownloadButton(targetBody, artifact, options = {}) {
@@ -707,7 +660,7 @@ function appendArtifactDownloadButton(targetBody, artifact, options = {}) {
   link.className = "ppt-download-btn";
   link.href = artifact.downloadUrl;
   if (String(artifact.downloadUrl || "").startsWith("blob:")) {
-    link.download = artifact.fileName || artifact.filename || "download.pptx";
+    link.download = artifact.fileName || artifact.filename || "download.xlsx";
   } else {
     link.target = "_blank";
     link.rel = "noopener noreferrer";
@@ -1102,6 +1055,8 @@ function updateRunningRpaJobsFromApi(jobs) {
     .map((job) => ({
       name: job.name || job.Name || "이름 없음",
       status: convertJobState(job.status || job.State || job.state),
+      robotName: job.robotName || job.RobotName || job.robot_name || "",
+      startedAt: job.startedAt || job.StartTime || job.createdAt || job.CreationTime || "",
     }))
     .filter((job) => {
       return job.status === "대기 중" || job.status === "실행 중" || job.status === "실행 요청 중";
@@ -1212,6 +1167,7 @@ function renderRunningRpaNotice() {
       "</span>" +
       '<span class="rpa-running-status">' +
       escapeHtml(job.status) +
+      (job.robotName ? " · " + escapeHtml(job.robotName) : "") +
       "</span>" +
       "</div>";
   });
@@ -1666,13 +1622,13 @@ async function initAgentSessionState() {
           lastRestoredUserMessage = content;
         }
 
-        // 새로고침 후에도 1시간 유효한 PPT/엑셀 다운로드 버튼을 다시 표시합니다.
-        // 다운로드 버튼은 메시지 본문 복사보다 파일 다운로드가 핵심 액션이므로 복사 버튼은 숨깁니다.
+        // 새로고침 후에도 1시간 유효한 엑셀 다운로드 버튼을 다시 표시합니다.
+        // 엑셀 다운로드 버튼은 메시지 본문 복사보다 파일 다운로드가 핵심 액션이므로 복사 버튼은 숨깁니다.
         if (isArtifact) {
           appendSavedArtifactDownloads(agentBody, metadata, metadata.artifactSavedAt || msg.created_at || msg.createdAt || "");
         }
 
-        if (role === "bot" && metadata?.pptJob?.id && !completedPptJobIds.has(metadata.pptJob.id) && hasPendingPptJob({ pptJob: metadata.pptJob })) {
+        if (false && role === "bot" && metadata?.pptJob?.id && !completedPptJobIds.has(metadata.pptJob.id) && hasPendingPptJob({ pptJob: metadata.pptJob })) {
           setAgentPptGenerating(true, metadata.pptJob.id);
           setTimeout(() => pollPptJobUntilDone(metadata.pptJob, metadata.originalMessage || lastRestoredUserMessage), 500);
         }
@@ -2001,126 +1957,23 @@ function shouldUsePptDraft(message, hasFiles = false) {
 
 
 function hasSensitivePptRequestText(message) {
-  const text = String(message || "").trim();
-  if (!text) return false;
-
-  const normalized = normalizeAgentText(text);
-  const compact = text.replace(/\s+/g, " ");
-
-  // 실제 개인정보 패턴: 숫자/식별자가 직접 들어온 경우만 차단합니다.
-  const directSensitivePatterns = [
-    /\d{6}\s*-?\s*[1-4]\d{6}/, // 주민등록번호 형태
-    /01[016789]\s*-?\s*\d{3,4}\s*-?\s*\d{4}/, // 휴대폰 번호
-    /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i, // 이메일 주소
-    /(?:계좌|카드)\s*(?:번호)?\s*[:：]?\s*\d{2,6}(?:[-\s]\d{2,6}){2,}/i,
-  ];
-
-  if (hasPattern(compact, directSensitivePatterns)) return true;
-
-  // 명시적 보안/기밀 키워드는 숫자가 없어도 차단합니다.
-  const explicitSecretPatterns = [
-    /대외비|극비|기밀|비공개|confidential|nda|비밀유지/i,
-    /개인정보|주민등록번호|계좌번호|카드번호/i,
-    /고객\s*명단|거래처\s*명단|임직원\s*명단|퇴사자\s*명단/i,
-    /연봉\s*현황|급여\s*현황|인사\s*평가|징계\s*내역/i,
-  ];
-
-  if (hasPattern(normalized, explicitSecretPatterns)) return true;
-
-  // 매출/비용 같은 단어만으로는 차단하지 않고, 구체적인 금액/수치가 함께 있을 때만 차단합니다.
-  const hasBusinessSensitiveKeyword = /(매출|영업이익|순이익|원가|마진|수익률|손익|계약금액|견적금액|단가|예산|투자금|인건비|급여|연봉)/i.test(normalized);
-  const hasConcreteNumber = /(?:\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(?:원|만원|억|억원|조|조원|달러|usd|krw|%|퍼센트|명|건|개|대)/i.test(normalized);
-
-  return hasBusinessSensitiveKeyword && hasConcreteNumber;
+  // PPTX 생성이 제거되어 프론트에서는 별도 PPT 보안 차단을 수행하지 않습니다.
+  // 실제 개인정보/기밀 차단은 agent-api 서버 정책에서 처리합니다.
+  return false;
 }
 
 function buildPptUploadBlockedAnswer() {
   return [
-    "**PPT 생성을 중단했습니다.**",
-    "첨부파일이 있는 경우 보안 정책상 PPT를 생성하지 않습니다.",
-    "",
-    "**이유**",
-    "- 업로드 파일의 내용이 외부 PPT 생성 과정에 전달될 수 있어 차단했습니다.",
-    "- 사내 자료, 견적서, 개인정보, 대외비가 포함될 가능성을 방지하기 위한 조치입니다.",
-    "",
-    "**이용 방법**",
-    "- 파일을 제거한 뒤 큰 틀이나 목차 중심으로 요청해 주세요.",
-    "- 예: 신규 업무 추진 계획에 대한 PPT 초안을 만들어줘",
+    "PPTX 파일 자동 생성은 지원하지 않습니다.",
+    "대신 슬라이드별 구성안과 본문 초안을 작성해 드리겠습니다.",
   ].join("\n");
 }
 
 function buildPptSensitiveBlockedAnswer() {
   return [
-    "**PPT 생성을 중단했습니다.**",
-    "요청 내용에 민감정보로 볼 수 있는 구체적인 데이터가 포함되어 있습니다.",
-    "",
-    "**이유**",
-    "- 금액, 개인정보, 계약·인사·기밀 정보는 외부 PPT 생성 과정에 전달하지 않습니다.",
-    "",
-    "**이용 방법**",
-    "- 구체적인 수치, 이름, 연락처, 계약 조건을 제거하고 요청해 주세요.",
-    "- 예: 신규 업무 추진 계획에 대한 PPT 초안을 만들어줘",
+    "요청 내용에 민감정보가 포함되어 있을 수 있습니다.",
+    "개인정보와 기밀 수치를 제거하거나 익명화한 뒤 슬라이드 구성안 작성을 요청해 주세요.",
   ].join("\n");
-}
-
-function shouldUseExcelDraft(message) {
-  return decideExportTask(message) === EXCEL_DRAFT_TASK;
-}
-
-function shouldUseWebSearch(message) {
-  const text = normalizeAgentText(message);
-  if (!text) return false;
-  const webPatterns = [
-    /최신|최근|현재|오늘|어제|이번\s*(?:주|달|분기|년도)/i,
-    /뉴스|기사|웹\s*검색|인터넷|검색해서|검색해/i,
-    /시장\s*동향|전망|트렌드|경쟁사|법규|고시|공시|환율|주가|가격|요금/i,
-  ];
-  return hasPattern(text, webPatterns);
-}
-
-function shouldRedirectToKnowledge(message, hasFiles = false) {
-  if (hasFiles) return false;
-  const text = normalizeAgentText(message);
-  if (!text) return false;
-
-  // 파일 생성/문서 작성 요청은 사내 지식 문의로 보내면 안 됩니다.
-  // 예: "담당자"가 엑셀 컬럼명으로 들어간 경우를 오탐하지 않도록 먼저 제외합니다.
-  const productionPatterns = [
-    /엑셀|xlsx?|스프레드시트|표로|표\s*형태|다운로드|파일로|만들|생성|작성|초안|메일|이메일|보고서|요약|정리/i,
-    /아래\s*내용|컬럼|데이터|행|열/i,
-  ];
-
-  if (hasPattern(text, productionPatterns)) {
-    return false;
-  }
-
-  const internalPatterns = [
-    /연차|휴가|출장비|복리\s*후생|복지|근태|급여|인사\s*규정/i,
-    /결재\s*(?:절차|규정|양식)|전결|품의|구매\s*절차/i,
-    /보안\s*(?:규정|정책)|문서\s*반출|개인정보|사내\s*규정|업무\s*절차/i,
-    /담당\s*부서|규정상|회사\s*내규/i,
-    /(?:모니터|노트북|pc|컴퓨터|마우스|키보드|프린터|복합기|소프트웨어|계정|권한|비품|장비|전산\s*장비|사무용품)\s*(?:은|는|을|를)?[^.?!\n]*(?:신청|요청|구매|지급|교체|수리|대여|반납|어디|방법)/i,
-    /(?:어디|어떻게|누구|어느\s*부서)[^.?!\n]*(?:신청|요청|문의|처리)/i,
-  ];
-
-  return hasPattern(text, internalPatterns);
-}
-
-function addKnowledgeRedirectMessage(originalMessage) {
-  const answer = "해당 질문은 사내 규정·업무 절차 확인이 필요한 내용으로 보입니다. 정확한 답변을 위해 [사내 지식 문의]에서 확인해 주세요.";
-  const div = addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-  applyKnowledgeRedirectAction(div, originalMessage);
-  saveAgentMessage("assistant", answer, { route: "knowledge-redirect", originalMessage });
-}
-
-function buildAgentMessage(message, files = agentSelectedFiles) {
-  if (!files.length) return message;
-
-  const fileList = files
-    .map((file) => "- " + getAttachmentName(file) + " (" + formatFileSize(getAttachmentSize(file)) + ")")
-    .join("\n");
-
-  return "[첨부 파일]\n" + fileList + "\n\n[요청]\n" + message;
 }
 
 
@@ -2129,97 +1982,13 @@ function sleep(ms) {
 }
 
 function hasPendingPptJob(data) {
-  const job = data?.pptJob || null;
-  if (!job?.id) return false;
-  const status = String(job.status || "queued").toLowerCase();
-  return !["completed", "failed", "cancelled"].includes(status);
+  // PPTX 생성 작업 큐는 운영 정책상 비활성화했습니다.
+  return false;
 }
 
 async function pollPptJobUntilDone(job, originalMessage = "") {
-  if (!job?.id) return;
-  const jobId = String(job.id);
-
-  // PPT 생성 중에는 화면 이탈/탭 전환/세션 복원으로 enableApp()이 다시 호출되어도
-  // 입력창과 전송 버튼이 풀리지 않도록 먼저 잠금 상태를 적용합니다.
-  setAgentPptGenerating(true, jobId);
-
-  // 같은 작업에 대한 polling은 한 번만 수행합니다.
-  // 화면을 나갔다가 다시 들어오거나 세션 복원 메시지가 여러 개 있어도
-  // 새 Skywork 생성 요청을 보내지 않고 기존 job 상태만 이어서 확인합니다.
-  if (activePptJobPolls.has(jobId)) return;
-  activePptJobPolls.add(jobId);
-
-  const startedAt = Date.now();
-  const pollMs = Math.max(3000, Number(job.pollAfterMs || PPT_JOB_POLL_INTERVAL_MS));
-  const statusDiv = addMessage(agentBody, "bot", "PPT 생성 상태를 확인하는 중입니다. 완료되면 다운로드 버튼이 표시됩니다.", false, { hideCopy: true });
-
-  try {
-    while (Date.now() - startedAt < PPT_JOB_POLL_MAX_MS) {
-      await sleep(pollMs);
-
-      let data;
-      try {
-        data = await agentStateRequest({ action: "get_ppt_job", jobId });
-      } catch (err) {
-        const errorAnswer = "PPT 생성 상태 조회 중 오류가 발생했습니다." + getErrorMessage(err);
-        setMessageContent(statusDiv, errorAnswer);
-        await saveAgentMessage("assistant", errorAnswer, {
-          route: "skywork-pull-status-error",
-          pptJob: { id: jobId },
-          originalMessage,
-        });
-        unlockAgentPptGeneratingIfJob(jobId);
-        return;
-      }
-
-      const status = String(data?.pptJob?.status || data?.status || "").toLowerCase();
-
-      if (data?.ppt?.ok) {
-        const answer = data.answer || "Skywork PPT 초안이 생성되었습니다. 아래 다운로드 버튼으로 파일을 받아 검토해 주세요.";
-        setMessageContent(statusDiv, answer);
-        appendPptDownloadButton(agentBody, data.ppt);
-        await saveAgentMessage("assistant", answer, {
-          route: "skywork-pull-completed",
-          artifact: true,
-          artifactSavedAt: new Date().toISOString(),
-          ppt: data.ppt || null,
-          pptJob: data.pptJob || { id: jobId, status: "completed" },
-          originalMessage,
-        });
-        unlockAgentPptGeneratingIfJob(jobId);
-        return;
-      }
-
-      if (["failed", "cancelled"].includes(status) || data?.failed) {
-        const answer = data.answer || "Skywork PPT 생성에 실패했습니다.";
-        setMessageContent(statusDiv, answer);
-        await saveAgentMessage("assistant", answer, {
-          route: "skywork-pull-failed",
-          pptJob: data.pptJob || { id: jobId, status },
-          originalMessage,
-        });
-        unlockAgentPptGeneratingIfJob(jobId);
-        return;
-      }
-
-      if (status === "running") {
-        setMessageContent(statusDiv, "Skywork PPT를 생성 중입니다. 완료되면 다운로드 버튼이 표시됩니다.");
-      } else {
-        setMessageContent(statusDiv, "Skywork PPT 생성 작업이 대기 중입니다. Worker가 순서대로 처리합니다.");
-      }
-    }
-
-    const timeoutMessage = "PPT 생성 상태 확인 시간이 초과되었습니다. 잠시 후 같은 대화로 돌아오면 완료 여부를 다시 확인할 수 있습니다.";
-    setMessageContent(statusDiv, timeoutMessage);
-    await saveAgentMessage("assistant", timeoutMessage, {
-      route: "skywork-pull-poll-timeout",
-      pptJob: { id: jobId },
-      originalMessage,
-    });
-    unlockAgentPptGeneratingIfJob(jobId);
-  } finally {
-    activePptJobPolls.delete(jobId);
-  }
+  // PPTX 생성 작업 큐가 제거되어 상태 조회를 수행하지 않습니다.
+  return;
 }
 
 async function sendChatToTarget({
@@ -2278,13 +2047,12 @@ async function sendChatToTarget({
         : { ok: true, answer: await res.text() };
 
       const answerText = data.answer || data.message || JSON.stringify(data, null, 2);
-      const isArtifact = Boolean(data.ppt?.ok || data.excel?.ok || task === PPT_DRAFT_TASK || task === EXCEL_DRAFT_TASK);
+      const isArtifact = Boolean(data.excel?.ok || task === EXCEL_DRAFT_TASK);
       const isKnowledgeRedirect = targetBody === agentBody && isKnowledgeRedirectText(answerText);
       if (targetBody === agentBody && task === PPT_DRAFT_TASK && hasPendingPptJob(data)) {
         setAgentPptGenerating(true, data.pptJob.id);
       }
       const messageDiv = addMessage(targetBody, "bot", answerText, false, { hideCopy: isArtifact || isKnowledgeRedirect });
-      appendPptDownloadButton(targetBody, data.ppt);
       appendExcelDownloadButton(targetBody, data.excel);
       appendEvidenceBox(targetBody, data);
       if (isKnowledgeRedirect) applyKnowledgeRedirectAction(messageDiv, message);
@@ -2293,9 +2061,7 @@ async function sendChatToTarget({
           route: isKnowledgeRedirect ? "knowledge-redirect" : task || "agent-api",
           artifact: isArtifact,
           artifactSavedAt: new Date().toISOString(),
-          ppt: data.ppt || null,
           excel: data.excel || null,
-          pptJob: data.pptJob || null,
           originalMessage: isKnowledgeRedirect ? message : undefined,
         });
         if (hasPendingPptJob(data)) {
@@ -2442,10 +2208,9 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
 
       mergePersistedAgentFiles(data.files || []);
       const answerText = data.answer || data.message || JSON.stringify(data, null, 2);
-      const isArtifact = Boolean(data.ppt?.ok || data.excel?.ok || task === PPT_DRAFT_TASK || task === EXCEL_DRAFT_TASK);
+      const isArtifact = Boolean(data.excel?.ok || task === EXCEL_DRAFT_TASK);
       const isKnowledgeRedirect = isKnowledgeRedirectText(answerText);
       const messageDiv = addMessage(agentBody, "bot", answerText, false, { hideCopy: isArtifact || isKnowledgeRedirect });
-      appendPptDownloadButton(agentBody, data.ppt);
       appendExcelDownloadButton(agentBody, data.excel);
       appendEvidenceBox(agentBody, data);
       if (isKnowledgeRedirect) applyKnowledgeRedirectAction(messageDiv, message);
@@ -2453,9 +2218,7 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
         route: isKnowledgeRedirect ? "knowledge-redirect" : task || "file-api",
         artifact: isArtifact,
         artifactSavedAt: new Date().toISOString(),
-        ppt: data.ppt || null,
         excel: data.excel || null,
-        pptJob: data.pptJob || null,
         fileIds: getAgentFileIds(),
         originalMessage: isKnowledgeRedirect ? message : undefined,
       });
@@ -2535,169 +2298,8 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
   }
 }
 
-function isSkyworkLocalTestEnabled() {
-  try {
-    const value = localStorage.getItem(SKYWORK_LOCAL_TEST_STORAGE_KEY);
-    if (value === "1") return true;
-    if (value === "0") return false;
-    return SKYWORK_LOCAL_TEST_DEFAULT_ENABLED;
-  } catch {
-    return SKYWORK_LOCAL_TEST_DEFAULT_ENABLED;
-  }
-}
+// Skywork 로컬 Worker 직접 호출 기능은 제거했습니다.
 
-function isSkyworkLocalAllowedUser() {
-  const loginId = String(currentLoginId || "").trim();
-  const empNo = String(currentEmpNo || "").trim();
-  if (!SKYWORK_LOCAL_ALLOWED_USERS.length) return true;
-  return SKYWORK_LOCAL_ALLOWED_USERS.includes(loginId) || SKYWORK_LOCAL_ALLOWED_USERS.includes(empNo);
-}
-
-function hasSkyworkLocalWorkerConfig() {
-  return Boolean(String(SKYWORK_LOCAL_WORKER_URL || "").trim() && String(SKYWORK_LOCAL_WORKER_TOKEN || "").trim());
-}
-
-function shouldUseSkyworkLocalWorker(task, hasFiles, message) {
-  return task === PPT_DRAFT_TASK
-    && hasSkyworkLocalWorkerConfig()
-    && isSkyworkLocalTestEnabled()
-    && isSkyworkLocalAllowedUser()
-    && !hasFiles
-    && !hasSensitivePptRequestText(message);
-}
-
-function buildSkyworkPptRequestPrompt(message) {
-  return [
-    message,
-    "",
-    "요구사항:",
-    "- 한국어 PPT로 작성",
-    "- 실제 회사 내부자료, 임직원·고객 식별 정보, 구체적인 재무·계약 수치는 사용하지 않음",
-    "- 일반적인 큰 틀/초안 수준으로 작성",
-    "- 가능하면 5장 내외로 간결하게 구성",
-    SKYWORK_PPT_CI_DESIGN_GUIDELINES,
-  ].join("\n");
-}
-
-function buildSkyworkLocalPrompt(message) {
-  return buildSkyworkPptRequestPrompt(message);
-}
-
-async function sendSkyworkLocalPptDraft(message) {
-  const thinkingBox = createThinkingBox(agentBody, [
-    "Skywork 로컬 Worker 연결 확인 중",
-    "외부 전송 전 보안 기준 확인 중",
-    "고품질 PPT 초안을 생성하는 중",
-    "PPTX 파일 다운로드를 준비하는 중",
-  ]);
-
-  try {
-    const okToGenerate = window.confirm(
-      "Skywork 고품질 PPT 생성을 진행합니다.\n\n" +
-      "이 작업은 Skywork 크레딧을 사용할 수 있습니다.\n" +
-      "파일 첨부와 민감정보는 전송하지 않습니다.\n\n" +
-      "생성하시겠습니까?"
-    );
-
-    if (!okToGenerate) {
-      removeThinkingBox(thinkingBox);
-      const answer = "**PPT 생성을 취소했습니다.**\nSkywork 크레딧이 차감되지 않도록 생성을 진행하지 않았습니다.";
-      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      saveAgentMessage("assistant", answer, { route: "skywork-local-cancelled" });
-      return;
-    }
-
-    const res = await fetch(SKYWORK_LOCAL_WORKER_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + SKYWORK_LOCAL_WORKER_TOKEN,
-      },
-      body: JSON.stringify({
-        prompt: buildSkyworkLocalPrompt(message),
-      }),
-    });
-
-    removeThinkingBox(thinkingBox);
-
-    if (!res.ok) {
-      let detail = "";
-      try {
-        const data = await res.json();
-        detail = data.detail || data.message || JSON.stringify(data);
-      } catch {
-        detail = await res.text();
-      }
-
-      const answer = [
-        "**Skywork PPT 생성에 실패했습니다.**",
-        "로컬 Worker 호출 또는 Skywork 생성 과정에서 오류가 발생했습니다.",
-        "",
-        "**확인할 사항**",
-        "- PowerShell에서 Worker가 켜져 있는지 확인해 주세요.",
-        "- 주소가 http://127.0.0.1:8787 인지 확인해 주세요.",
-        "- .env의 WORKER_API_TOKEN과 app.js의 토큰이 같은지 확인해 주세요.",
-        detail ? "" : "",
-        detail ? "**오류 내용**\n" + String(detail).slice(0, 600) : "",
-      ].filter(Boolean).join("\n");
-
-      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      saveAgentMessage("assistant", answer, { route: "skywork-local-error" });
-      return;
-    }
-
-    const blob = await res.blob();
-    if (!blob || blob.size < 1024) {
-      throw new Error("다운로드된 PPTX 파일 크기가 비정상적으로 작습니다.");
-    }
-
-    const fileUrl = URL.createObjectURL(blob);
-    const artifact = {
-      ok: true,
-      downloadUrl: fileUrl,
-      fileName: "skywork-ppt-draft.pptx",
-      expiresIn: 0,
-      provider: "skywork-local-worker",
-      createdAt: new Date().toISOString(),
-    };
-
-    const answer = [
-      "**Skywork PPT 초안이 생성되었습니다.**",
-      "아래 다운로드 버튼으로 파일을 받아 검토해 주세요.",
-      "",
-      "**테스트 기준**",
-      "- 파일 첨부 없이 요청 문장만 전송했습니다.",
-      "- 민감정보 포함 여부를 확인한 뒤 생성했습니다.",
-      "- 생성 결과는 AI 초안이므로 최종 검토 후 활용해 주세요.",
-    ].join("\n");
-
-    addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-    appendPptDownloadButton(agentBody, artifact);
-    saveAgentMessage("assistant", answer, {
-      route: "skywork-local-worker",
-      artifact: true,
-      artifactSavedAt: new Date().toISOString(),
-      ppt: null,
-      note: "Blob URL은 새로고침 후 재사용할 수 없습니다.",
-    });
-  } catch (err) {
-    removeThinkingBox(thinkingBox);
-    const answer = [
-      "**Skywork PPT 생성에 실패했습니다.**",
-      getErrorMessage(err),
-      "",
-      "**확인할 사항**",
-      "- NCP 서버에서 Worker가 실행 중인지 확인해 주세요.",
-      "- ACG에서 Worker 포트가 필요한 IP에만 허용되어 있는지 확인해 주세요.",
-      "- 먼저 PowerShell curl 테스트가 성공하는지 확인해 주세요.",
-    ].join("\n");
-    addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-    saveAgentMessage("assistant", answer, { route: "skywork-local-exception" });
-  } finally {
-    if (agentSendBtn) agentSendBtn.disabled = false;
-    focusInputWhenPanelReady(agentMessageInput);
-  }
-}
 
 async function sendAgentChat(message, files = [], history = [], options = {}) {
   const task = options.task || "";
@@ -2707,11 +2309,10 @@ async function sendAgentChat(message, files = [], history = [], options = {}) {
   const useFileApi = Boolean(options.useFileApi && files.length);
   const thinkingSteps = isPptDraft
     ? [
-      "자료와 첨부파일을 확인하는 중",
-      "근거 데이터와 핵심 수치를 추출하는 중",
-      "보고용 PPT 목차를 구성하는 중",
-      "표준 레이아웃과 검증 기준을 적용하는 중",
-      "PPTX 생성 및 다운로드 링크를 준비하는 중",
+      "요청 의도와 발표 목적을 정리하는 중",
+      "슬라이드 흐름과 핵심 메시지를 구성하는 중",
+      "장표별 본문 초안을 작성하는 중",
+      "확인 필요 자료와 검토 항목을 정리하는 중",
     ]
     : null;
 
@@ -2727,9 +2328,7 @@ async function sendAgentChat(message, files = [], history = [], options = {}) {
 
   lastAgentRoute = "agent-api";
 
-  // 운영 Pull Worker 구조에서는 민감정보 검사 대상과 모델용 내부 지침을 분리합니다.
-  // 프론트는 사용자 원문만 agent-api로 보내고, CI/로고/디자인 지침은 agent-api 내부에서 safe_prompt에만 추가합니다.
-  // 이렇게 해야 내부 지침의 보안 키워드 때문에 정상 PPT 요청이 오탐 차단되지 않습니다.
+  // PPT 요청도 agent-api 일반 문서 작성 경로로 전달합니다. 서버에서 PPTX 생성을 차단하고 슬라이드 구성안만 반환합니다.
   return sendChatToTarget({
     targetBody: agentBody,
     message,
@@ -2740,6 +2339,7 @@ async function sendAgentChat(message, files = [], history = [], options = {}) {
     task,
     stream: !(isPptDraft || isExcelDraft || isWebSearch),
     thinkingSteps,
+    attachments: files,
   });
 }
 
@@ -2897,56 +2497,23 @@ if (agentMessageInput && agentForm) {
     const usePptDraft = task === PPT_DRAFT_TASK;
     const useExcelDraft = task === EXCEL_DRAFT_TASK;
 
-    if (usePptDraft && hasFiles) {
-      const displayMessage = buildAgentMessage(message, filesSnapshot);
-      const answer = buildPptUploadBlockedAnswer();
+    // PPT 요청은 더 이상 차단하거나 외부 PPT 생성 Worker로 보내지 않습니다.
+    // agent-api에 일반 문서 작성 요청으로 전달하여 슬라이드 구성안 텍스트만 제공합니다.
 
-      addMessage(agentBody, "user", displayMessage);
-      clearAgentComposerInput();
-      await saveAgentMessage("user", displayMessage, { route: "ppt-security-block", fileIds: getAgentFileIds(filesSnapshot) });
-
-      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      await saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "uploaded-file" });
-      focusInputWhenPanelReady(agentMessageInput);
-      return;
-    }
-
-    if (usePptDraft && hasSensitivePptRequestText(message)) {
-      const answer = buildPptSensitiveBlockedAnswer();
-
-      addMessage(agentBody, "user", message);
-      clearAgentComposerInput();
-      await saveAgentMessage("user", message, { route: "ppt-security-block" });
-
-      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      await saveAgentMessage("assistant", answer, { route: "ppt-security-block", policy: "sensitive-text" });
-      focusInputWhenPanelReady(agentMessageInput);
-      return;
-    }
-
-    if (shouldUseSkyworkLocalWorker(task, hasFiles, message)) {
-      addMessage(agentBody, "user", message);
-      clearAgentComposerInput();
-      agentSendBtn.disabled = true;
-      await saveAgentMessage("user", message, { route: "skywork-local-worker" });
-
-      await sendSkyworkLocalPptDraft(message);
-      return;
-    }
-
-    const useFileApi = useExcelDraft && hasFiles
-      ? true
-      : shouldUseFileApi(message, hasFiles, historySnapshot);
-    const displayMessage = useFileApi ? buildAgentMessage(message, filesSnapshot) : message;
+    const useFileApi = usePptDraft
+      ? false
+      : (useExcelDraft && hasFiles ? true : shouldUseFileApi(message, hasFiles, historySnapshot));
+    const displayMessage = (useFileApi || (usePptDraft && hasFiles)) ? buildAgentMessage(message, filesSnapshot) : message;
 
     addMessage(agentBody, "user", displayMessage);
     clearAgentComposerInput();
 
-    if (usePptDraft) {
-      setAgentPptGenerating(true, "pending");
-    }
 
     await saveAgentMessage("user", displayMessage, { route: useFileApi ? "file-api" : task || "agent-api", fileIds: getAgentFileIds(filesSnapshot) });
+
+    if (usePptDraft && hasFiles && !useFileApi) {
+      clearAgentFiles();
+    }
 
     if (!task && !useFileApi && shouldRedirectToKnowledge(message, hasFiles)) {
       addKnowledgeRedirectMessage(message);
