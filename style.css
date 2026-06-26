@@ -349,6 +349,10 @@ button {
   transition: opacity 0.16s ease;
 }
 
+.user-greeting .greeting-text.is-auth-pending {
+  color: #64748b;
+}
+
 /* 홈 메뉴 카드 */
 .menu-card-list {
   display: grid;

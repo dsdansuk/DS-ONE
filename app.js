@@ -32,6 +32,9 @@ const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
 const CHAT_HISTORY_STORAGE_PREFIX = "ds_chatbot_ai_history_v1_";
 const AUTH_CACHE_STORAGE_PREFIX = "ds_chatbot_auth_cache_v1_";
 const AUTH_CACHE_TTL_MS = 10 * 60 * 1000; // 10분
+const DISPLAY_NAME_CACHE_KEY = "ds_chatbot_last_display_name_v1";
+const DISPLAY_NAME_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7일
+const DEFAULT_HOME_GREETING = "필요한 업무를 선택해 주세요";
 
 const RPA_STATUS_POLL_INTERVAL_MS = 30 * 1000; // 30초
 const RPA_STATUS_POLL_MAX_MS = 10 * 60 * 1000; // 최대 10분
@@ -81,6 +84,7 @@ const docBackBtn = document.getElementById("docBackBtn");
 let agentSelectedFiles = [];
 let agentSessionId = sessionStorage.getItem("ds_agent_session_id") || "";
 let agentStateReady = false;
+let agentStateLoading = false;
 let lastAgentRoute = "";
 let lastAgentFileUseAt = 0;
 let agentSubmitInProgress = false;
@@ -246,17 +250,60 @@ function clearCachedAuth() {
   if (key) sessionStorage.removeItem(key);
 }
 
+function getCachedDisplayName() {
+  try {
+    const raw = localStorage.getItem(DISPLAY_NAME_CACHE_KEY);
+    if (!raw) return "";
+
+    const cached = JSON.parse(raw);
+    const savedAt = Number(cached.savedAt || 0);
+    const name = String(cached.name || "").trim();
+
+    if (!name || !savedAt || Date.now() - savedAt > DISPLAY_NAME_CACHE_TTL_MS) {
+      localStorage.removeItem(DISPLAY_NAME_CACHE_KEY);
+      return "";
+    }
+
+    return name;
+  } catch {
+    localStorage.removeItem(DISPLAY_NAME_CACHE_KEY);
+    return "";
+  }
+}
+
+function setCachedDisplayName(name) {
+  const safeName = String(name || "").trim();
+  if (!safeName || safeName === "사용자") return;
+
+  try {
+    localStorage.setItem(
+      DISPLAY_NAME_CACHE_KEY,
+      JSON.stringify({
+        name: safeName,
+        savedAt: Date.now(),
+      })
+    );
+  } catch (err) {
+    console.warn("사용자명 캐시 저장 실패:", err);
+  }
+}
+
 function applyAuthenticatedProfile(profile) {
   currentEmpNo = String(profile.empNo || "");
   currentLoginId = String(profile.loginId || "");
   const displayUserName = getDisplayUserName(profile);
 
   userInfo.textContent = "로그인ID: " + currentLoginId;
+  setCachedDisplayName(displayUserName);
   setHomeGreeting(displayUserName, true);
   restoreChatHistory();
   restoreAgentPptJobLock();
-  initAgentSessionState();
   enableApp();
+
+  // 홈 화면 초기 로딩 속도를 위해 업무 AI Agent 세션 복원은 화면 진입 후 비동기로 수행합니다.
+  if (isDocModeActive()) {
+    scheduleAgentSessionRestore();
+  }
 }
 
 function getDisplayUserName(profile) {
@@ -283,7 +330,7 @@ function getDisplayUserName(profile) {
 function setHomeGreeting(name, isAuthenticated = true) {
   if (!homeGreetingText) return;
 
-  homeGreetingText.classList.remove("is-waiting-auth", "is-auth-ready");
+  homeGreetingText.classList.remove("is-waiting-auth", "is-auth-ready", "is-auth-pending");
 
   if (!isAuthenticated) {
     homeGreetingText.textContent = "인증 후 이용 가능합니다";
@@ -291,23 +338,27 @@ function setHomeGreeting(name, isAuthenticated = true) {
     return;
   }
 
-  const safeName = String(name || "").trim() || "사용자";
-  homeGreetingText.textContent = safeName + "님, 필요한 업무를 선택해 주세요";
+  const safeName = String(name || "").trim();
+  homeGreetingText.textContent = safeName
+    ? safeName + "님, 필요한 업무를 선택해 주세요"
+    : DEFAULT_HOME_GREETING;
   homeGreetingText.classList.add("is-auth-ready");
 }
 
-function hideHomeGreetingUntilAuth() {
-  if (!homeGreetingText) return;
-  homeGreetingText.textContent = "";
-  homeGreetingText.classList.remove("is-auth-ready");
-  homeGreetingText.classList.add("is-waiting-auth");
+function showInitialHomeGreeting() {
+  const cachedName = getCachedDisplayName();
+  setHomeGreeting(cachedName, true);
+
+  if (homeGreetingText && !cachedName) {
+    homeGreetingText.classList.add("is-auth-pending");
+  }
 }
 
 bootstrap();
 
 async function bootstrap() {
   cleanupExpiredChatHistories();
-  hideHomeGreetingUntilAuth();
+  showInitialHomeGreeting();
 
   // RPA 목록 새로고침 버튼은 최종 사용자용 UI에서는 숨깁니다.
   if (reloadRpaBtn) {
@@ -422,6 +473,7 @@ function setMode(mode) {
     if (docWriteBtn) docWriteBtn.blur();
     syncAgentPptGeneratingControls();
     if (!isAgentPptGenerating) focusInputWhenPanelReady(agentMessageInput);
+    scheduleAgentSessionRestore();
   }
 }
 
@@ -1688,8 +1740,26 @@ async function agentStateRequest(payload) {
   return data;
 }
 
+function scheduleAgentSessionRestore() {
+  if (!sessionToken || agentStateReady || agentStateLoading) return;
+
+  const run = () => {
+    // 화면 표시와 입력 가능 상태가 먼저 잡힌 뒤, 이전 대화/파일 상태만 조용히 복원합니다.
+    initAgentSessionState();
+  };
+
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(run, { timeout: 1200 });
+    return;
+  }
+
+  setTimeout(run, 0);
+}
+
 async function initAgentSessionState() {
-  if (!sessionToken || agentStateReady) return;
+  if (!sessionToken || agentStateReady || agentStateLoading) return;
+
+  agentStateLoading = true;
 
   try {
     const data = await agentStateRequest({ action: "get_state", sessionId: agentSessionId });
@@ -1770,6 +1840,8 @@ async function initAgentSessionState() {
   } catch (err) {
     console.warn("업무 AI Agent 세션 복원 실패:", err);
     agentStateReady = true;
+  } finally {
+    agentStateLoading = false;
   }
 }
 
