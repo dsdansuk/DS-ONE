@@ -94,6 +94,50 @@ function hasAgentVisibleConversation() {
   return Boolean(agentBody.querySelector(".chat-row .msg.user, .chat-row .msg.bot, .msg.user, .msg.bot"));
 }
 
+function createAgentWelcomeCard() {
+  const card = document.createElement("section");
+  card.className = "chat-welcome-card";
+  card.setAttribute("aria-label", "업무 AI 안내");
+  card.innerHTML = `
+    <div class="welcome-avatar" aria-hidden="true">
+      <img src="./robot.png" alt="" />
+    </div>
+    <div class="welcome-copy">
+      <strong>안녕하세요. DS ONE입니다.</strong>
+      <p>문서 작성과 업무 수행을 지원합니다.</p>
+    </div>
+  `;
+  return card;
+}
+
+function ensureAgentWelcomeCard() {
+  if (!agentBody) return null;
+
+  let card = agentBody.querySelector(".chat-welcome-card");
+  if (!card) {
+    card = createAgentWelcomeCard();
+  }
+
+  if (agentBody.firstElementChild !== card) {
+    agentBody.prepend(card);
+  }
+
+  return card;
+}
+
+function resetAgentMessagesKeepingWelcome() {
+  if (!agentBody) return;
+
+  const card = ensureAgentWelcomeCard();
+  Array.from(agentBody.children).forEach((child) => {
+    if (child !== card) child.remove();
+  });
+
+  if (card && agentBody.firstElementChild !== card) {
+    agentBody.prepend(card);
+  }
+}
+
 // PPTX/Skywork 생성 잠금·폴링 기능은 제거했습니다.
 // 아래 상수는 기존 조건문 호환용이며 항상 false입니다.
 const isAgentPptGenerating = false;
@@ -382,6 +426,7 @@ function setMode(mode) {
 
   if (mode === "doc") {
     if (docWriteBtn) docWriteBtn.blur();
+    ensureAgentWelcomeCard();
     syncAgentPptGeneratingControls();
     if (!isAgentPptGenerating) focusInputWhenPanelReady(agentMessageInput);
     scheduleAgentSessionRestore();
@@ -1676,7 +1721,7 @@ async function initAgentSessionState() {
         return;
       }
 
-      agentBody.innerHTML = "";
+      resetAgentMessagesKeepingWelcome();
       let lastRestoredUserMessage = "";
       const completedPptJobIds = new Set();
 
