@@ -283,18 +283,31 @@ function getDisplayUserName(profile) {
 function setHomeGreeting(name, isAuthenticated = true) {
   if (!homeGreetingText) return;
 
+  homeGreetingText.classList.remove("is-waiting-auth", "is-auth-ready");
+
   if (!isAuthenticated) {
     homeGreetingText.textContent = "인증 후 이용 가능합니다";
+    homeGreetingText.classList.add("is-auth-ready");
     return;
   }
 
-  homeGreetingText.textContent = name + "님, 필요한 업무를 선택해 주세요";
+  const safeName = String(name || "").trim() || "사용자";
+  homeGreetingText.textContent = safeName + "님, 필요한 업무를 선택해 주세요";
+  homeGreetingText.classList.add("is-auth-ready");
+}
+
+function hideHomeGreetingUntilAuth() {
+  if (!homeGreetingText) return;
+  homeGreetingText.textContent = "";
+  homeGreetingText.classList.remove("is-auth-ready");
+  homeGreetingText.classList.add("is-waiting-auth");
 }
 
 bootstrap();
 
 async function bootstrap() {
   cleanupExpiredChatHistories();
+  hideHomeGreetingUntilAuth();
 
   // RPA 목록 새로고침 버튼은 최종 사용자용 UI에서는 숨깁니다.
   if (reloadRpaBtn) {

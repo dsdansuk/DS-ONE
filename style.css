@@ -335,6 +335,20 @@ button {
   text-overflow: ellipsis;
 }
 
+.user-greeting .greeting-text {
+  display: inline-block;
+  min-height: 17px;
+}
+
+.user-greeting .greeting-text.is-waiting-auth {
+  opacity: 0;
+}
+
+.user-greeting .greeting-text.is-auth-ready {
+  opacity: 1;
+  transition: opacity 0.16s ease;
+}
+
 /* 홈 메뉴 카드 */
 .menu-card-list {
   display: grid;
