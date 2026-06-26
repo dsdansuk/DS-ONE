@@ -7,39 +7,35 @@
 // - file-api: 첨부 파일 본문 추출 및 SideTalk 기반 파일 분석
 // - rpa-api: UiPath RPA 호출
 
-const AI_API_URL =
-  "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/ai-api";
+const DS_ONE_CONFIG = window.DS_ONE_CONFIG || {};
+const DS_ENDPOINTS = DS_ONE_CONFIG.endpoints || {};
+const DS_TASKS = DS_ONE_CONFIG.tasks || {};
+const DS_STORAGE = DS_ONE_CONFIG.storage || {};
+const DS_UI = DS_ONE_CONFIG.ui || {};
 
-const AGENT_API_URL =
-  "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/agent-api";
-
-const FILE_API_URL =
-  "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api";
+const AI_API_URL = DS_ENDPOINTS.aiApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/ai-api";
+const AGENT_API_URL = DS_ENDPOINTS.agentApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/agent-api";
+const FILE_API_URL = DS_ENDPOINTS.fileApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api";
+const RPA_API_URL = DS_ENDPOINTS.rpaApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api";
 
 // agent-api 안에서 세션/메시지/파일 상태도 함께 관리합니다.
 const AGENT_STATE_API_URL = AGENT_API_URL;
 
-const RPA_API_URL =
-  "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api";
+// PPT 요청은 PPTX/Skywork 생성 경로 없이 agent-api 일반 문서 작성 경로에서 슬라이드 구성안 텍스트로만 처리합니다.
+const PPT_DRAFT_TASK = DS_TASKS.pptDraft || "ppt_draft";
+const EXCEL_DRAFT_TASK = DS_TASKS.excelDraft || "excel_draft";
+const WEB_SEARCH_TASK = DS_TASKS.webSearch || "web_search";
 
-// PPTX/Skywork 파일 생성 기능은 운영 정책상 제거했습니다.
-// PPT 요청은 agent-api에서 슬라이드 구성안 텍스트로만 처리합니다.
-const PPT_DRAFT_TASK = "ppt_draft";
-const EXCEL_DRAFT_TASK = "excel_draft";
-const WEB_SEARCH_TASK = "web_search";
+const CHAT_HISTORY_TTL_MS = Number(DS_STORAGE.chatHistoryTtlMs || 60 * 60 * 1000);
+const CHAT_HISTORY_STORAGE_PREFIX = DS_STORAGE.chatHistoryPrefix || "ds_chatbot_ai_history_v1_";
+const AUTH_CACHE_STORAGE_PREFIX = DS_STORAGE.authCachePrefix || "ds_chatbot_auth_cache_v1_";
+const AUTH_CACHE_TTL_MS = Number(DS_STORAGE.authCacheTtlMs || 10 * 60 * 1000);
+const DISPLAY_NAME_CACHE_KEY = DS_STORAGE.displayNameCacheKey || "ds_chatbot_last_display_name_v1";
+const DISPLAY_NAME_CACHE_TTL_MS = Number(DS_STORAGE.displayNameCacheTtlMs || 7 * 24 * 60 * 60 * 1000);
+const DEFAULT_HOME_GREETING = DS_UI.defaultHomeGreeting || "필요한 업무를 선택해 주세요";
 
-const CHAT_HISTORY_TTL_MS = 60 * 60 * 1000; // 1시간
-const CHAT_HISTORY_STORAGE_PREFIX = "ds_chatbot_ai_history_v1_";
-const AUTH_CACHE_STORAGE_PREFIX = "ds_chatbot_auth_cache_v1_";
-const AUTH_CACHE_TTL_MS = 10 * 60 * 1000; // 10분
-const DISPLAY_NAME_CACHE_KEY = "ds_chatbot_last_display_name_v1";
-const DISPLAY_NAME_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7일
-const DEFAULT_HOME_GREETING = "필요한 업무를 선택해 주세요";
-
-const RPA_STATUS_POLL_INTERVAL_MS = 30 * 1000; // 30초
-const RPA_STATUS_POLL_MAX_MS = 10 * 60 * 1000; // 최대 10분
-const PPT_JOB_POLL_INTERVAL_MS = 10 * 1000; // 10초
-const PPT_JOB_POLL_MAX_MS = 20 * 60 * 1000; // 최대 20분
+const RPA_STATUS_POLL_INTERVAL_MS = Number(DS_UI.rpaStatusPollIntervalMs || 30 * 1000);
+const RPA_STATUS_POLL_MAX_MS = Number(DS_UI.rpaStatusPollMaxMs || 10 * 60 * 1000);
 
 let sessionToken = sessionStorage.getItem("sso_session_token") || "";
 let currentMode = "home";
@@ -98,102 +94,20 @@ function hasAgentVisibleConversation() {
   return Boolean(agentBody.querySelector(".chat-row .msg.user, .chat-row .msg.bot, .msg.user, .msg.bot"));
 }
 
-// PPTX 생성 작업 큐는 제거되었지만, 과거 세션 메타데이터 호환을 위해 빈 Set만 유지합니다.
-const activePptJobPolls = new Set();
-
-// PPTX 생성 잠금은 제거되었습니다. 아래 상태값은 과거 저장 세션 호환용입니다.
-let isAgentPptGenerating = false;
-let activeAgentPptJobId = "";
+// PPTX/Skywork 생성 잠금·폴링 기능은 제거했습니다.
+// 아래 상수는 기존 조건문 호환용이며 항상 false입니다.
+const isAgentPptGenerating = false;
 const AGENT_DEFAULT_PLACEHOLDER = agentMessageInput?.getAttribute("placeholder") || "필요한 업무를 입력해 주세요";
-const AGENT_PPT_GENERATING_PLACEHOLDER = "슬라이드 구성안을 작성하는 중입니다.";
-const AGENT_PPT_JOB_LOCK_STORAGE_PREFIX = "ds_agent_active_ppt_job_v1_";
-const AGENT_PPT_JOB_LOCK_TTL_MS = Math.max(PPT_JOB_POLL_MAX_MS, 30 * 60 * 1000);
-
-function getAgentPptJobLockStorageKey() {
-  const userKey = currentLoginId || currentEmpNo || "unknown";
-  return AGENT_PPT_JOB_LOCK_STORAGE_PREFIX + userKey;
-}
-
-function persistAgentPptJobLock(jobId) {
-  if (!jobId || (!currentLoginId && !currentEmpNo)) return;
-
-  try {
-    localStorage.setItem(
-      getAgentPptJobLockStorageKey(),
-      JSON.stringify({
-        jobId: String(jobId),
-        savedAt: Date.now(),
-      })
-    );
-  } catch (err) {
-    console.warn("PPT 작업 잠금 상태 저장 실패:", err);
-  }
-}
-
-function clearAgentPptJobLock() {
-  if (!currentLoginId && !currentEmpNo) return;
-
-  try {
-    localStorage.removeItem(getAgentPptJobLockStorageKey());
-  } catch (err) {
-    console.warn("PPT 작업 잠금 상태 제거 실패:", err);
-  }
-}
-
-function restoreAgentPptJobLock() {
-  if (!currentLoginId && !currentEmpNo) return;
-
-  try {
-    const raw = localStorage.getItem(getAgentPptJobLockStorageKey());
-    if (!raw) return;
-
-    const saved = JSON.parse(raw);
-    const jobId = String(saved.jobId || "");
-    const savedAt = Number(saved.savedAt || 0);
-
-    if (!jobId || !savedAt || Date.now() - savedAt > AGENT_PPT_JOB_LOCK_TTL_MS) {
-      localStorage.removeItem(getAgentPptJobLockStorageKey());
-      return;
-    }
-
-    setAgentPptGenerating(true, jobId, { persist: false });
-  } catch (err) {
-    console.warn("PPT 작업 잠금 상태 복원 실패:", err);
-    clearAgentPptJobLock();
-  }
-}
 
 function syncAgentPptGeneratingControls() {
-  // PPTX 생성 작업이 제거되어 PPT 전용 입력 잠금은 사용하지 않습니다.
-  const locked = false;
-
   if (agentMessageInput) {
-    agentMessageInput.disabled = locked;
-    agentMessageInput.placeholder = locked
-      ? AGENT_PPT_GENERATING_PLACEHOLDER
-      : AGENT_DEFAULT_PLACEHOLDER;
+    agentMessageInput.disabled = false;
+    agentMessageInput.placeholder = AGENT_DEFAULT_PLACEHOLDER;
   }
-
-  if (agentSendBtn) agentSendBtn.disabled = locked;
-  if (agentAttachBtn) agentAttachBtn.disabled = locked;
-  if (agentFileInput) agentFileInput.disabled = locked;
+  if (agentSendBtn) agentSendBtn.disabled = false;
+  if (agentAttachBtn) agentAttachBtn.disabled = false;
+  if (agentFileInput) agentFileInput.disabled = false;
 }
-
-function setAgentPptGenerating(isGenerating, jobId = "", options = {}) {
-  // PPTX 생성/폴링이 제거되어 더 이상 입력을 잠그지 않습니다.
-  isAgentPptGenerating = false;
-  activeAgentPptJobId = "";
-  clearAgentPptJobLock();
-  syncAgentPptGeneratingControls();
-}
-
-function unlockAgentPptGeneratingIfJob(jobId) {
-  const currentJobId = String(jobId || "");
-  if (!currentJobId || !activeAgentPptJobId || activeAgentPptJobId === currentJobId) {
-    setAgentPptGenerating(false);
-  }
-}
-
 
 function getAuthCacheKey() {
   if (!sessionToken) return "";
@@ -297,7 +211,6 @@ function applyAuthenticatedProfile(profile) {
   setCachedDisplayName(displayUserName);
   setHomeGreeting(displayUserName, true);
   restoreChatHistory();
-  restoreAgentPptJobLock();
   enableApp();
 
   // 홈 화면 초기 로딩 속도를 위해 업무 AI Agent 세션 복원은 화면 진입 후 비동기로 수행합니다.
@@ -680,12 +593,6 @@ function addMessage(targetBody, type, text, debug = false, options = {}) {
   return div;
 }
 
-
-function appendPptDownloadButton(targetBody, ppt) {
-  // 운영 정책상 PPTX 파일 생성/다운로드는 비활성화했습니다.
-  // 과거 저장 메시지에 ppt 메타데이터가 남아 있어도 버튼을 표시하지 않습니다.
-  return;
-}
 
 function appendExcelDownloadButton(targetBody, excel) {
   appendArtifactDownloadButton(targetBody, excel, { label: "엑셀 다운로드", className: "excel-download-row" });
@@ -1172,8 +1079,6 @@ async function loadRpaList() {
         "bot",
         "사용 가능한 RPA 업무가 없습니다.\n관리자에게 권한을 요청하세요."
       );
-
-      console.log("RPA DEBUG:", data.debug || data);
       syncRpaPollingByCurrentJobs();
       return;
     }
@@ -1810,11 +1715,6 @@ async function initAgentSessionState() {
           appendSavedArtifactDownloads(agentBody, metadata, metadata.artifactSavedAt || msg.created_at || msg.createdAt || "");
         }
 
-        if (false && role === "bot" && metadata?.pptJob?.id && !completedPptJobIds.has(metadata.pptJob.id) && hasPendingPptJob({ pptJob: metadata.pptJob })) {
-          setAgentPptGenerating(true, metadata.pptJob.id);
-          setTimeout(() => pollPptJobUntilDone(metadata.pptJob, metadata.originalMessage || lastRestoredUserMessage), 500);
-        }
-
         // 사내 규정/업무 절차 안내 메시지는 복사 버튼을 숨기고 이동 버튼만 복원합니다.
         if (isKnowledgeRedirect) {
           applyKnowledgeRedirectAction(messageDiv, metadata.originalMessage || lastRestoredUserMessage);
@@ -2240,19 +2140,6 @@ function buildPptSensitiveBlockedAnswer() {
 }
 
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function hasPendingPptJob(data) {
-  // PPTX 생성 작업 큐는 운영 정책상 비활성화했습니다.
-  return false;
-}
-
-async function pollPptJobUntilDone(job, originalMessage = "") {
-  // PPTX 생성 작업 큐가 제거되어 상태 조회를 수행하지 않습니다.
-  return;
-}
 
 async function sendChatToTarget({
   targetBody,
@@ -2335,9 +2222,6 @@ async function sendChatToTarget({
       const answerText = getApiAnswerText(data, "답변을 생성하지 못했습니다.");
       const isArtifact = Boolean(data.excel?.ok || task === EXCEL_DRAFT_TASK);
       const isKnowledgeRedirect = targetBody === agentBody && isKnowledgeRedirectText(answerText);
-      if (targetBody === agentBody && task === PPT_DRAFT_TASK && hasPendingPptJob(data)) {
-        setAgentPptGenerating(true, data.pptJob.id);
-      }
       const messageDiv = addMessage(targetBody, "bot", answerText, false, { hideCopy: isArtifact || isKnowledgeRedirect });
       appendExcelDownloadButton(targetBody, data.excel);
       appendEvidenceBox(targetBody, data);
@@ -2350,11 +2234,6 @@ async function sendChatToTarget({
           excel: data.excel || null,
           originalMessage: isKnowledgeRedirect ? message : undefined,
         });
-        if (hasPendingPptJob(data)) {
-          pollPptJobUntilDone(data.pptJob, message);
-        } else if (task === PPT_DRAFT_TASK) {
-          unlockAgentPptGeneratingIfJob(data?.pptJob?.id || "");
-        }
       }
       return;
     }
@@ -2376,7 +2255,6 @@ async function sendChatToTarget({
       if (done) break;
 
       const chunk = decoder.decode(value, { stream: true });
-      console.log("AI STREAM CHUNK:", chunk);
 
       buffer += chunk;
 
@@ -2420,9 +2298,6 @@ async function sendChatToTarget({
   } catch (err) {
     removeThinkingBox(thinkingBox);
     addMessage(targetBody, "bot", "호출 실패: " + getErrorMessage(err));
-    if (targetBody === agentBody && task === PPT_DRAFT_TASK) {
-      unlockAgentPptGeneratingIfJob("");
-    }
   } finally {
     if (sendButton) {
       if (sendButton === agentSendBtn && isAgentPptGenerating) {
@@ -2529,9 +2404,6 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
         fileIds: getAgentFileIds(),
         originalMessage: isKnowledgeRedirect ? message : undefined,
       });
-      if (hasPendingPptJob(data)) {
-        pollPptJobUntilDone(data.pptJob, message);
-      }
       return;
     }
 
@@ -2604,8 +2476,6 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
     }
   }
 }
-
-// Skywork 로컬 Worker 직접 호출 기능은 제거했습니다.
 
 
 async function sendAgentChat(message, files = [], history = [], options = {}) {
