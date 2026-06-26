@@ -100,7 +100,7 @@ const activePptJobPolls = new Set();
 // PPTX 생성 잠금은 제거되었습니다. 아래 상태값은 과거 저장 세션 호환용입니다.
 let isAgentPptGenerating = false;
 let activeAgentPptJobId = "";
-const AGENT_DEFAULT_PLACEHOLDER = agentMessageInput?.getAttribute("placeholder") || "질문이나 업무 요청을 입력하세요";
+const AGENT_DEFAULT_PLACEHOLDER = agentMessageInput?.getAttribute("placeholder") || "필요한 업무를 입력해 주세요";
 const AGENT_PPT_GENERATING_PLACEHOLDER = "슬라이드 구성안을 작성하는 중입니다.";
 const AGENT_PPT_JOB_LOCK_STORAGE_PREFIX = "ds_agent_active_ppt_job_v1_";
 const AGENT_PPT_JOB_LOCK_TTL_MS = Math.max(PPT_JOB_POLL_MAX_MS, 30 * 60 * 1000);
@@ -1970,6 +1970,29 @@ function buildAmbiguousExportAnswer() {
 
 function shouldUsePptDraft(message, hasFiles = false) {
   return decideExportTask(message) === PPT_DRAFT_TASK;
+}
+
+
+function shouldUseWebSearch(message) {
+  const text = normalizeAgentText(message);
+  if (!text) return false;
+
+  /**
+   * 웹 검색은 명시적 요청 또는 최신성이 핵심인 질문에만 사용합니다.
+   * 일반 메일/문서 작성 요청이 외부 업체, AWS, 견적서 같은 단어를 포함하더라도
+   * 최신 정보 조회 의도가 없으면 agent-api 일반 작성 경로로 보냅니다.
+   */
+  const explicitSearchPatterns = [
+    /웹\s*검색|인터넷\s*검색|온라인\s*검색|검색해서|찾아보고|조사해서|최신\s*자료|최신\s*정보/i,
+    /근거\s*자료\s*(?:찾아|검색|조사)|출처\s*(?:포함|찾아|검색)|링크\s*(?:포함|찾아|검색)/i,
+  ];
+
+  const freshnessPatterns = [
+    /(?:오늘|현재|지금|최근|최신|요즘|이번\s*주|이번\s*달|올해|\d{4}년).{0,20}(?:현황|동향|뉴스|이슈|사례|가격|요금|정책|법령|규정|버전|업데이트|일정|환율|주가|날씨)/i,
+    /(?:뉴스|공시|주가|환율|날씨|일정|가격|요금|채용|공고|법령|정책|보안\s*취약점|릴리스\s*노트|업데이트\s*내역).{0,20}(?:알려|정리|요약|확인|찾아|검색)/i,
+  ];
+
+  return hasPattern(text, explicitSearchPatterns) || hasPattern(text, freshnessPatterns);
 }
 
 
