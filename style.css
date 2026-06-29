@@ -444,12 +444,7 @@ button {
 }
 
 .chat-icon img,
-.doc-icon img {
-  width: 20px;
-  height: 20px;
-  z-index: 1;
-}
-
+.doc-icon img,
 .rpa-icon img {
   width: 20px;
   height: 20px;
