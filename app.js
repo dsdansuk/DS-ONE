@@ -12,6 +12,7 @@ const DS_ENDPOINTS = DS_ONE_CONFIG.endpoints || {};
 const DS_TASKS = DS_ONE_CONFIG.tasks || {};
 const DS_STORAGE = DS_ONE_CONFIG.storage || {};
 const DS_UI = DS_ONE_CONFIG.ui || {};
+const DS_FILE_POLICY = DS_ONE_CONFIG.filePolicy || {};
 
 const AI_API_URL = DS_ENDPOINTS.aiApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/ai-api";
 const AGENT_API_URL = DS_ENDPOINTS.agentApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/agent-api";
@@ -39,6 +40,13 @@ const DEFAULT_HOME_GREETING = DS_UI.defaultHomeGreeting || "필요한 업무를 
 
 const RPA_STATUS_POLL_INTERVAL_MS = Number(DS_UI.rpaStatusPollIntervalMs || 30 * 1000);
 const RPA_STATUS_POLL_MAX_MS = Number(DS_UI.rpaStatusPollMaxMs || 10 * 60 * 1000);
+const AGENT_ALLOWED_FILE_EXTENSIONS = (DS_FILE_POLICY.allowedExtensions || ["txt", "md", "csv", "json", "docx", "xlsx", "pptx"])
+  .map((item) => String(item || "").toLowerCase().replace(/^\./, ""))
+  .filter(Boolean);
+const AGENT_BLOCKED_FILE_EXTENSIONS = new Set((DS_FILE_POLICY.blockedExtensions || ["exe", "dll", "msi", "bat", "cmd", "com", "scr", "ps1", "vbs", "js", "mjs", "jar", "sh", "php", "asp", "aspx", "jsp", "html", "htm", "xml", "doc", "xls", "ppt", "docm", "xlsm", "pptm", "hwp", "hwpx", "zip", "7z", "rar", "tar", "gz", "png", "jpg", "jpeg", "webp"])
+  .map((item) => String(item || "").toLowerCase().replace(/^\./, ""))
+  .filter(Boolean));
+const AGENT_MAX_FILE_SIZE_BYTES = Number(DS_FILE_POLICY.maxFileSizeBytes || 15 * 1024 * 1024);
 
 let sessionToken = sessionStorage.getItem("sso_session_token") || "";
 let currentMode = "home";
@@ -1052,6 +1060,64 @@ function getApiAnswerText(data, fallback = "") {
   return fallback || "답변을 생성하지 못했습니다.";
 }
 
+
+function buildUserFriendlyFileErrorMessage(rawMessage = "") {
+  const text = String(rawMessage || "").trim();
+  const normalized = text.replace(/\s+/g, " ");
+
+  if (/PDF|pdf/.test(normalized) && (/FILE_INLINE_AI_ENABLED|Vertex|본문을 추출|안전하게 본문|현재 설정/.test(normalized))) {
+    return [
+      "현재 이 PDF 파일은 바로 분석할 수 없습니다.",
+      "PDF 본문을 안정적으로 읽을 수 없는 상태라 분석을 중단했습니다.",
+      "",
+      "가능한 방법",
+      "- PDF 내용을 복사해 입력창에 붙여넣어 주세요.",
+      "- PDF를 Word(.docx), Excel(.xlsx), 텍스트(.txt) 파일로 변환해 업로드해 주세요.",
+      "- PDF 파일 분석이 꼭 필요하면 IT팀에 기능 설정을 요청해 주세요.",
+    ].join("\n");
+  }
+
+  if (/이미지|png|jpg|jpeg|webp/i.test(normalized) && /업로드|분석|정책|설정/.test(normalized)) {
+    return [
+      "현재 이미지 파일은 바로 분석할 수 없습니다.",
+      "이미지 안의 내용을 텍스트로 입력하거나, 문서 파일로 변환해 업로드해 주세요.",
+    ].join("\n");
+  }
+
+  if (/운영 보안 정책상 업로드할 수 없습니다|차단|보안 정책/.test(normalized)) {
+    return [
+      "파일 보안 정책에 따라 해당 파일은 분석할 수 없습니다.",
+      "개인정보·기밀정보·실행성 파일이 포함되어 있지 않은지 확인한 뒤 다시 업로드해 주세요.",
+    ].join("\n");
+  }
+
+  if (/허용 목록|파일 형식/.test(normalized)) {
+    return [
+      "현재 지원하지 않는 파일 형식입니다.",
+      "Word(.docx), Excel(.xlsx), PowerPoint(.pptx), 텍스트(.txt), CSV(.csv) 형식으로 변환해 업로드해 주세요.",
+    ].join("\n");
+  }
+
+  if (/분석할 파일을 첨부/.test(normalized)) {
+    return "분석할 파일을 첨부해 주세요.";
+  }
+
+  if (/FILE_INLINE|Vertex|Gemini|GOOGLE_|SIDETALK_|OPENAI_|HTTP\s*5\d{2}|환경변수|토큰|service_role/i.test(normalized)) {
+    return [
+      "일시적으로 파일 분석을 처리하지 못했습니다.",
+      "잠시 후 다시 시도해 주세요. 같은 문제가 반복되면 IT팀에 문의해 주세요.",
+    ].join("\n");
+  }
+
+  return text || "파일 분석을 진행하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
+function getFileIdsFromResponses(files = []) {
+  return (Array.isArray(files) ? files : [])
+    .map((file) => String(file?.id || file?.fileId || ""))
+    .filter(Boolean);
+}
+
 async function apiJson(url, options = {}) {
   const res = await fetch(url, {
     ...options,
@@ -1512,6 +1578,9 @@ function addOrUpdateRunningJob(name, status) {
 async function runRpaJob(item, executeBtn, cancelBtn) {
   if (!item) return;
 
+  const confirmed = window.confirm(item.name + " RPA를 실행하시겠습니까?\n\n실행 후 실제 자동화 작업이 시작됩니다.");
+  if (!confirmed) return;
+
   if (executeBtn) {
     executeBtn.disabled = true;
     executeBtn.textContent = "실행 요청 중";
@@ -1575,9 +1644,9 @@ async function runRpaJob(item, executeBtn, cancelBtn) {
     addMessage(
       rpaBody,
       "bot",
-      "RPA 실행 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)),
-      true
+      "RPA 실행 실패\n" + (data.message || "실행 요청 처리 중 오류가 발생했습니다.")
     );
+
 
     restoreInlineButtons(executeBtn, cancelBtn);
   } catch (err) {
@@ -1693,11 +1762,48 @@ function syncAgentFileInput() {
   agentFileInput.files = transfer.files;
 }
 
+function validateAgentFileForUpload(file) {
+  const name = String(file?.name || "uploaded-file");
+  const ext = getFileExtension(name);
+  if (!ext) return name + " 파일은 확장자가 없어 업로드할 수 없습니다.";
+  if (ext === "pdf" && !AGENT_ALLOWED_FILE_EXTENSIONS.includes(ext)) {
+    return name + " PDF 파일은 현재 바로 분석할 수 없습니다. PDF 내용을 복사해 입력창에 붙여넣거나, Word(.docx) 또는 텍스트(.txt) 파일로 변환해 업로드해 주세요.";
+  }
+  if (["png", "jpg", "jpeg", "webp"].includes(ext) && !AGENT_ALLOWED_FILE_EXTENSIONS.includes(ext)) {
+    return name + " 이미지 파일은 현재 바로 분석할 수 없습니다. 이미지 내용을 텍스트로 입력하거나 문서 파일로 변환해 업로드해 주세요.";
+  }
+  if (AGENT_BLOCKED_FILE_EXTENSIONS.has(ext)) return name + " 파일은 현재 업로드할 수 없는 형식입니다. 문서 파일로 변환한 뒤 다시 업로드해 주세요.";
+  if (!AGENT_ALLOWED_FILE_EXTENSIONS.includes(ext)) return name + " 파일 형식(." + ext + ")은 현재 지원하지 않습니다. Word(.docx), Excel(.xlsx), PowerPoint(.pptx), 텍스트(.txt), CSV(.csv) 형식으로 변환해 업로드해 주세요.";
+  if (file.size > AGENT_MAX_FILE_SIZE_BYTES) return name + " 파일은 최대 " + formatFileSize(AGENT_MAX_FILE_SIZE_BYTES) + "까지 업로드할 수 있습니다.";
+  return "";
+}
+
+function getFileExtension(name) {
+  const text = String(name || "").toLowerCase();
+  const index = text.lastIndexOf(".");
+  return index >= 0 ? text.slice(index + 1) : "";
+}
+
+function formatFileSize(size) {
+  const value = Number(size || 0);
+  if (value < 1024) return value + "B";
+  if (value < 1024 * 1024) return Math.round(value / 1024) + "KB";
+  return (value / 1024 / 1024).toFixed(1) + "MB";
+}
+
 function addAgentFiles(files) {
   const incomingFiles = Array.from(files || []);
   if (!incomingFiles.length) return;
 
+  const rejected = [];
+
   incomingFiles.forEach((file) => {
+    const validationMessage = validateAgentFileForUpload(file);
+    if (validationMessage) {
+      rejected.push(validationMessage);
+      return;
+    }
+
     const duplicate = agentSelectedFiles.some((saved) =>
       getAttachmentName(saved) === file.name &&
       getAttachmentSize(saved) === file.size &&
@@ -1717,15 +1823,23 @@ function addAgentFiles(files) {
     }
   });
 
+  if (rejected.length) {
+    addMessage(agentBody, "bot", "첨부할 수 없는 파일이 제외되었습니다.\n" + rejected.slice(0, 5).map((item) => "- " + item).join("\n"));
+  }
+
   syncAgentFileInput();
   renderAgentFileChips();
   focusInputWhenPanelReady(agentMessageInput);
 }
 
-function clearAgentFiles() {
+function clearAgentComposerFiles() {
   agentSelectedFiles = [];
   if (agentFileInput) agentFileInput.value = "";
   renderAgentFileChips();
+}
+
+function clearAgentFiles() {
+  clearAgentComposerFiles();
   lastAgentRoute = "";
   lastAgentFileUseAt = 0;
 }
@@ -1880,16 +1994,9 @@ async function initAgentSessionState() {
     }
 
     if (Array.isArray(data.files)) {
-      agentSelectedFiles = data.files.map((file) => ({
-        id: String(file.id || ""),
-        file: null,
-        name: file.original_name || file.originalName || file.name || "uploaded-file",
-        size: Number(file.size_bytes || file.sizeBytes || file.size || 0),
-        type: file.mime_type || file.mimeType || "",
-        extractionStatus: file.extraction_status || file.extractionStatus || "",
-        persisted: true,
-      }));
-      renderAgentFileChips();
+      // 이전에 분석한 파일은 대화 이력에는 남기되, 입력창 위의 현재 첨부 목록으로 복원하지 않습니다.
+      // 새 요청에 과거 파일이 자동으로 다시 첨부된 것처럼 보이면 사용자가 혼동할 수 있습니다.
+      clearAgentComposerFiles();
     }
 
     agentStateReady = true;
@@ -2516,7 +2623,12 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
     if (!res.ok) {
       const data = await readResponseData(res);
       const answerText = getApiAnswerText(data, "HTTP " + res.status);
-      addMessage(agentBody, "bot", "파일 분석 API 오류가 발생했습니다.\n" + answerText, true);
+      const safeMessage = buildUserFriendlyFileErrorMessage(answerText);
+      addMessage(agentBody, "bot", safeMessage, false, { hideCopy: true });
+      await saveAgentMessage("assistant", safeMessage, {
+        route: "file-api-error",
+        fileIds: getAgentFileIds(files),
+      });
       return;
     }
 
@@ -2524,7 +2636,8 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
 
     if (useStream && responseContentType.includes("application/json")) {
       const data = await readResponseData(res);
-      mergePersistedAgentFiles(data.files || []);
+      const responseFileIds = getFileIdsFromResponses(data.files || []);
+      if (options.keepFilesInComposer === true) mergePersistedAgentFiles(data.files || []);
       const answerText = getApiAnswerText(data, "파일 분석 답변을 생성하지 못했습니다.");
       const isArtifact = Boolean(data.excel?.ok || task === EXCEL_DRAFT_TASK);
       const isKnowledgeRedirect = isKnowledgeRedirectText(answerText);
@@ -2537,7 +2650,7 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
         artifact: isArtifact,
         artifactSavedAt: isArtifact ? new Date().toISOString() : undefined,
         excel: data.excel || null,
-        fileIds: getAgentFileIds(),
+        fileIds: responseFileIds,
         originalMessage: isKnowledgeRedirect ? message : undefined,
       });
       return;
@@ -2546,7 +2659,8 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
     if (!useStream) {
       const data = await readResponseData(res);
 
-      mergePersistedAgentFiles(data.files || []);
+      const responseFileIds = getFileIdsFromResponses(data.files || []);
+      if (options.keepFilesInComposer === true) mergePersistedAgentFiles(data.files || []);
       const answerText = getApiAnswerText(data, "파일 분석 답변을 생성하지 못했습니다.");
       const isArtifact = Boolean(data.excel?.ok || task === EXCEL_DRAFT_TASK);
       const isKnowledgeRedirect = isKnowledgeRedirectText(answerText);
@@ -2559,7 +2673,7 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
         artifact: isArtifact,
         artifactSavedAt: new Date().toISOString(),
         excel: data.excel || null,
-        fileIds: getAgentFileIds(),
+        fileIds: responseFileIds,
         originalMessage: isKnowledgeRedirect ? message : undefined,
       });
       return;
@@ -2626,7 +2740,8 @@ async function sendAgentFileAnalysis(message, files = [], history = [], options 
     }
   } catch (err) {
     removeThinkingBox(thinkingBox);
-    addMessage(agentBody, "bot", "파일 분석 호출 실패: " + getErrorMessage(err));
+    const safeMessage = buildUserFriendlyFileErrorMessage(getErrorMessage(err));
+    addMessage(agentBody, "bot", safeMessage, false, { hideCopy: true });
   } finally {
     if (isAgentPptGenerating) {
       syncAgentPptGeneratingControls();
@@ -2835,6 +2950,7 @@ async function handleAgentFormSubmit() {
     if (exportTask === "ambiguous_export") {
       addMessage(agentBody, "user", message);
       clearAgentComposerInput();
+      if (hasFiles) clearAgentComposerFiles();
       saveAgentMessage("user", message, { route: "agent-api" });
 
       const answer = buildAmbiguousExportAnswer();
@@ -2859,16 +2975,13 @@ async function handleAgentFormSubmit() {
 
     addMessage(agentBody, "user", displayMessage);
     clearAgentComposerInput();
+    if (hasFiles) clearAgentComposerFiles();
 
     // 세션/메시지 저장 실패가 실제 AI 호출을 막지 않도록 분리합니다.
     saveAgentMessage("user", displayMessage, {
       route: useFileApi ? "file-api" : task || "agent-api",
       fileIds: getAgentFileIds(filesSnapshot),
     });
-
-    if (usePptDraft && hasFiles && !useFileApi) {
-      clearAgentFiles();
-    }
 
     if (!task && !useFileApi && shouldRedirectToKnowledge(message, hasFiles)) {
       addKnowledgeRedirectMessage(message);
