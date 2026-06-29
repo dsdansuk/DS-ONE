@@ -443,7 +443,7 @@ button {
   filter: drop-shadow(0 2px 3px rgba(37, 99, 235, 0.08));
 }
 
-.chat-icon svg {
+.chat-icon img {
   width: 25px;
   height: 25px;
 }
