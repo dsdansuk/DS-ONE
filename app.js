@@ -109,15 +109,21 @@ function hasAgentVisibleConversation() {
 
 function createAgentWelcomeCard() {
   const card = document.createElement("section");
-  card.className = "chat-welcome-card";
+  card.className = "chat-welcome-card agent-welcome-card";
   card.setAttribute("aria-label", "업무 AI 안내");
   card.innerHTML = `
     <div class="welcome-avatar" aria-hidden="true">
       <img src="./robot.png" alt="" />
     </div>
     <div class="welcome-copy">
-      <strong>안녕하세요. DS ONE입니다.</strong>
-      <p>문서 작성과 업무 수행을 지원합니다.</p>
+      <strong>무엇이든 업무 형태로 정리해 드립니다.</strong>
+      <p>메일, 보고, 회의록, 검토, 체크리스트를 바로 요청해 보세요.</p>
+    </div>
+    <div class="agent-suggestion-area" aria-label="업무 AI 추천 요청">
+      <span class="agent-suggestion-title">추천 업무</span>
+      <div class="agent-suggestion-grid">
+        ${buildAgentSuggestionButtonsHtml()}
+      </div>
     </div>
   `;
   return card;
@@ -249,7 +255,71 @@ function restoreAgentConversationFromCache() {
 // PPTX/Skywork 생성 잠금·폴링 기능은 제거했습니다.
 // 아래 상수는 기존 조건문 호환용이며 항상 false입니다.
 const isAgentPptGenerating = false;
-const AGENT_DEFAULT_PLACEHOLDER = agentMessageInput?.getAttribute("placeholder") || "필요한 업무를 입력해 주세요";
+const AGENT_DEFAULT_PLACEHOLDER = agentMessageInput?.getAttribute("placeholder") || "메일 초안, 보고용 요약, 회의록 정리 등 필요한 업무를 입력해 주세요";
+const AGENT_SUGGESTIONS = [
+  {
+    id: "email_draft",
+    label: "메일 다듬기",
+    hint: "정중한 업무 메일",
+    template: "아래 내용을 정중하고 자연스러운 업무 메일로 다듬어 주세요.\n\n[내용]\n",
+  },
+  {
+    id: "report_summary",
+    label: "보고용 요약",
+    hint: "핵심·리스크·다음 조치",
+    template: "아래 내용을 팀장/임원 보고용으로 정리해 주세요.\n형식은 핵심 요약, 주요 내용, 리스크/이슈, 확인 필요, 다음 조치로 작성해 주세요.\n\n[내용]\n",
+  },
+  {
+    id: "meeting_minutes",
+    label: "회의록 정리",
+    hint: "결정사항·할 일 추출",
+    template: "아래 회의 내용을 회의록으로 정리해 주세요.\n회의 요약, 결정사항, 담당자별 할 일, 미확정 사항, 후속 일정으로 구분해 주세요.\n\n[회의 내용]\n",
+  },
+  {
+    id: "document_review",
+    label: "문서 검토",
+    hint: "문제점·보완점 확인",
+    template: "아래 내용을 검토해서 문제될 수 있는 부분, 누락된 부분, 보완 제안을 정리해 주세요.\n\n[내용]\n",
+  },
+  {
+    id: "checklist",
+    label: "체크리스트",
+    hint: "실행 전 점검표",
+    template: "아래 업무를 진행하기 위한 체크리스트를 만들어 주세요.\n목적, 점검 항목, 주의사항, 완료 기준으로 정리해 주세요.\n\n[업무 내용]\n",
+  },
+  {
+    id: "rewrite",
+    label: "문장 교정",
+    hint: "더 자연스럽게",
+    template: "아래 문장을 더 자연스럽고 업무에 적합한 표현으로 다듬어 주세요.\n\n[문장]\n",
+  },
+];
+
+
+function buildAgentSuggestionButtonsHtml() {
+  return AGENT_SUGGESTIONS.map((item) => `
+    <button class="agent-suggestion-btn" type="button" data-template="${escapeHtml(item.template)}" data-task="${escapeHtml(item.id)}">
+      <strong>${escapeHtml(item.label)}</strong>
+      <span>${escapeHtml(item.hint)}</span>
+    </button>
+  `).join("");
+}
+
+function applyAgentSuggestionTemplate(template = "") {
+  if (!agentMessageInput) return;
+  const current = agentMessageInput.value.trim();
+  const next = String(template || "").trimEnd();
+  agentMessageInput.value = current ? `${current}\n\n${next}` : next;
+  autoResizeTextarea(agentMessageInput);
+  focusInputWhenPanelReady(agentMessageInput);
+  const marker = "[내용]";
+  const markerIndex = agentMessageInput.value.indexOf(marker);
+  if (markerIndex >= 0 && typeof agentMessageInput.setSelectionRange === "function") {
+    const start = markerIndex;
+    const end = markerIndex + marker.length;
+    window.setTimeout(() => agentMessageInput.setSelectionRange(start, end), 0);
+  }
+}
 
 function syncAgentPptGeneratingControls() {
   if (agentMessageInput) {
@@ -2909,6 +2979,15 @@ if (messageInput && chatForm) {
     sendBtn.disabled = true;
 
     await sendChat(message);
+  });
+}
+
+if (agentBody) {
+  agentBody.addEventListener("click", (e) => {
+    const btn = e.target?.closest?.(".agent-suggestion-btn");
+    if (!btn) return;
+    e.preventDefault();
+    applyAgentSuggestionTemplate(btn.getAttribute("data-template") || "");
   });
 }
 

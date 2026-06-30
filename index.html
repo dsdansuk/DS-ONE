@@ -132,13 +132,42 @@
         </div>
 
         <div id="agentBody" class="body chat-body">
-          <section class="chat-welcome-card" aria-label="업무 AI 안내">
+          <section class="chat-welcome-card agent-welcome-card" aria-label="업무 AI 안내">
             <div class="welcome-avatar" aria-hidden="true">
               <img src="./robot.png" alt="" />
             </div>
             <div class="welcome-copy">
-              <strong>안녕하세요. DS ONE입니다.</strong>
-              <p>문서 작성과 업무 수행을 지원합니다.</p>
+              <strong>무엇이든 업무 형태로 정리해 드립니다.</strong>
+              <p>메일, 보고, 회의록, 검토, 체크리스트를 바로 요청해 보세요.</p>
+            </div>
+            <div class="agent-suggestion-area" aria-label="업무 AI 추천 요청">
+              <span class="agent-suggestion-title">추천 업무</span>
+              <div class="agent-suggestion-grid">
+                <button class="agent-suggestion-btn" type="button" data-template="아래 내용을 정중하고 자연스러운 업무 메일로 다듬어 주세요.&#10;&#10;[내용]&#10;" data-task="email_draft">
+                  <strong>메일 다듬기</strong>
+                  <span>정중한 업무 메일</span>
+                </button>
+                <button class="agent-suggestion-btn" type="button" data-template="아래 내용을 팀장/임원 보고용으로 정리해 주세요.&#10;형식은 핵심 요약, 주요 내용, 리스크/이슈, 확인 필요, 다음 조치로 작성해 주세요.&#10;&#10;[내용]&#10;" data-task="report_summary">
+                  <strong>보고용 요약</strong>
+                  <span>핵심·리스크·다음 조치</span>
+                </button>
+                <button class="agent-suggestion-btn" type="button" data-template="아래 회의 내용을 회의록으로 정리해 주세요.&#10;회의 요약, 결정사항, 담당자별 할 일, 미확정 사항, 후속 일정으로 구분해 주세요.&#10;&#10;[회의 내용]&#10;" data-task="meeting_minutes">
+                  <strong>회의록 정리</strong>
+                  <span>결정사항·할 일 추출</span>
+                </button>
+                <button class="agent-suggestion-btn" type="button" data-template="아래 내용을 검토해서 문제될 수 있는 부분, 누락된 부분, 보완 제안을 정리해 주세요.&#10;&#10;[내용]&#10;" data-task="document_review">
+                  <strong>문서 검토</strong>
+                  <span>문제점·보완점 확인</span>
+                </button>
+                <button class="agent-suggestion-btn" type="button" data-template="아래 업무를 진행하기 위한 체크리스트를 만들어 주세요.&#10;목적, 점검 항목, 주의사항, 완료 기준으로 정리해 주세요.&#10;&#10;[업무 내용]&#10;" data-task="checklist">
+                  <strong>체크리스트</strong>
+                  <span>실행 전 점검표</span>
+                </button>
+                <button class="agent-suggestion-btn" type="button" data-template="아래 문장을 더 자연스럽고 업무에 적합한 표현으로 다듬어 주세요.&#10;&#10;[문장]&#10;" data-task="rewrite">
+                  <strong>문장 교정</strong>
+                  <span>더 자연스럽게</span>
+                </button>
+              </div>
             </div>
           </section>
         </div>
@@ -162,7 +191,7 @@
               </button>
               <textarea
                 id="agentMessageInput"
-                placeholder="필요한 업무를 입력해 주세요"
+                placeholder="메일 초안, 보고용 요약, 회의록 정리 등 필요한 업무를 입력해 주세요"
                 autocomplete="off"
                 rows="1"
               ></textarea>
@@ -195,7 +224,7 @@
     </main>
   </div>
 
-  <script src="./config.js?v=20260626_agent_cache_fast"></script>
-  <script src="./app.js?v=20260622_agent_cache_fast"></script>
+  <script src="./config.js?v=20260630_work_agent_enhanced"></script>
+  <script src="./app.js?v=20260630_work_agent_enhanced"></script>
 </body>
 </html>
