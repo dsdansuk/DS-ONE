@@ -78,6 +78,7 @@ const agentSendBtn = document.getElementById("agentSendBtn");
 const agentAttachBtn = document.getElementById("agentAttachBtn");
 const agentFileInput = document.getElementById("agentFileInput");
 const agentFileChips = document.getElementById("agentFileChips");
+const agentNewChatBtn = document.getElementById("agentNewChatBtn");
 const reloadRpaBtn = document.getElementById("reloadRpaBtn");
 const userInfo = document.getElementById("userInfo");
 const homeGreetingText = document.getElementById("homeGreetingText");
@@ -154,6 +155,75 @@ function resetAgentMessagesKeepingWelcome() {
 
   if (card && agentBody.firstElementChild !== card) {
     agentBody.prepend(card);
+  }
+}
+
+function updateAgentNewChatButtonVisibility() {
+  if (!agentNewChatBtn) return;
+
+  const hasConversation = hasAgentVisibleConversation();
+  agentNewChatBtn.hidden = !hasConversation;
+  agentNewChatBtn.disabled = !hasConversation || agentStateLoading || agentSubmitInProgress;
+}
+
+function clearAgentConversationCache() {
+  const key = getAgentHistoryCacheKey();
+  if (!key) return;
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+  }
+}
+
+async function startNewAgentConversation() {
+  if (!agentBody || agentStateLoading || agentSubmitInProgress) return;
+
+  if (agentSelectedFiles.length) {
+    const ok = window.confirm("첨부한 파일이 사라집니다. 새 대화를 시작할까요?");
+    if (!ok) {
+      focusInputWhenPanelReady(agentMessageInput);
+      return;
+    }
+  }
+
+  const previousLabel = agentNewChatBtn?.textContent || "새 대화";
+  if (agentNewChatBtn) {
+    agentNewChatBtn.disabled = true;
+    agentNewChatBtn.textContent = "시작 중";
+  }
+
+  try {
+    if (sessionToken) {
+      const data = await agentStateRequest({ action: "clear_state", sessionId: agentSessionId });
+      if (data?.session?.id) {
+        agentSessionId = data.session.id;
+        sessionStorage.setItem("ds_agent_session_id", agentSessionId);
+      } else {
+        agentSessionId = "";
+        sessionStorage.removeItem("ds_agent_session_id");
+      }
+    } else {
+      agentSessionId = "";
+      sessionStorage.removeItem("ds_agent_session_id");
+    }
+
+    agentStateReady = true;
+    agentStateLoading = false;
+    agentConversationRenderedFromCache = false;
+    clearAgentConversationCache();
+    clearAgentFiles();
+    clearAgentComposerInput();
+    resetAgentMessagesKeepingWelcome();
+    clearAgentConversationCache();
+    if (agentBody) agentBody.scrollTop = 0;
+    focusInputWhenPanelReady(agentMessageInput);
+  } catch (err) {
+    addMessage(agentBody, "bot", "새 대화를 시작하지 못했습니다.\n" + getErrorMessage(err), true);
+  } finally {
+    if (agentNewChatBtn) {
+      agentNewChatBtn.textContent = previousLabel;
+    }
+    updateAgentNewChatButtonVisibility();
   }
 }
 
@@ -245,6 +315,7 @@ function restoreAgentConversationFromCache() {
 
     agentConversationRenderedFromCache = true;
     agentBody.scrollTop = agentBody.scrollHeight;
+    updateAgentNewChatButtonVisibility();
     return true;
   } catch {
     sessionStorage.removeItem(key);
@@ -607,6 +678,7 @@ function setMode(mode) {
     ensureAgentWelcomeCard();
     restoreAgentConversationFromCache();
     syncAgentPptGeneratingControls();
+    updateAgentNewChatButtonVisibility();
     if (!isAgentPptGenerating) focusInputWhenPanelReady(agentMessageInput);
     scheduleAgentSessionRestore();
   }
@@ -819,6 +891,7 @@ function addMessage(targetBody, type, text, debug = false, options = {}) {
   if (targetBody === agentBody && !debug && !options.skipAgentCache) {
     agentConversationRenderedFromCache = false;
     saveAgentConversationCacheDebounced();
+    updateAgentNewChatButtonVisibility();
   }
 
   return div;
@@ -1841,6 +1914,8 @@ function renderAgentFileChips() {
     chip.appendChild(removeBtn);
     agentFileChips.appendChild(chip);
   });
+
+  updateAgentNewChatButtonVisibility();
 }
 
 function syncAgentFileInput() {
@@ -2079,6 +2154,7 @@ async function initAgentSessionState() {
       });
       agentBody.scrollTop = agentBody.scrollHeight;
       saveAgentConversationCacheNow();
+      updateAgentNewChatButtonVisibility();
     } else if (agentConversationRenderedFromCache) {
       resetAgentMessagesKeepingWelcome();
       agentConversationRenderedFromCache = false;
@@ -2096,6 +2172,7 @@ async function initAgentSessionState() {
     agentStateReady = true;
   } finally {
     agentStateLoading = false;
+    updateAgentNewChatButtonVisibility();
   }
 }
 
@@ -2914,6 +2991,12 @@ if (rpaBackBtn) {
 
 if (docBackBtn) {
   docBackBtn.addEventListener("click", () => setMode("home"));
+}
+
+if (agentNewChatBtn) {
+  agentNewChatBtn.addEventListener("click", () => {
+    startNewAgentConversation();
+  });
 }
 
 if (reloadRpaBtn) {
