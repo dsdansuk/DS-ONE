@@ -1198,13 +1198,21 @@ function saveChatHistory() {
   if (!currentLoginId && !currentEmpNo) return;
 
   const messages = getAllAiMessages();
-  const payload = {
-    savedAt: Date.now(),
-    messages,
-  };
+  const key = getChatHistoryKey();
 
   try {
-    localStorage.setItem(getChatHistoryKey(), JSON.stringify(payload));
+    if (!messages.length) {
+      sessionStorage.removeItem(key);
+      return;
+    }
+
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        savedAt: Date.now(),
+        messages,
+      })
+    );
   } catch (err) {
   }
 }
@@ -1213,7 +1221,7 @@ function restoreChatHistory() {
   if (!currentLoginId && !currentEmpNo) return;
 
   const key = getChatHistoryKey();
-  const raw = localStorage.getItem(key);
+  const raw = sessionStorage.getItem(key);
 
   if (!raw) return;
 
@@ -1223,7 +1231,7 @@ function restoreChatHistory() {
     const messages = Array.isArray(payload.messages) ? payload.messages : [];
 
     if (!savedAt || Date.now() - savedAt > CHAT_HISTORY_TTL_MS) {
-      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
       return;
     }
 
@@ -1238,28 +1246,42 @@ function restoreChatHistory() {
 
     aiBody.scrollTop = aiBody.scrollHeight;
   } catch (err) {
-    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
   }
 }
 
 function cleanupExpiredChatHistories() {
   const now = Date.now();
+  cleanupChatHistoryStorage(sessionStorage, now, false);
+  // 이전 버전은 사내 지식 문의 대화를 localStorage에 저장했습니다.
+  // 운영 보안 기준에 맞춰 남아 있는 과거 캐시를 복원하지 않고 정리합니다.
+  cleanupChatHistoryStorage(localStorage, now, true);
+}
 
-  for (let i = localStorage.length - 1; i >= 0; i--) {
-    const key = localStorage.key(i);
+function cleanupChatHistoryStorage(storage, now, removeAll = false) {
+  try {
+    for (let i = storage.length - 1; i >= 0; i--) {
+      const key = storage.key(i);
 
-    if (!key || !key.startsWith(CHAT_HISTORY_STORAGE_PREFIX)) continue;
+      if (!key || !key.startsWith(CHAT_HISTORY_STORAGE_PREFIX)) continue;
 
-    try {
-      const payload = JSON.parse(localStorage.getItem(key) || "{}");
-      const savedAt = Number(payload.savedAt || 0);
-
-      if (!savedAt || now - savedAt > CHAT_HISTORY_TTL_MS) {
-        localStorage.removeItem(key);
+      if (removeAll) {
+        storage.removeItem(key);
+        continue;
       }
-    } catch {
-      localStorage.removeItem(key);
+
+      try {
+        const payload = JSON.parse(storage.getItem(key) || "{}");
+        const savedAt = Number(payload.savedAt || 0);
+
+        if (!savedAt || now - savedAt > CHAT_HISTORY_TTL_MS) {
+          storage.removeItem(key);
+        }
+      } catch {
+        storage.removeItem(key);
+      }
     }
+  } catch {
   }
 }
 
