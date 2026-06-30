@@ -3181,6 +3181,7 @@ async function handleAgentFormSubmit() {
   } finally {
     agentSubmitInProgress = false;
     if (agentSendBtn && !isAgentPptGenerating) agentSendBtn.disabled = false;
+    updateAgentNewChatButtonVisibility();
     focusInputWhenPanelReady(agentMessageInput);
   }
 }
