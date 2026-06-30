@@ -1065,6 +1065,13 @@ function buildUserFriendlyFileErrorMessage(rawMessage = "") {
   const text = String(rawMessage || "").trim();
   const normalized = text.replace(/\s+/g, " ");
 
+  if (/운영 보안 정책상 업로드할 수 없습니다|운영 보안 정책에 따라 파일 분석을 중단|차단 사유|차단|보안 정책/.test(normalized)) {
+    return [
+      "파일 보안 정책에 따라 해당 파일은 분석할 수 없습니다.",
+      "주민등록번호·외국인등록번호·계좌·카드·급여·인사평가·대외비·기밀정보 또는 실행성 파일이 포함되어 있지 않은지 확인한 뒤 다시 업로드해 주세요.",
+    ].join("\n");
+  }
+
   if (/PDF|pdf/.test(normalized) && (/FILE_INLINE_AI_ENABLED|Vertex|본문을 추출|안전하게 본문|현재 설정/.test(normalized))) {
     return [
       "현재 이 PDF 파일은 바로 분석할 수 없습니다.",
@@ -1077,17 +1084,10 @@ function buildUserFriendlyFileErrorMessage(rawMessage = "") {
     ].join("\n");
   }
 
-  if (/이미지|png|jpg|jpeg|webp/i.test(normalized) && /업로드|분석|정책|설정/.test(normalized)) {
+  if (/(?:이미지 파일|image\/|png 파일|jpg 파일|jpeg 파일|webp 파일|\.png|\.jpg|\.jpeg|\.webp)/i.test(normalized) && /업로드|분석|정책|설정|지원/.test(normalized)) {
     return [
       "현재 이미지 파일은 바로 분석할 수 없습니다.",
       "이미지 안의 내용을 텍스트로 입력하거나, 문서 파일로 변환해 업로드해 주세요.",
-    ].join("\n");
-  }
-
-  if (/운영 보안 정책상 업로드할 수 없습니다|차단|보안 정책/.test(normalized)) {
-    return [
-      "파일 보안 정책에 따라 해당 파일은 분석할 수 없습니다.",
-      "개인정보·기밀정보·실행성 파일이 포함되어 있지 않은지 확인한 뒤 다시 업로드해 주세요.",
     ].join("\n");
   }
 
