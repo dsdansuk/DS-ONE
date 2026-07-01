@@ -31,6 +31,6 @@ window.DS_ONE_CONFIG = Object.freeze({
   filePolicy: Object.freeze({
     allowedExtensions: Object.freeze(["txt", "md", "csv", "json", "docx", "xlsx", "pptx"]),
     blockedExtensions: Object.freeze(["exe", "dll", "msi", "bat", "cmd", "com", "scr", "ps1", "vbs", "js", "mjs", "jar", "sh", "php", "asp", "aspx", "jsp", "html", "htm", "xml", "doc", "xls", "ppt", "docm", "xlsm", "pptm", "hwp", "hwpx", "zip", "7z", "rar", "tar", "gz", "png", "jpg", "jpeg", "webp"]),
-    maxFileSizeBytes: 15 * 1024 * 1024,
+    maxFileSizeBytes: 50 * 1024 * 1024,
   }),
 });
