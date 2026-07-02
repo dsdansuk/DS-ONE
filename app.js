@@ -703,47 +703,260 @@ function showComingSoonNotice() {
   }, 1400);
 }
 
+function normalizeBotMessageText(text) {
+  let value = String(text || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trimEnd();
+
+  if (!value) return "";
+
+  const sectionLabels = [
+    "제목:",
+    "본문:",
+    "수정 포인트:",
+    "후속 작업 제안:",
+    "결론:",
+    "요약:",
+    "검토 결과 요약:",
+    "문제/리스크:",
+    "보완 제안:",
+    "확인 필요:",
+    "기준/근거:",
+    "근거:",
+    "다음 조치:",
+    "참고:",
+  ];
+
+  sectionLabels.forEach((label) => {
+    const escaped = escapeRegExp(label);
+    value = value.replace(new RegExp(`([^\\n])\\s*(${escaped})`, "g"), "$1\n\n$2");
+  });
+
+  // 모델이 한 문단 안에 목록을 붙여서 반환하는 경우를 화면에서 읽기 좋게 보정합니다.
+  value = value
+    .replace(/([^\n])\s+(\d+\.\s+[^\n])/g, "$1\n$2")
+    .replace(/([^\n])\s+(·\s+[^\n])/g, "$1\n$2")
+    .replace(/([^\n])\s+([-•]\s+[^\n])/g, "$1\n$2")
+    .replace(/\n{3,}/g, "\n\n");
+
+  return value;
+}
+
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function renderMessageContent(div, text) {
   div.textContent = "";
-  const lines = String(text || "").split(/\n/);
+  const normalizedText = normalizeBotMessageText(text);
+  const lines = normalizedText.split(/\n/);
 
-  lines.forEach((line) => {
-    const trimmed = String(line || "").trim();
+  let index = 0;
+  let lastWasSpacer = false;
+
+  while (index < lines.length) {
+    const rawLine = lines[index] || "";
+    const trimmed = rawLine.trim();
 
     if (!trimmed) {
-      const spacer = document.createElement("div");
-      spacer.className = "msg-block-spacer";
-      div.appendChild(spacer);
-      return;
+      if (!lastWasSpacer && div.childNodes.length) {
+        const spacer = document.createElement("div");
+        spacer.className = "msg-block-spacer";
+        div.appendChild(spacer);
+        lastWasSpacer = true;
+      }
+      index += 1;
+      continue;
     }
 
-    const lineDiv = document.createElement("div");
-    const isHeading = /^\*\*[^*]+\*\*$/.test(trimmed);
-    const isBullet = /^[-•]\s+/.test(trimmed);
-    lineDiv.className = "msg-line" + (isHeading ? " msg-heading" : "") + (isBullet ? " msg-bullet" : "");
-    appendInlineMarkdown(lineDiv, trimmed);
-    div.appendChild(lineDiv);
+    if (/^```/.test(trimmed)) {
+      const codeLines = [];
+      index += 1;
+      while (index < lines.length && !/^```/.test(String(lines[index] || "").trim())) {
+        codeLines.push(lines[index] || "");
+        index += 1;
+      }
+      if (index < lines.length) index += 1;
+      appendCodeBlock(div, codeLines.join("\n"));
+      lastWasSpacer = false;
+      continue;
+    }
+
+    if (isMarkdownTableStart(lines, index)) {
+      const tableLines = [];
+      while (index < lines.length && isMarkdownTableLine(lines[index])) {
+        tableLines.push(lines[index]);
+        index += 1;
+      }
+      appendMarkdownTable(div, tableLines);
+      lastWasSpacer = false;
+      continue;
+    }
+
+    appendFormattedLine(div, trimmed);
+    lastWasSpacer = false;
+    index += 1;
+  }
+}
+
+function appendFormattedLine(parent, line) {
+  const headingText = getMessageHeadingText(line);
+  const labelMatch = line.match(/^(제목|본문|수정 포인트|후속 작업 제안|결론|요약|검토 결과 요약|문제\/리스크|보완 제안|확인 필요|기준\/근거|근거|다음 조치|참고)\s*:\s+(.+)$/);
+  const numberedMatch = line.match(/^(\d+)[.)]\s+(.+)$/);
+  const bulletMatch = line.match(/^[-•·*]\s+(.+)$/);
+
+  const lineDiv = document.createElement("div");
+
+  if (headingText) {
+    lineDiv.className = "msg-line msg-heading";
+    appendInlineMarkdown(lineDiv, headingText);
+  } else if (labelMatch) {
+    lineDiv.className = "msg-line msg-label-line";
+    const label = document.createElement("strong");
+    label.textContent = labelMatch[1] + ": ";
+    lineDiv.appendChild(label);
+    appendInlineMarkdown(lineDiv, labelMatch[2]);
+  } else if (numberedMatch) {
+    lineDiv.className = "msg-line msg-numbered";
+    const marker = document.createElement("span");
+    marker.className = "msg-list-marker";
+    marker.textContent = numberedMatch[1] + ".";
+    const body = document.createElement("span");
+    body.className = "msg-list-body";
+    appendInlineMarkdown(body, numberedMatch[2]);
+    lineDiv.appendChild(marker);
+    lineDiv.appendChild(body);
+  } else if (bulletMatch) {
+    lineDiv.className = "msg-line msg-bullet";
+    const marker = document.createElement("span");
+    marker.className = "msg-list-marker";
+    marker.textContent = "•";
+    const body = document.createElement("span");
+    body.className = "msg-list-body";
+    appendInlineMarkdown(body, bulletMatch[1]);
+    lineDiv.appendChild(marker);
+    lineDiv.appendChild(body);
+  } else {
+    lineDiv.className = "msg-line";
+    appendInlineMarkdown(lineDiv, line);
+  }
+
+  parent.appendChild(lineDiv);
+}
+
+function getMessageHeadingText(line) {
+  const value = String(line || "").trim();
+  if (!value) return "";
+
+  const markdownHeading = value.match(/^#{1,4}\s+(.+)$/);
+  if (markdownHeading) return markdownHeading[1].trim();
+
+  const boldHeading = value.match(/^\*\*([^*]+)\*\*:?$/);
+  if (boldHeading) return boldHeading[1].trim().replace(/:$/, "");
+
+  const sectionHeading = value.match(/^(본문|수정 포인트|후속 작업 제안|결론|요약|검토 결과 요약|문제\/리스크|보완 제안|확인 필요|기준\/근거|근거|다음 조치|참고)\s*:?$/);
+  if (sectionHeading) return sectionHeading[1].trim();
+
+  return "";
+}
+
+function isMarkdownTableLine(line) {
+  const value = String(line || "").trim();
+  return /^\|.+\|$/.test(value);
+}
+
+function isMarkdownTableSeparator(line) {
+  const value = String(line || "").trim();
+  return /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(value);
+}
+
+function isMarkdownTableStart(lines, index) {
+  return isMarkdownTableLine(lines[index]) && isMarkdownTableSeparator(lines[index + 1] || "");
+}
+
+function parseMarkdownTableRow(line) {
+  return String(line || "")
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+}
+
+function appendMarkdownTable(parent, tableLines) {
+  if (!tableLines.length) return;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "msg-table-wrap";
+
+  const table = document.createElement("table");
+  table.className = "msg-table";
+
+  const headerCells = parseMarkdownTableRow(tableLines[0]);
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  headerCells.forEach((cell) => {
+    const th = document.createElement("th");
+    appendInlineMarkdown(th, cell);
+    headerRow.appendChild(th);
   });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  tableLines.slice(2).forEach((line) => {
+    if (!isMarkdownTableLine(line) || isMarkdownTableSeparator(line)) return;
+    const tr = document.createElement("tr");
+    parseMarkdownTableRow(line).forEach((cell) => {
+      const td = document.createElement("td");
+      appendInlineMarkdown(td, cell);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+
+  wrapper.appendChild(table);
+  parent.appendChild(wrapper);
+}
+
+function appendCodeBlock(parent, code) {
+  const pre = document.createElement("pre");
+  pre.className = "msg-code-block";
+  const codeEl = document.createElement("code");
+  codeEl.textContent = String(code || "");
+  pre.appendChild(codeEl);
+  parent.appendChild(pre);
 }
 
 function appendInlineMarkdown(parent, line) {
-  const pattern = /\*\*(.+?)\*\*/g;
+  const value = String(line || "");
+  const pattern = /(\*\*(.+?)\*\*|`([^`]+)`)/g;
   let lastIndex = 0;
   let match;
 
-  while ((match = pattern.exec(line)) !== null) {
+  while ((match = pattern.exec(value)) !== null) {
     if (match.index > lastIndex) {
-      parent.appendChild(document.createTextNode(line.slice(lastIndex, match.index)));
+      parent.appendChild(document.createTextNode(value.slice(lastIndex, match.index)));
     }
 
-    const strong = document.createElement("strong");
-    strong.textContent = match[1];
-    parent.appendChild(strong);
+    if (match[2] !== undefined) {
+      const strong = document.createElement("strong");
+      strong.textContent = match[2];
+      parent.appendChild(strong);
+    } else if (match[3] !== undefined) {
+      const code = document.createElement("code");
+      code.className = "msg-inline-code";
+      code.textContent = match[3];
+      parent.appendChild(code);
+    }
+
     lastIndex = pattern.lastIndex;
   }
 
-  if (lastIndex < line.length) {
-    parent.appendChild(document.createTextNode(line.slice(lastIndex)));
+  if (lastIndex < value.length) {
+    parent.appendChild(document.createTextNode(value.slice(lastIndex)));
   }
 }
 
