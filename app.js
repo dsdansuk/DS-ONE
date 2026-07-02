@@ -4,7 +4,7 @@
 // - sso-login: 그룹웨어 SSO 진입 및 토큰 발급
 // - ai-api: 사내 지식 문의 / SideTalk 지식베이스 호출
 // - agent-api: 업무 AI Agent / SideTalk 일반 생성 호출
-// - file-api: 첨부 파일 본문 추출 및 SideTalk 기반 파일 분석
+// - file-api: 첨부 파일 본문 추출 및 Vertex/Gemini 기반 파일 분석
 // - rpa-api: UiPath RPA 호출
 
 const DS_ONE_CONFIG = window.DS_ONE_CONFIG || {};
@@ -2161,10 +2161,11 @@ async function initAgentSessionState() {
       saveAgentConversationCacheNow();
     }
 
-    if (Array.isArray(data.files)) {
-      // 이전에 분석한 파일은 대화 이력에는 남기되, 입력창 위의 현재 첨부 목록으로 복원하지 않습니다.
-      // 새 요청에 과거 파일이 자동으로 다시 첨부된 것처럼 보이면 사용자가 혼동할 수 있습니다.
-      clearAgentComposerFiles();
+    if (Array.isArray(data.files) && data.files.length) {
+      // 파일 분석 후속 질문에서 "이 파일", "리스크", "부서별" 같은 표현이
+      // 일반 지식베이스로 빠지지 않도록 현재 분석 파일 칩을 복원합니다.
+      // 사용자가 X를 누르거나 새 대화를 시작하기 전까지 같은 파일을 기준으로 file-api를 사용합니다.
+      mergePersistedAgentFiles(data.files);
     }
 
     agentStateReady = true;
@@ -2342,7 +2343,26 @@ function shouldUseFileApi(message, hasFiles, history = []) {
   }
 
   /**
-   * 3순위: 약한 파일 참조 + 파일 작업 동사
+   * 3순위: 현재 파일 칩이 남아 있고 분석/집계/리스크 성격의 요청이면 file-api를 유지합니다.
+   * 파일 칩은 사용자가 직접 X를 누르기 전까지 "현재 분석 파일"을 뜻합니다.
+   * 예: 부서별 합계, 평균, 상위 5건, 리스크, 누락값, 중복값, 프로젝트/재고 현황
+   */
+  const fileTaskPatterns = [
+    /요약|분석|정리|추출|검토|비교/i,
+    /표로|표\s*형태|목록화/i,
+    /핵심|주요\s*성과|성과|리스크|시사점|결론|근거/i,
+    /찾아|찾아서|뽑아|알려줘|확인해줘/i,
+    /합계|평균|중앙값|최대|최소|상위|하위|높은|낮은|최고|최저|순위|랭킹/i,
+    /부서별|담당자별|거래처별|제품별|지역별|상태별|월별|일자별/i,
+    /순매출|매출|수량|단가|재고|안전재고|예산|집행액|프로젝트|거래번호|누락|중복|이상치/i,
+  ];
+
+  if (hasPattern(text, fileTaskPatterns)) {
+    return true;
+  }
+
+  /**
+   * 4순위: 약한 파일 참조 + 파일 작업 동사
    * 단독으로는 위험하지만, "요약/분석/정리"와 함께 나오면 file-api로 보냅니다.
    *
    * 예:
@@ -2355,13 +2375,6 @@ function shouldUseFileApi(message, hasFiles, history = []) {
     /브로슈어/i,
     /pdf|pptx?|파워포인트|xlsx?|엑셀|docx?|워드|txt|csv/i,
     /파일|자료|문서/i,
-  ];
-
-  const fileTaskPatterns = [
-    /요약|분석|정리|추출|검토|비교/i,
-    /표로|표\s*형태|목록화/i,
-    /핵심|주요\s*성과|성과|리스크|시사점|결론|근거/i,
-    /찾아|찾아서|뽑아|알려줘|확인해줘/i,
   ];
 
   const hasWeakFileReference = hasPattern(text, weakFileReferencePatterns);
@@ -2944,6 +2957,7 @@ async function sendAgentChat(message, files = [], history = [], options = {}) {
       task,
       stream: false,
       thinkingSteps,
+      keepFilesInComposer: true,
     });
   }
 
@@ -2960,7 +2974,10 @@ async function sendAgentChat(message, files = [], history = [], options = {}) {
     task,
     stream: !(isPptDraft || isExcelDraft || isWebSearch),
     thinkingSteps,
-    attachments: files,
+    // 파일 칩이 남아 있더라도 일반 업무 요청으로 판단된 경우에는
+    // agent-api/SideTalk에 첨부 메타데이터를 넘기지 않습니다.
+    // 파일 기반 후속 질문은 위 file-api 경로에서만 처리합니다.
+    attachments: [],
   });
 }
 
@@ -3134,8 +3151,8 @@ async function handleAgentFormSubmit() {
     if (exportTask === "ambiguous_export") {
       addMessage(agentBody, "user", message);
       clearAgentComposerInput();
-      if (hasFiles) clearAgentComposerFiles();
-      saveAgentMessage("user", message, { route: "agent-api" });
+      // 파일 칩은 사용자가 직접 X를 누르기 전까지 유지합니다.
+      saveAgentMessage("user", message, { route: "agent-api", fileIds: getAgentFileIds(filesSnapshot) });
 
       const answer = buildAmbiguousExportAnswer();
       addMessage(agentBody, "bot", answer, false, { hideCopy: true });
@@ -3159,7 +3176,8 @@ async function handleAgentFormSubmit() {
 
     addMessage(agentBody, "user", displayMessage);
     clearAgentComposerInput();
-    if (hasFiles) clearAgentComposerFiles();
+    // 파일 칩은 사용자가 직접 X를 누르거나 새 대화를 시작하기 전까지 유지합니다.
+    // 후속 질문에서도 같은 fileId를 file-api로 넘겨 지식베이스가 끼어드는 것을 막습니다.
 
     // 세션/메시지 저장 실패가 실제 AI 호출을 막지 않도록 분리합니다.
     saveAgentMessage("user", displayMessage, {
