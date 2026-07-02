@@ -1658,35 +1658,99 @@ button {
 .chat-body .msg.bot .msg-table-wrap {
   width: 100%;
   max-width: 100%;
-  overflow-x: auto;
-  margin: 7px 0 9px;
+  margin: 8px 0 10px;
   border: 1px solid rgba(226, 232, 240, 0.95);
-  border-radius: 10px;
+  border-radius: 12px;
   background: #fff;
+  overflow: hidden;
+}
+
+.chat-body .msg.bot .msg-table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 7px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.chat-body .msg.bot .msg-table-copy-btn {
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 6px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chat-body .msg.bot .msg-table-copy-btn:hover {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.chat-body .msg.bot .msg-table-copy-btn.copied {
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.chat-body .msg.bot .msg-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-body .msg.bot .msg-table-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.chat-body .msg.bot .msg-table-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
 }
 
 .chat-body .msg.bot .msg-table {
-  width: 100%;
-  min-width: 280px;
+  width: max-content;
+  min-width: max(100%, 560px);
   border-collapse: collapse;
   font-size: 12.4px;
   line-height: 1.42;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.035em;
+  table-layout: auto;
 }
 
 .chat-body .msg.bot .msg-table th,
 .chat-body .msg.bot .msg-table td {
-  padding: 7px 8px;
+  padding: 8px 10px;
   border-bottom: 1px solid #e5e7eb;
   text-align: left;
   vertical-align: top;
-  white-space: normal;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
 }
 
 .chat-body .msg.bot .msg-table th {
   background: #f8fafc;
   color: #0f172a;
   font-weight: 850;
+}
+
+.chat-body .msg.bot .msg-table td:nth-child(2),
+.chat-body .msg.bot .msg-table td:nth-child(3) {
+  max-width: 260px;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .chat-body .msg.bot .msg-table tr:last-child td {

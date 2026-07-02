@@ -722,6 +722,7 @@ function normalizeBotMessageText(text) {
     "문제/리스크:",
     "보완 제안:",
     "확인 필요:",
+    "기준 및 근거:",
     "기준/근거:",
     "근거:",
     "다음 조치:",
@@ -732,6 +733,14 @@ function normalizeBotMessageText(text) {
     const escaped = escapeRegExp(label);
     value = value.replace(new RegExp(`([^\\n])\\s*(${escaped})`, "g"), "$1\n\n$2");
   });
+
+  // 모델이 굵게 표시 기호를 줄바꿈과 섞어 반환하는 경우를 보정합니다.
+  value = value
+    .replace(/\n\s*\*\*\s*\n+\s*([^\n*][^\n]{0,40}:?)\s*\*\*/g, "\n## $1")
+    .replace(/\*\*\s*\n+\s*([^\n*][^\n]{0,40}:?)\s*\*\*/g, "## $1")
+    .replace(/^\s*\*\*\s*$/gm, "")
+    .replace(/기준\s*\/\s*\n+\s*근거\s*:?/g, "기준 및 근거")
+    .replace(/기준\s*\/\s*근거\s*:?/g, "기준 및 근거");
 
   // 모델이 한 문단 안에 목록을 붙여서 반환하는 경우를 화면에서 읽기 좋게 보정합니다.
   value = value
@@ -802,7 +811,7 @@ function renderMessageContent(div, text) {
 
 function appendFormattedLine(parent, line) {
   const headingText = getMessageHeadingText(line);
-  const labelMatch = line.match(/^(제목|본문|수정 포인트|후속 작업 제안|결론|요약|검토 결과 요약|문제\/리스크|보완 제안|확인 필요|기준\/근거|근거|다음 조치|참고)\s*:\s+(.+)$/);
+  const labelMatch = line.match(/^(제목|본문|수정 포인트|후속 작업 제안|결론|요약|검토 결과 요약|문제\/리스크|보완 제안|확인 필요|기준 및 근거|기준\/근거|근거|다음 조치|참고)\s*:\s+(.+)$/);
   const numberedMatch = line.match(/^(\d+)[.)]\s+(.+)$/);
   const bulletMatch = line.match(/^[-•·*]\s+(.+)$/);
 
@@ -855,7 +864,7 @@ function getMessageHeadingText(line) {
   const boldHeading = value.match(/^\*\*([^*]+)\*\*:?$/);
   if (boldHeading) return boldHeading[1].trim().replace(/:$/, "");
 
-  const sectionHeading = value.match(/^(본문|수정 포인트|후속 작업 제안|결론|요약|검토 결과 요약|문제\/리스크|보완 제안|확인 필요|기준\/근거|근거|다음 조치|참고)\s*:?$/);
+  const sectionHeading = value.match(/^(본문|수정 포인트|후속 작업 제안|결론|요약|검토 결과 요약|문제\/리스크|보완 제안|확인 필요|기준 및 근거|기준\/근거|근거|다음 조치|참고)\s*:?$/);
   if (sectionHeading) return sectionHeading[1].trim();
 
   return "";
@@ -884,11 +893,104 @@ function parseMarkdownTableRow(line) {
     .map((cell) => cell.trim());
 }
 
+function cleanMarkdownTableCellForCopy(value) {
+  return String(value || "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/<br\s*\/?\s*>/gi, " ")
+    .replace(/[\t\r\n]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function buildTsvFromMarkdownTable(tableLines) {
+  const rows = [];
+  tableLines.forEach((line, index) => {
+    if (!isMarkdownTableLine(line) || isMarkdownTableSeparator(line)) return;
+    const cells = parseMarkdownTableRow(line).map(cleanMarkdownTableCellForCopy);
+    if (index === 0 || cells.some((cell) => cell)) rows.push(cells.join("\t"));
+  });
+  return rows.join("\n");
+}
+
+async function copyTextToClipboard(value) {
+  const text = String(value || "");
+  if (!text) return false;
+
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // 아래 fallback으로 재시도합니다.
+  }
+
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+    const ok = document.execCommand("copy");
+    textarea.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function extractMessageTextForCopy(messageDiv, fallback = "") {
+  if (!messageDiv) return String(fallback || "").trim();
+  const clone = messageDiv.cloneNode(true);
+  clone.querySelectorAll?.(".msg-table-toolbar").forEach((el) => el.remove());
+  return String(clone.textContent || fallback || "").trim();
+}
+
+function setTemporaryButtonText(button, text, delay = 1200) {
+  if (!button) return;
+  const original = button.dataset.originalText || button.textContent || "";
+  button.dataset.originalText = original;
+  button.textContent = text;
+  window.setTimeout(() => {
+    button.textContent = button.dataset.originalText || original;
+  }, delay);
+}
+
 function appendMarkdownTable(parent, tableLines) {
   if (!tableLines.length) return;
 
   const wrapper = document.createElement("div");
   wrapper.className = "msg-table-wrap";
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "msg-table-toolbar";
+
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.className = "msg-table-copy-btn";
+  copyBtn.textContent = "표 복사";
+  copyBtn.title = "표를 Excel에 붙여넣기 가능한 형식으로 복사";
+  copyBtn.setAttribute("aria-label", "표를 Excel 붙여넣기용으로 복사");
+  copyBtn.addEventListener("click", async () => {
+    const copied = await copyTextToClipboard(buildTsvFromMarkdownTable(tableLines));
+    copyBtn.classList.toggle("copied", copied);
+    setTemporaryButtonText(copyBtn, copied ? "복사 완료" : "복사 실패", copied ? 1200 : 1600);
+    if (copied) {
+      window.setTimeout(() => copyBtn.classList.remove("copied"), 1200);
+    }
+  });
+
+  toolbar.appendChild(copyBtn);
+  wrapper.appendChild(toolbar);
+
+  const scroll = document.createElement("div");
+  scroll.className = "msg-table-scroll";
 
   const table = document.createElement("table");
   table.className = "msg-table";
@@ -917,7 +1019,8 @@ function appendMarkdownTable(parent, tableLines) {
   });
   table.appendChild(tbody);
 
-  wrapper.appendChild(table);
+  scroll.appendChild(table);
+  wrapper.appendChild(scroll);
   parent.appendChild(wrapper);
 }
 
@@ -975,26 +1078,17 @@ function appendBotCopyAction(row, messageDiv, text, options = {}) {
   copyBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 8.5A2.5 2.5 0 0 1 10.5 6H18a2.5 2.5 0 0 1 2.5 2.5V16A2.5 2.5 0 0 1 18 18.5h-7.5A2.5 2.5 0 0 1 8 16V8.5Z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 15.5H5A2.5 2.5 0 0 1 2.5 13V5.5A2.5 2.5 0 0 1 5 3h7.5A2.5 2.5 0 0 1 15 5.5V6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 
   copyBtn.addEventListener("click", async () => {
-    const value = String(messageDiv.textContent || text || "").trim();
+    const value = extractMessageTextForCopy(messageDiv, text);
     if (!value) return;
 
-    try {
-      await navigator.clipboard.writeText(value);
+    const copied = await copyTextToClipboard(value);
+    if (copied) {
       copyBtn.classList.add("copied");
       copyBtn.setAttribute("aria-label", "복사 완료");
       setTimeout(() => {
         copyBtn.classList.remove("copied");
         copyBtn.setAttribute("aria-label", "답변 복사");
       }, 1200);
-    } catch {
-      const textarea = document.createElement("textarea");
-      textarea.value = value;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      textarea.remove();
     }
   });
 
