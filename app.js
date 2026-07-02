@@ -717,6 +717,10 @@ function normalizeBotMessageText(text) {
     "수정 포인트:",
     "후속 작업 제안:",
     "결론:",
+    "파일 구조 요약:",
+    "핵심 이슈:",
+    "주요 리스크:",
+    "우선 조치:",
     "요약:",
     "검토 결과 요약:",
     "문제/리스크:",
@@ -744,9 +748,13 @@ function normalizeBotMessageText(text) {
 
   // 모델이 한 문단 안에 목록을 붙여서 반환하는 경우를 화면에서 읽기 좋게 보정합니다.
   value = value
+    .replace(/(^|\n)\s*(\d+)[.)]\s*\n+\s*([^\n]+)/g, "$1$2. $3")
+    .replace(/(^|\n)\s*[-•·]\s*\n+\s*([^\n]+)/g, "$1• $2")
     .replace(/([^\n])\s+(\d+\.\s+[^\n])/g, "$1\n$2")
     .replace(/([^\n])\s+(·\s+[^\n])/g, "$1\n$2")
     .replace(/([^\n])\s+([-•]\s+[^\n])/g, "$1\n$2")
+    .replace(/Excel\s*정밀\s*구조\s*분석\s*JSON의?\s*[A-Za-z0-9_.\[\],\s]+\s*정보를\s*활용하였습니다\.?/gi, "업로드된 Excel 파일의 시트별 구조, 주요 컬럼, 계산값, 데이터 품질 신호를 기준으로 작성되었습니다.")
+    .replace(/riskRegister|metricIndex|groupSummaryIndex|topRowsIndex|bottomRowsIndex|questionReady|primaryTables|businessViews|workbookIntelligence|answerGuide|sheetMeta|visualLayout|detectedTables/gi, "분석 근거")
     .replace(/\n{3,}/g, "\n\n");
 
   return value;
@@ -811,7 +819,7 @@ function renderMessageContent(div, text) {
 
 function appendFormattedLine(parent, line) {
   const headingText = getMessageHeadingText(line);
-  const labelMatch = line.match(/^(제목|본문|수정 포인트|후속 작업 제안|결론|요약|검토 결과 요약|문제\/리스크|보완 제안|확인 필요|기준 및 근거|기준\/근거|근거|다음 조치|참고)\s*:\s+(.+)$/);
+  const labelMatch = line.match(/^(제목|본문|수정 포인트|후속 작업 제안|결론|파일 구조 요약|핵심 이슈|주요 리스크|우선 조치|요약|검토 결과 요약|문제\/리스크|보완 제안|확인 필요|기준 및 근거|기준\/근거|근거|다음 조치|참고)\s*:\s+(.+)$/);
   const numberedMatch = line.match(/^(\d+)[.)]\s+(.+)$/);
   const bulletMatch = line.match(/^[-•·*]\s+(.+)$/);
 
@@ -864,7 +872,7 @@ function getMessageHeadingText(line) {
   const boldHeading = value.match(/^\*\*([^*]+)\*\*:?$/);
   if (boldHeading) return boldHeading[1].trim().replace(/:$/, "");
 
-  const sectionHeading = value.match(/^(본문|수정 포인트|후속 작업 제안|결론|요약|검토 결과 요약|문제\/리스크|보완 제안|확인 필요|기준 및 근거|기준\/근거|근거|다음 조치|참고)\s*:?$/);
+  const sectionHeading = value.match(/^(본문|수정 포인트|후속 작업 제안|결론|파일 구조 요약|핵심 이슈|주요 리스크|우선 조치|요약|검토 결과 요약|문제\/리스크|보완 제안|확인 필요|기준 및 근거|기준\/근거|근거|다음 조치|참고)\s*:?$/);
   if (sectionHeading) return sectionHeading[1].trim();
 
   return "";
