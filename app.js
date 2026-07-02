@@ -2291,124 +2291,39 @@ function addKnowledgeRedirectMessage(originalMessage = "") {
 }
 
 function shouldUseFileApi(message, hasFiles, history = []) {
-  if (!hasFiles) return false;
+  // 운영 정책: 입력창 위 파일 칩이 남아 있으면 사용자가 명시적으로 X를 누르기 전까지
+  // 현재 분석 파일이 연결된 상태로 봅니다.
+  // 따라서 메일/보고서/문장 작성처럼 보이는 요청이어도 file-api로 보내서
+  // SideTalk 지식베이스가 끼어들 가능성을 차단합니다.
+  return Boolean(hasFiles);
+}
 
+function isMissingFileReferenceQuestion(message) {
   const text = normalizeAgentText(message);
+  if (!text) return false;
 
-  // 파일만 첨부하고 입력 없이 전송한 경우
-  if (!text) return true;
-
-  /**
-   * 1순위: 강한 파일 참조
-   * 아래 표현은 사용자가 업로드/첨부 파일을 직접 가리키는 경우입니다.
-   * 이 경우에는 이메일 초안/보고서 작성 요청이어도 file-api로 보내는 게 맞습니다.
-   *
-   * 예:
-   * - 이 파일 내용으로 메일 초안 써줘
-   * - 첨부한 자료 기준으로 보고서 작성해줘
-   * - 해당 문서에서 주요 성과 알려줘
-   */
   const strongFileReferencePatterns = [
-    /(?:해당|이|위|앞)\s*(?:파일|자료|문서|내용|브로슈어)/i,
-    /(?:첨부한|첨부된|업로드한|업로드된)\s*(?:파일|자료|문서|내용|브로슈어)?/i,
-    /(?:파일|자료|문서|브로슈어)\s*(?:내용|기준|안에서|에서|상에서|내에서)/i,
-    /(?:pdf|pptx?|파워포인트|xlsx?|엑셀|docx?|워드|txt|csv)\s*(?:내용|기준|안에서|에서|상에서|내에서)/i,
-    /(?:파일|자료|문서|브로슈어)\s*(?:에\s*있는|에\s*나온|에\s*포함된|속의)/i,
-    /(?:이|해당)\s*(?:pdf|pptx?|파워포인트|xlsx?|엑셀|docx?|워드|txt|csv)/i,
+    /(?:이|해당|위|앞|방금|현재)\s*(?:파일|자료|문서|엑셀|시트|xlsx|csv|pdf|pptx?|워드|docx?)/i,
+    /(?:첨부(?:한|된)?|업로드(?:한|된)?)\s*(?:파일|자료|문서|엑셀|시트|xlsx|csv|pdf|pptx?|워드|docx?)?/i,
+    /(?:첨부\s*파일|업로드\s*파일|분석\s*파일|연결된\s*파일)/i,
+    /(?:파일|자료|문서|엑셀|시트)\s*(?:분석|요약|정리|검토|확인|기준|내용|안에서|에서|내에서)/i,
+    /(?:분석|요약|정리|검토|확인)\s*(?:해줘|해\s*줘|해주세요|해\s*주세요).{0,10}(?:파일|자료|문서|엑셀|시트)/i,
   ];
 
-  if (hasPattern(text, strongFileReferencePatterns)) {
-    return true;
-  }
+  if (hasPattern(text, strongFileReferencePatterns)) return true;
 
-  /**
-   * 2순위: 명백한 일반 업무 요청
-   * 파일 칩이 남아 있어도 아래 요청은 agent-api로 보내야 합니다.
-   *
-   * 예:
-   * - 외부 업체에 github 파일 이관 가능한지 묻는 이메일 초안 써줘
-   * - 엑셀 함수 알려줘
-   * - 보고서 제목 추천해줘
-   * - 네이버 클라우드 이관 문의 메일 작성해줘
-   */
-  const generalWorkPatterns = [
-    /메일|이메일|공문|안내문|문구|인사말|초안|작성/i,
-    /제목\s*추천|아이디어|방법|설명|개념|코드|함수|쿼리|오류|에러|번역/i,
-    /github|깃허브|네이버\s*클라우드|ncp|aws|azure/i,
-    /외부\s*업체|업체|거래처|담당자|문의|가능한지|이관|마이그레이션/i,
+  // 실제 엑셀 첨부가 없을 때 아래 업무 데이터 표현은 사내 지식베이스로 보내지지 않게 막습니다.
+  // 단, "엑셀 함수 알려줘" 같은 일반 교육성 질문은 차단하지 않습니다.
+  const sheetDataReferencePatterns = [
+    /(?:매출원장|순매출|거래번호|안전재고|누락값|중복값|이상치).{0,30}(?:분석|정리|표|합계|평균|상위|하위|리스크|알려|확인|추출)/i,
+    /(?:부서별|담당자별|거래처별|제품별|지역별|상태별|월별|일자별).{0,20}(?:합계|평균|매출|순매출|집계|표|정리)/i,
   ];
 
-  if (hasPattern(text, generalWorkPatterns)) {
-    return false;
-  }
+  return hasPattern(text, sheetDataReferencePatterns);
+}
 
-  /**
-   * 3순위: 현재 파일 칩이 남아 있고 분석/집계/리스크 성격의 요청이면 file-api를 유지합니다.
-   * 파일 칩은 사용자가 직접 X를 누르기 전까지 "현재 분석 파일"을 뜻합니다.
-   * 예: 부서별 합계, 평균, 상위 5건, 리스크, 누락값, 중복값, 프로젝트/재고 현황
-   */
-  const fileTaskPatterns = [
-    /요약|분석|정리|추출|검토|비교/i,
-    /표로|표\s*형태|목록화/i,
-    /핵심|주요\s*성과|성과|리스크|시사점|결론|근거/i,
-    /찾아|찾아서|뽑아|알려줘|확인해줘/i,
-    /합계|평균|중앙값|최대|최소|상위|하위|높은|낮은|최고|최저|순위|랭킹/i,
-    /부서별|담당자별|거래처별|제품별|지역별|상태별|월별|일자별/i,
-    /순매출|매출|수량|단가|재고|안전재고|예산|집행액|프로젝트|거래번호|누락|중복|이상치/i,
-  ];
-
-  if (hasPattern(text, fileTaskPatterns)) {
-    return true;
-  }
-
-  /**
-   * 4순위: 약한 파일 참조 + 파일 작업 동사
-   * 단독으로는 위험하지만, "요약/분석/정리"와 함께 나오면 file-api로 보냅니다.
-   *
-   * 예:
-   * - 브로슈어 요약해줘
-   * - pdf 정리해줘
-   * - 엑셀 표로 정리해줘
-   */
-  const weakFileReferencePatterns = [
-    /첨부|업로드/i,
-    /브로슈어/i,
-    /pdf|pptx?|파워포인트|xlsx?|엑셀|docx?|워드|txt|csv/i,
-    /파일|자료|문서/i,
-  ];
-
-  const hasWeakFileReference = hasPattern(text, weakFileReferencePatterns);
-  const hasFileTask = hasPattern(text, fileTaskPatterns);
-
-  if (hasWeakFileReference && hasFileTask) {
-    return true;
-  }
-
-  /**
-   * 4순위: 애매한 후속 질문
-   * 직전에 파일 분석을 했고, 현재 질문이 짧은 분석성 질문이면 file-api로 보냅니다.
-   *
-   * 예:
-   * - 주요 성과는?
-   * - 핵심은?
-   * - 표로 정리해줘
-   * - 리스크는?
-   */
-  const recentFileContext = hasRecentFileConversation(history);
-
-  if (recentFileContext && hasFileTask && isShortText(text, 45)) {
-    return true;
-  }
-
-  /**
-   * 5순위: 파일 업로드 직후 짧은 요청
-   * 파일을 첨부하고 바로 "요약해줘", "분석해줘"처럼 짧게 요청하는 경우
-   */
-  if (hasFileTask && isShortText(text, 25)) {
-    return true;
-  }
-
-  return false;
+function buildFileContextRequiredAnswer() {
+  return "현재 연결된 파일이 없습니다.\n분석할 파일을 첨부한 뒤 다시 요청해 주세요.";
 }
 
 
@@ -3146,6 +3061,18 @@ async function handleAgentFormSubmit() {
   const exportTask = decideExportTask(message);
 
   try {
+    if (!hasFiles && isMissingFileReferenceQuestion(message)) {
+      addMessage(agentBody, "user", message);
+      clearAgentComposerInput();
+
+      const answer = buildFileContextRequiredAnswer();
+      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
+
+      saveAgentMessage("user", message, { route: "file-context-required" });
+      saveAgentMessage("assistant", answer, { route: "file-context-required" });
+      return;
+    }
+
     // 사용자 입력은 네트워크 세션 복원보다 먼저 화면에 표시합니다.
     // 그래야 agent-api 세션 복원/저장 요청이 느리거나 실패해도 사용자가 전송 여부를 즉시 알 수 있습니다.
     if (exportTask === "ambiguous_export") {
