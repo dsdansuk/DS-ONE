@@ -289,6 +289,7 @@
     </div>
   </div>
 
+  <script src="config.js?v=20260707_function_only"></script>
   <script>
     const stage = document.querySelector(".home-stage");
     const fitTarget = document.querySelector("[data-fit-home]");
@@ -361,69 +362,6 @@
 
       if (profileName) profileName.textContent = displayName;
       if (profileAvatar) profileAvatar.textContent = displayName.slice(0, 1);
-    }
-
-
-    function isEmbeddedInIframe() {
-      try {
-        return window.self !== window.top;
-      } catch {
-        return true;
-      }
-    }
-
-    function buildPlatformOpenUrl() {
-      const token = sessionStorage.getItem(SSO_SESSION_TOKEN_KEY) || readSsoSessionToken();
-      const url = new URL(location.href);
-      url.searchParams.delete("launcher");
-      url.searchParams.set("open", "platform");
-      if (token) url.searchParams.set("token", token);
-      return url.toString();
-    }
-
-    function showGroupwarePlatformButton() {
-      if (document.querySelector(".iframe-launcher")) return;
-      document.body.classList.add("is-iframe-launcher");
-
-      const launcher = document.createElement("main");
-      launcher.className = "iframe-launcher";
-      launcher.innerHTML = `
-        <button
-          class="iframe-launch-button"
-          type="button"
-          title="DS ONE 업무 AI 플랫폼 새 탭 열기"
-          aria-label="DS ONE 업무 AI 플랫폼을 새 탭에서 열기"
-        >
-          <span class="iframe-launch-newtab" aria-hidden="true">↗</span>
-          <span class="iframe-launch-visual" aria-hidden="true">
-            <span class="iframe-launch-orbit"></span>
-            <span class="iframe-launch-people"><span></span><span></span><span></span></span>
-            <span class="iframe-launch-hand"></span>
-          </span>
-          <span class="iframe-launch-title">DS ONE</span>
-          <span class="iframe-launch-subtitle">업무 AI</span>
-        </button>
-      `;
-      document.body.appendChild(launcher);
-
-      const openButton = launcher.querySelector(".iframe-launch-button");
-      openButton?.addEventListener("click", () => {
-        const targetUrl = buildPlatformOpenUrl();
-        const popup = window.open(targetUrl, "_blank", "noopener,noreferrer");
-        if (!popup) {
-          let link = launcher.querySelector(".iframe-launch-fallback");
-          if (!link) {
-            link = document.createElement("a");
-            link.className = "iframe-launch-fallback";
-            link.target = "_blank";
-            link.rel = "noopener noreferrer";
-            link.textContent = "열기 ↗";
-            launcher.appendChild(link);
-          }
-          link.href = targetUrl;
-          link.focus();
-        }
-      });
     }
 
     async function bootstrapSsoProfile() {
@@ -515,13 +453,11 @@
       resizePromptTextarea();
       fitHomeToViewport();
     });
-    if (isEmbeddedInIframe()) {
-      showGroupwarePlatformButton();
-    }
     bootstrapSsoProfile();
     resizePromptTextarea();
     fitHomeToViewport();
   </script>
+  <script src="app.js?v=20260707_function_only"></script>
 </body>
 </html>
 
