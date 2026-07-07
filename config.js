@@ -22,6 +22,9 @@ window.DS_ONE_CONFIG = Object.freeze({
     agentHistoryCachePrefix: "ds_one_agent_history_v1_",
     agentHistoryCacheTtlMs: 60 * 60 * 1000,
     agentHistoryCacheMaxMessages: 20,
+    recentWorkPrefix: "ds_one_platform_recent_work_v1_",
+    recentWorkMaxItems: 8,
+    recentWorkMaxMessages: 24,
   }),
   ui: Object.freeze({
     defaultHomeGreeting: "필요한 업무를 선택해 주세요",

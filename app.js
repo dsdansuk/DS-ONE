@@ -16,7 +16,10 @@
   const DISPLAY_NAME_CACHE_KEY = STORAGE.displayNameCacheKey || "ds_chatbot_last_display_name_v1";
   const DISPLAY_NAME_CACHE_TTL_MS = Number(STORAGE.displayNameCacheTtlMs || 7 * 24 * 60 * 60 * 1000);
   const LOCAL_HISTORY_PREFIX = "ds_one_platform_recent_messages_v2_";
+  const RECENT_WORK_PREFIX = STORAGE.recentWorkPrefix || "ds_one_platform_recent_work_v1_";
   const MAX_HISTORY = Number(STORAGE.agentHistoryCacheMaxMessages || 20);
+  const MAX_RECENT_WORK = Number(STORAGE.recentWorkMaxItems || 8);
+  const MAX_STORED_CONVERSATION_MESSAGES = Number(STORAGE.recentWorkMaxMessages || 24);
 
   const ALLOWED_EXTENSIONS = (FILE_POLICY.allowedExtensions || ["txt", "md", "csv", "json", "docx", "xlsx", "pptx", "pdf"])
     .map((value) => String(value || "").toLowerCase().replace(/^\./, ""))
@@ -33,6 +36,7 @@
   let currentLoginId = "";
   let currentEmpNo = "";
   let currentMode = "home";
+  let activeConversationId = "";
 
   const state = {
     homePanel: null,
@@ -53,6 +57,8 @@
     docBackBtn: null,
     profileName: null,
     profileAvatar: null,
+    recentList: null,
+    lowerRecentList: null,
   };
 
   function init() {
@@ -75,7 +81,7 @@
     createRuntimeAgentWorkspace();
     bootstrapProfile();
     bindUiEvents();
-    restoreLocalHistory();
+    renderRecentWorkList();
     resizeTextarea(state.homePromptInput);
     resizeTextarea(state.agentMessageInput);
   }
@@ -155,7 +161,359 @@
     const style = document.createElement("style");
     style.id = "ds-one-agent-runtime-style";
     style.textContent = `
-      .home-stage.ds-agent-mode{justify-content:stretch;align-items:stretch;padding:0;background:#fff}.home-stage.ds-agent-mode::before,.home-stage.ds-agent-mode::after{display:none!important}.home-stage.ds-agent-mode .home-fit[hidden]{display:none!important}.ds-agent-workspace[hidden]{display:none!important}.ds-agent-workspace{position:relative;z-index:2;flex:1 1 auto;width:100%;min-width:0;min-height:0;height:100%;display:grid;grid-template-rows:minmax(0,1fr) auto;padding:0 clamp(18px,3vw,48px) clamp(12px,2dvh,22px);overflow:hidden;background:#fff}.ds-agent-body{min-height:0;display:flex;flex-direction:column;gap:18px;overflow-y:auto;padding:clamp(24px,7dvh,76px) 0 24px;scrollbar-width:thin}.ds-chat-row,.ds-thinking-row{width:min(960px,100%);display:flex;gap:12px;margin:0 auto}.ds-user-row{justify-content:flex-end}.ds-bot-row{justify-content:flex-start;align-items:flex-start}.ds-chat-avatar{display:none}.ds-msg{max-width:min(720px,calc(100% - 48px));padding:12px 16px;font-size:15px;line-height:1.7;word-break:keep-all;overflow-wrap:anywhere;border:0;box-shadow:none}.ds-msg.user{color:#111827;background:#f3f4f6;border-radius:20px}.ds-msg.bot{max-width:min(780px,100%);padding:0;color:#202124;background:transparent;border-radius:0}.ds-thinking-row .ds-msg{padding:0;color:#9ca3af;background:transparent;border:0;font-size:15px}.ds-msg-heading{margin:18px 0 8px;font-weight:900;font-size:16px;color:#121827}.ds-msg-heading:first-child{margin-top:0}.ds-msg-bullet{padding-left:2px}.ds-msg-table-wrap{margin:10px 0 14px}.ds-msg-table-toolbar{display:flex;justify-content:flex-end;margin-bottom:6px}.ds-msg-table-toolbar button,.ds-bot-copy-btn{height:28px;padding:0 10px;color:#2f5fb6;font-size:12px;font-weight:800;background:#eef5ff;border:1px solid #d8e6ff;border-radius:999px}.ds-msg-table-scroll{max-width:100%;overflow:auto;border:1px solid #e0e7f3;border-radius:12px;background:#fff}.ds-msg-table{width:max-content;min-width:100%;border-collapse:collapse;font-size:13px}.ds-msg-table th,.ds-msg-table td{padding:8px 10px;border-bottom:1px solid #edf1f7;text-align:left;vertical-align:top;white-space:nowrap}.ds-msg-table th{background:#f5f8fd;font-weight:900;color:#263146}.ds-bot-copy-btn{align-self:flex-start;margin-left:calc((100% - min(960px,100%))/2);opacity:.86}.ds-agent-composer{width:min(860px,100%);margin:0 auto;display:grid;gap:8px}.ds-file-chip-row,.ds-home-file-chip-row{display:flex;flex-wrap:wrap;gap:7px}.ds-file-chip{display:inline-flex;align-items:center;gap:7px;max-width:260px;min-height:30px;padding:5px 8px;color:#29456f;background:#eef5ff;border:1px solid #d8e6ff;border-radius:999px;font-size:12px;font-weight:750}.ds-file-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ds-file-chip em{font-style:normal;color:#6a7690;font-weight:700}.ds-file-chip button{width:20px;height:20px;display:grid;place-items:center;color:#6a7690;background:#fff;border:1px solid #d8e6ff;border-radius:999px}.ds-agent-input-row{display:flex;align-items:flex-end;gap:8px;padding:10px;background:#fff;border:1px solid #dfe7f2;border-radius:18px;box-shadow:0 14px 30px rgba(37,48,77,.08)}.ds-attach-btn,.ds-agent-send-btn{width:40px;height:40px;display:grid;place-items:center;flex:0 0 auto;color:#2f5fb6;background:#f2f7ff;border:1px solid #d8e6ff;border-radius:12px}.ds-agent-send-btn{color:#fff;background:linear-gradient(145deg,var(--blue,#2f6fed),#7da8ff);border-color:transparent}.ds-agent-input-row textarea{min-height:40px;max-height:160px;flex:1;resize:none;border:0;outline:0;background:transparent;color:#1b2332;font:inherit;line-height:1.5;padding:8px 4px}.ds-agent-disclaimer{margin:0;color:#8a93a5;font-size:12px;text-align:center}.ds-toast{position:fixed;left:50%;bottom:24px;z-index:9999;min-width:220px;max-width:min(420px,calc(100vw - 32px));padding:12px 14px;color:#fff;font-size:14px;font-weight:800;text-align:center;background:rgba(20,28,44,.92);border-radius:999px;box-shadow:0 14px 36px rgba(0,0,0,.18);transform:translate(-50%,12px);opacity:0;transition:opacity .18s ease,transform .18s ease}.ds-toast.show{opacity:1;transform:translate(-50%,0)}@media(max-width:900px){.ds-agent-workspace{padding:0 14px 12px}.ds-msg{max-width:min(720px,calc(100% - 24px))}.ds-agent-body{padding-top:28px}}
+      .home-stage.ds-agent-mode {
+        justify-content: stretch;
+        align-items: stretch;
+        padding: 0;
+        background:
+          radial-gradient(circle at 82% 8%, rgba(99, 142, 255, 0.08), transparent 30%),
+          linear-gradient(180deg, #fbfdff 0%, #ffffff 48%, #ffffff 100%);
+      }
+      .home-stage.ds-agent-mode::before,
+      .home-stage.ds-agent-mode::after { display: none !important; }
+      .home-stage.ds-agent-mode .home-fit[hidden],
+      .ds-agent-workspace[hidden] { display: none !important; }
+      .ds-agent-workspace {
+        position: relative;
+        z-index: 2;
+        flex: 1 1 auto;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+        height: 100%;
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        padding: 0 clamp(18px, 4vw, 72px) clamp(12px, 2dvh, 22px);
+        overflow: hidden;
+      }
+      .ds-agent-body {
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        overflow-y: auto;
+        padding: clamp(28px, 7dvh, 78px) 0 28px;
+        scrollbar-width: thin;
+      }
+      .ds-chat-row,
+      .ds-thinking-row {
+        width: min(900px, 100%);
+        display: flex;
+        gap: 12px;
+        margin: 0 auto;
+      }
+      .ds-user-row { justify-content: flex-end; }
+      .ds-bot-row { justify-content: flex-start; align-items: flex-start; }
+      .ds-chat-avatar {
+        width: 30px;
+        height: 30px;
+        flex: 0 0 auto;
+        display: grid;
+        place-items: center;
+        margin-top: 2px;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+        border-radius: 10px;
+        background: linear-gradient(145deg, #2f6fed, #80a7ff);
+        box-shadow: 0 10px 24px rgba(47, 111, 237, 0.18);
+      }
+      .ds-msg {
+        max-width: min(720px, calc(100% - 48px));
+        font-size: 15px;
+        line-height: 1.76;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+      }
+      .ds-msg.user {
+        padding: 12px 16px;
+        color: #111827;
+        background: #f3f4f6;
+        border: 1px solid rgba(226, 232, 240, 0.85);
+        border-radius: 20px 20px 6px 20px;
+        box-shadow: 0 8px 22px rgba(17, 24, 39, 0.04);
+        white-space: pre-wrap;
+      }
+      .ds-msg.bot {
+        max-width: min(820px, 100%);
+        padding: 0;
+        color: #202124;
+        background: transparent;
+      }
+      .ds-thinking-row .ds-msg {
+        padding: 0;
+        color: #8b95a8;
+        background: transparent;
+        border: 0;
+      }
+      .ds-thinking-dots {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding-top: 4px;
+      }
+      .ds-thinking-dots i {
+        width: 6px;
+        height: 6px;
+        display: block;
+        border-radius: 999px;
+        background: #9aa8bd;
+        animation: dsThinkingPulse 1.25s ease-in-out infinite;
+      }
+      .ds-thinking-dots i:nth-child(2) { animation-delay: .15s; }
+      .ds-thinking-dots i:nth-child(3) { animation-delay: .3s; }
+      @keyframes dsThinkingPulse { 0%, 80%, 100% { opacity: .35; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+      .ds-msg-heading {
+        margin: 24px 0 10px;
+        font-size: 17px;
+        line-height: 1.45;
+        font-weight: 900;
+        letter-spacing: -0.035em;
+        color: #121827;
+      }
+      .ds-msg-heading:first-child { margin-top: 0; }
+      .ds-msg-heading::before {
+        content: "";
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        margin: 0 8px 3px 0;
+        border-radius: 999px;
+        background: #2f6fed;
+      }
+      .ds-msg-paragraph,
+      .ds-msg-line {
+        margin: 0 0 12px;
+        color: #202937;
+      }
+      .ds-msg-paragraph:last-child,
+      .ds-msg-line:last-child { margin-bottom: 0; }
+      .ds-msg-spacer { height: 6px; }
+      .ds-msg-bullet,
+      .ds-msg-numbered {
+        position: relative;
+        margin: 5px 0;
+        padding-left: 18px;
+        color: #253146;
+      }
+      .ds-msg-bullet::before {
+        content: "";
+        position: absolute;
+        left: 4px;
+        top: .82em;
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: #6b8ff7;
+      }
+      .ds-msg-numbered .ds-num {
+        position: absolute;
+        left: 0;
+        color: #2f6fed;
+        font-weight: 900;
+      }
+      .ds-msg-quote {
+        margin: 10px 0 14px;
+        padding: 10px 14px;
+        color: #3e4c63;
+        background: #f8fbff;
+        border-left: 3px solid #8fb3ff;
+        border-radius: 0 12px 12px 0;
+      }
+      .ds-msg-codeblock {
+        margin: 12px 0 16px;
+        padding: 14px 16px;
+        overflow: auto;
+        color: #e5e7eb;
+        background: #111827;
+        border-radius: 14px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 13px;
+        line-height: 1.65;
+        white-space: pre;
+      }
+      .ds-msg code {
+        padding: 2px 5px;
+        color: #1e4eb3;
+        background: #eef5ff;
+        border-radius: 6px;
+        font-size: .92em;
+      }
+      .ds-msg-table-wrap { margin: 12px 0 18px; }
+      .ds-msg-table-toolbar { display: flex; justify-content: flex-end; margin-bottom: 7px; }
+      .ds-msg-table-toolbar button,
+      .ds-bot-copy-btn {
+        height: 28px;
+        padding: 0 10px;
+        color: #2f5fb6;
+        font-size: 12px;
+        font-weight: 850;
+        background: #eef5ff;
+        border: 1px solid #d8e6ff;
+        border-radius: 999px;
+      }
+      .ds-msg-table-scroll {
+        max-width: 100%;
+        overflow: auto;
+        border: 1px solid #e0e7f3;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 10px 26px rgba(37, 48, 77, 0.05);
+      }
+      .ds-msg-table {
+        width: max-content;
+        min-width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .ds-msg-table th,
+      .ds-msg-table td {
+        padding: 9px 11px;
+        border-bottom: 1px solid #edf1f7;
+        text-align: left;
+        vertical-align: top;
+        white-space: nowrap;
+      }
+      .ds-msg-table th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #f5f8fd;
+        font-weight: 900;
+        color: #263146;
+      }
+      .ds-bot-copy-btn {
+        align-self: flex-start;
+        margin-left: 42px;
+        opacity: 0;
+        transform: translateY(-2px);
+        transition: opacity .16s ease, transform .16s ease;
+      }
+      .ds-bot-row:hover .ds-bot-copy-btn,
+      .ds-bot-copy-btn:focus-visible { opacity: .92; transform: translateY(0); }
+      .ds-agent-composer {
+        width: min(860px, 100%);
+        margin: 0 auto;
+        display: grid;
+        gap: 8px;
+      }
+      .ds-file-chip-row,
+      .ds-home-file-chip-row { display: flex; flex-wrap: wrap; gap: 7px; }
+      .ds-file-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        max-width: 260px;
+        min-height: 30px;
+        padding: 5px 8px;
+        color: #29456f;
+        background: #eef5ff;
+        border: 1px solid #d8e6ff;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 750;
+      }
+      .ds-file-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .ds-file-chip em { font-style: normal; color: #6a7690; font-weight: 700; }
+      .ds-file-chip button {
+        width: 20px;
+        height: 20px;
+        display: grid;
+        place-items: center;
+        color: #6a7690;
+        background: #fff;
+        border: 1px solid #d8e6ff;
+        border-radius: 999px;
+      }
+      .ds-agent-input-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid #dfe7f2;
+        border-radius: 20px;
+        box-shadow: 0 18px 40px rgba(37, 48, 77, 0.10);
+        backdrop-filter: blur(14px);
+      }
+      .ds-attach-btn,
+      .ds-agent-send-btn {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        color: #2f5fb6;
+        background: #f2f7ff;
+        border: 1px solid #d8e6ff;
+        border-radius: 13px;
+      }
+      .ds-agent-send-btn {
+        color: #fff;
+        background: linear-gradient(145deg, var(--blue, #2f6fed), #7da8ff);
+        border-color: transparent;
+        box-shadow: 0 10px 20px rgba(47, 111, 237, 0.22);
+      }
+      .ds-agent-input-row textarea {
+        min-height: 40px;
+        max-height: 160px;
+        flex: 1;
+        resize: none;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: #1b2332;
+        font: inherit;
+        line-height: 1.5;
+        padding: 8px 4px;
+      }
+      .ds-agent-disclaimer { margin: 0; color: #8a93a5; font-size: 12px; text-align: center; }
+      .ds-recent-empty {
+        min-height: 92px;
+        display: grid;
+        place-items: center;
+        padding: 14px;
+        color: #8a93a5;
+        font-size: 13px;
+        line-height: 1.55;
+        text-align: center;
+        white-space: pre-line;
+        border: 1px dashed #d9e3f3;
+        border-radius: 16px;
+        background: rgba(248, 251, 255, 0.74);
+      }
+      .recent-item.is-active {
+        background: #eef5ff;
+        border-color: #c9dcff;
+      }
+      .ds-toast {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        z-index: 9999;
+        min-width: 220px;
+        max-width: min(420px, calc(100vw - 32px));
+        padding: 12px 14px;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 800;
+        text-align: center;
+        background: rgba(20, 28, 44, .92);
+        border-radius: 999px;
+        box-shadow: 0 14px 36px rgba(0, 0, 0, .18);
+        transform: translate(-50%, 12px);
+        opacity: 0;
+        transition: opacity .18s ease, transform .18s ease;
+      }
+      .ds-toast.show { opacity: 1; transform: translate(-50%, 0); }
+      @media (max-width: 900px) {
+        .ds-agent-workspace { padding: 0 14px 12px; }
+        .ds-chat-avatar { display: none; }
+        .ds-msg { max-width: min(720px, calc(100% - 24px)); }
+        .ds-agent-body { padding-top: 28px; }
+        .ds-bot-copy-btn { margin-left: 0; }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -168,6 +526,8 @@
     state.homeAttachBtn = document.querySelector(".prompt-card .icon-btn");
     state.profileName = document.querySelector(".profile-button strong");
     state.profileAvatar = document.querySelector(".avatar");
+    state.recentList = document.querySelector(".recent-list");
+    state.lowerRecentList = document.querySelector(".task-list");
 
     const promptCard = document.querySelector(".prompt-card");
     if (promptCard && !document.getElementById("dsHomeFileChips")) {
@@ -235,8 +595,8 @@
       const label = button.textContent.trim();
       if (label.includes("새 대화")) {
         button.addEventListener("click", () => {
-          startNewConversation();
-          setMode("doc");
+          startNewConversation({ showToast: true });
+          setMode("home");
         });
       } else if (label.includes("검색") || label.includes("즐겨찾기") || label.includes("휴지통")) {
         button.addEventListener("click", () => showToast("해당 기능은 추후 연동 예정입니다."));
@@ -285,7 +645,7 @@
       handleAgentSubmit();
     });
 
-    document.querySelectorAll(".sidebar-guide-button,.header-button,.recent-item,.task-row").forEach((button) => {
+    document.querySelectorAll(".sidebar-guide-button,.header-button,.task-row").forEach((button) => {
       button.addEventListener("click", () => showToast("해당 기능은 추후 연동 예정입니다."));
     });
     window.addEventListener("resize", () => {
@@ -353,14 +713,20 @@
     window.setTimeout(() => state.homePromptInput?.focus(), 30);
   }
 
-  function startNewConversation() {
+  function startNewConversation(options = {}) {
+    const { showToast: shouldShowToast = false } = options || {};
+    activeConversationId = "";
+    currentTask = "";
     selectedFiles = [];
     renderFileChips();
     clearMessages();
     if (state.agentMessageInput) state.agentMessageInput.value = "";
+    if (state.homePromptInput) state.homePromptInput.value = "";
     resizeTextarea(state.agentMessageInput);
+    resizeTextarea(state.homePromptInput);
     sessionStorage.removeItem(getLocalHistoryKey());
-    showToast("새 대화를 시작했습니다.");
+    renderRecentWorkList();
+    if (shouldShowToast) showToast("새 대화를 시작했습니다.");
   }
 
   function clearMessages() {
@@ -433,21 +799,29 @@
     submitInProgress = true;
     setComposerDisabled(true);
     const userText = message || "첨부한 파일을 분석해 주세요.";
-    addMessage("user", buildDisplayUserMessage(userText));
+    const history = getRecentHistory();
+    const displayUserMessage = buildDisplayUserMessage(userText);
+    ensureActiveConversation(userText, displayUserMessage);
+    appendConversationMessage("user", displayUserMessage);
+    addMessage("user", displayUserMessage);
     if (state.agentMessageInput) state.agentMessageInput.value = "";
     resizeTextarea(state.agentMessageInput);
-    const thinking = addThinkingMessage("생각 중...");
+    const thinking = addThinkingMessage("생각 중");
 
     try {
-      const history = getRecentHistory();
       const data = selectedFiles.length ? await requestFileAnalysis(userText, history) : await requestAgentAnswer(userText, history);
       thinking.remove();
       const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
       addMessage("bot", answer);
+      appendConversationMessage("assistant", answer);
       saveLocalHistory(userText, answer);
+      renderRecentWorkList();
     } catch (error) {
       thinking.remove();
-      addMessage("bot", `업무 AI Agent 처리 중 오류가 발생했습니다.\n${getErrorMessage(error)}`);
+      const errorText = `업무 AI Agent 처리 중 오류가 발생했습니다.\n${getErrorMessage(error)}`;
+      addMessage("bot", errorText);
+      appendConversationMessage("assistant", errorText);
+      renderRecentWorkList();
     } finally {
       submitInProgress = false;
       setComposerDisabled(false);
@@ -529,7 +903,11 @@
   function addThinkingMessage(text) {
     const row = document.createElement("div");
     row.className = "ds-thinking-row ds-bot-row";
-    row.innerHTML = `<span class="ds-chat-avatar">AI</span><div class="ds-msg bot">${escapeHtml(text)}</div>`;
+    row.innerHTML = `
+      <span class="ds-chat-avatar">AI</span>
+      <div class="ds-msg bot" aria-label="${escapeHtml(text)}">
+        <span class="ds-thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>`;
     state.agentBody.appendChild(row);
     state.agentBody.scrollTop = state.agentBody.scrollHeight;
     return row;
@@ -537,29 +915,127 @@
 
   function renderMessageContent(container, text) {
     container.innerHTML = "";
-    const lines = normalizeAnswerText(text).split(/\r?\n/);
-    for (let i = 0; i < lines.length; i += 1) {
-      const line = lines[i];
-      if (!line.trim()) { container.appendChild(document.createElement("br")); continue; }
-      if (isMarkdownTableStart(lines, i)) {
+    const rawLines = normalizeAnswerText(text).split(/\r?\n/);
+    let inCode = false;
+    let codeLines = [];
+
+    for (let i = 0; i < rawLines.length; i += 1) {
+      const line = rawLines[i];
+      const trimmed = line.trim();
+
+      if (/^```/.test(trimmed)) {
+        if (inCode) {
+          appendCodeBlock(container, codeLines.join("\n"));
+          codeLines = [];
+          inCode = false;
+        } else {
+          inCode = true;
+          codeLines = [];
+        }
+        continue;
+      }
+      if (inCode) {
+        codeLines.push(line);
+        continue;
+      }
+      if (!trimmed) {
+        appendSpacer(container);
+        continue;
+      }
+      if (trimmed === "표 복사") continue;
+      if (isMarkdownTableStart(rawLines, i)) {
         const tableLines = [];
-        while (i < lines.length && isMarkdownTableLine(lines[i])) { tableLines.push(lines[i]); i += 1; }
+        while (i < rawLines.length && isMarkdownTableLine(rawLines[i])) {
+          tableLines.push(rawLines[i]);
+          i += 1;
+        }
         i -= 1;
         appendMarkdownTable(container, tableLines);
         continue;
       }
+      if (/^---+$/.test(trimmed)) {
+        appendSpacer(container, true);
+        continue;
+      }
+
+      const headingText = getHeadingText(trimmed);
+      if (headingText) {
+        const div = document.createElement("div");
+        div.className = "ds-msg-heading";
+        div.textContent = headingText;
+        container.appendChild(div);
+        continue;
+      }
+
+      if (/^>\s+/.test(trimmed)) {
+        const div = document.createElement("div");
+        div.className = "ds-msg-quote";
+        appendInlineMarkdown(div, trimmed.replace(/^>\s+/, ""));
+        container.appendChild(div);
+        continue;
+      }
+
+      const numbered = trimmed.match(/^(\d+)[.)]\s+(.+)$/);
+      if (numbered) {
+        const div = document.createElement("div");
+        div.className = "ds-msg-numbered";
+        const num = document.createElement("span");
+        num.className = "ds-num";
+        num.textContent = `${numbered[1]}.`;
+        div.appendChild(num);
+        appendInlineMarkdown(div, numbered[2]);
+        container.appendChild(div);
+        continue;
+      }
+
+      if (/^[-•]\s+/.test(trimmed)) {
+        const div = document.createElement("div");
+        div.className = "ds-msg-bullet";
+        appendInlineMarkdown(div, trimmed.replace(/^[-•]\s+/, ""));
+        container.appendChild(div);
+        continue;
+      }
+
       const div = document.createElement("div");
-      const heading = line.match(/^\s*(결론|요약|분석 결과|파일 구조 요약|핵심 이슈|우선 조치|기준 및 근거|확인 필요|다음 조치)\s*:?\s*$/);
-      if (heading) { div.className = "ds-msg-heading"; div.textContent = heading[1]; }
-      else if (/^\s*[-•]\s+/.test(line)) { div.className = "ds-msg-bullet"; div.textContent = line.replace(/^\s*[-•]\s+/, "• "); }
-      else { div.className = "ds-msg-line"; appendInlineMarkdown(div, line); }
+      div.className = "ds-msg-paragraph";
+      appendInlineMarkdown(div, line);
       container.appendChild(div);
     }
+
+    if (inCode && codeLines.length) appendCodeBlock(container, codeLines.join("\n"));
+  }
+
+  function getHeadingText(line) {
+    const markdown = line.match(/^#{1,4}\s+(.+)$/);
+    if (markdown) return markdown[1].replace(/[:：]\s*$/, "").trim();
+    const section = line.match(/^\s*(결론|요약|분석 결과|파일 구조 요약|핵심 이슈|우선 조치|기준 및 근거|확인 필요|확인되지 않은 항목|다음 조치|상세 내용|참고 사항)\s*[:：]?\s*$/);
+    return section ? section[1] : "";
+  }
+
+  function appendSpacer(container, strong = false) {
+    if (!container.lastElementChild) return;
+    const spacer = document.createElement("div");
+    spacer.className = "ds-msg-spacer";
+    if (strong) spacer.style.height = "12px";
+    container.appendChild(spacer);
+  }
+
+  function appendCodeBlock(container, code) {
+    const pre = document.createElement("pre");
+    pre.className = "ds-msg-codeblock";
+    pre.textContent = String(code || "");
+    container.appendChild(pre);
   }
 
   function normalizeAnswerText(text) {
-    return String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/기준\s*\/\s*근거/g, "기준 및 근거").replace(/\n{3,}/g, "\n\n").trim();
+    return String(text || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .replace(/기준\s*\/\s*근거/g, "기준 및 근거")
+      .replace(/\n{4,}/g, "\n\n\n")
+      .trim();
   }
+
 
   function isMarkdownTableLine(line) { return /^\s*\|.+\|\s*$/.test(String(line || "")); }
   function isMarkdownTableSeparator(line) { return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(String(line || "")); }
@@ -647,26 +1123,218 @@
     } catch { return false; }
   }
 
+  function getStorageUserKey() {
+    return String(currentEmpNo || currentLoginId || "anonymous").replace(/[^a-zA-Z0-9_.:-]/g, "_");
+  }
+
   function getLocalHistoryKey() {
-    const userKey = currentEmpNo || currentLoginId || "anonymous";
-    return LOCAL_HISTORY_PREFIX + String(userKey).replace(/[^a-zA-Z0-9_.:-]/g, "_");
+    return LOCAL_HISTORY_PREFIX + getStorageUserKey();
   }
+
+  function getRecentWorkKey() {
+    return RECENT_WORK_PREFIX + getStorageUserKey();
+  }
+
   function getRecentHistory() {
-    try { const raw = sessionStorage.getItem(getLocalHistoryKey()); const data = raw ? JSON.parse(raw) : []; return Array.isArray(data) ? data.slice(-MAX_HISTORY) : []; } catch { return []; }
+    const active = getActiveConversation();
+    if (active?.messages?.length) {
+      return active.messages
+        .slice(-MAX_HISTORY)
+        .map((message) => ({ role: message.role === "assistant" ? "assistant" : "user", text: message.text || "" }));
+    }
+    try {
+      const raw = sessionStorage.getItem(getLocalHistoryKey());
+      const data = raw ? JSON.parse(raw) : [];
+      return Array.isArray(data) ? data.slice(-MAX_HISTORY) : [];
+    } catch { return []; }
   }
+
   function saveLocalHistory(userText, assistantText) {
     try {
-      const history = getRecentHistory();
+      const history = getRecentHistory().filter((message) => message.text);
       history.push({ role: "user", text: userText });
       if (assistantText) history.push({ role: "assistant", text: assistantText });
       sessionStorage.setItem(getLocalHistoryKey(), JSON.stringify(history.slice(-MAX_HISTORY)));
     } catch {}
   }
-  function restoreLocalHistory() {
-    const history = getRecentHistory();
-    if (!history.length) return;
+
+  function loadRecentWorkItems() {
+    try {
+      const raw = localStorage.getItem(getRecentWorkKey());
+      const data = raw ? JSON.parse(raw) : [];
+      return Array.isArray(data) ? data.filter((item) => item && item.id).slice(0, MAX_RECENT_WORK) : [];
+    } catch { return []; }
+  }
+
+  function saveRecentWorkItems(items) {
+    try {
+      localStorage.setItem(getRecentWorkKey(), JSON.stringify((items || []).slice(0, MAX_RECENT_WORK)));
+    } catch {}
+  }
+
+  function ensureActiveConversation(userText, displayUserMessage) {
+    if (activeConversationId) return activeConversationId;
+    activeConversationId = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const now = Date.now();
+    const title = createConversationTitle(userText);
+    const item = {
+      id: activeConversationId,
+      title,
+      preview: createConversationPreview(displayUserMessage || userText),
+      task: normalizeTask(currentTask) || currentTask || "general",
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+    };
+    const items = loadRecentWorkItems().filter((entry) => entry.id !== activeConversationId);
+    saveRecentWorkItems([item, ...items]);
+    renderRecentWorkList();
+    return activeConversationId;
+  }
+
+  function appendConversationMessage(role, text) {
+    if (!activeConversationId) return;
+    const now = Date.now();
+    const items = loadRecentWorkItems();
+    const index = items.findIndex((item) => item.id === activeConversationId);
+    if (index < 0) return;
+    const item = { ...items[index] };
+    const messages = Array.isArray(item.messages) ? item.messages.slice(-MAX_STORED_CONVERSATION_MESSAGES) : [];
+    messages.push({ role, text: String(text || ""), at: now });
+    item.messages = messages.slice(-MAX_STORED_CONVERSATION_MESSAGES);
+    item.updatedAt = now;
+    if (role === "user") item.preview = createConversationPreview(text);
+    if (!item.title || item.title === "새 업무 요청") item.title = createConversationTitle(text);
+    items.splice(index, 1);
+    saveRecentWorkItems([item, ...items]);
+    renderRecentWorkList();
+  }
+
+  function getActiveConversation() {
+    if (!activeConversationId) return null;
+    return loadRecentWorkItems().find((item) => item.id === activeConversationId) || null;
+  }
+
+  function renderRecentWorkList() {
+    const items = loadRecentWorkItems();
+    renderSidebarRecentList(items);
+    renderLowerRecentList(items);
+  }
+
+  function renderSidebarRecentList(items) {
+    if (!state.recentList) return;
+    state.recentList.innerHTML = "";
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "ds-recent-empty";
+      empty.textContent = "아직 최근 작업이 없습니다.\n업무를 요청하면 자동으로 쌓입니다.";
+      state.recentList.appendChild(empty);
+      return;
+    }
+    items.slice(0, MAX_RECENT_WORK).forEach((item) => {
+      const button = document.createElement("button");
+      button.className = `recent-item${item.id === activeConversationId ? " is-active" : ""}`;
+      button.type = "button";
+      button.dataset.conversationId = item.id;
+      button.innerHTML = `<span class="recent-item-title">${escapeHtml(item.title || "새 업무 요청")}</span><span class="recent-item-meta">${escapeHtml(formatRelativeTime(item.updatedAt))}</span>`;
+      button.addEventListener("click", () => openRecentConversation(item.id));
+      state.recentList.appendChild(button);
+    });
+  }
+
+  function renderLowerRecentList(items) {
+    if (!state.lowerRecentList) return;
+    state.lowerRecentList.innerHTML = "";
+    items.slice(0, 5).forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "task-row";
+      row.innerHTML = `
+        <span class="app-icon ${getTaskIconClass(item.task)}">${escapeHtml(getTaskIconText(item.task))}</span>
+        <div class="task-copy">
+          <p class="task-title">${escapeHtml(item.title || "새 업무 요청")}</p>
+          <p class="task-desc">${escapeHtml(item.preview || "최근 업무 요청")}</p>
+        </div>
+        <span class="time">${escapeHtml(formatRelativeTime(item.updatedAt))}</span>
+        <button class="more-btn" type="button" aria-label="대화 열기"><svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg></button>`;
+      row.addEventListener("click", () => openRecentConversation(item.id));
+      state.lowerRecentList.appendChild(row);
+    });
+  }
+
+  function openRecentConversation(conversationId) {
+    const item = loadRecentWorkItems().find((entry) => entry.id === conversationId);
+    if (!item) return;
+    activeConversationId = item.id;
+    currentTask = item.task || "";
+    selectedFiles = [];
+    renderFileChips();
+    clearMessages();
     setMode("doc");
-    history.forEach((message) => addMessage(message.role === "user" ? "user" : "bot", message.text || ""));
+    const messages = Array.isArray(item.messages) ? item.messages : [];
+    messages.forEach((message) => addMessage(message.role === "assistant" ? "bot" : "user", message.text || ""));
+    try {
+      const apiHistory = messages.map((message) => ({ role: message.role === "assistant" ? "assistant" : "user", text: message.text || "" })).slice(-MAX_HISTORY);
+      sessionStorage.setItem(getLocalHistoryKey(), JSON.stringify(apiHistory));
+    } catch {}
+    renderRecentWorkList();
+  }
+
+  function createConversationTitle(text) {
+    const cleaned = stripAttachmentBlock(text)
+      .replace(/[\r\n]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!cleaned) return "새 업무 요청";
+    return cleaned.length > 34 ? `${cleaned.slice(0, 34)}…` : cleaned;
+  }
+
+  function createConversationPreview(text) {
+    const cleaned = stripAttachmentBlock(text)
+      .replace(/[\r\n]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return cleaned.length > 72 ? `${cleaned.slice(0, 72)}…` : cleaned;
+  }
+
+  function stripAttachmentBlock(text) {
+    return String(text || "").replace(/\n\n?\[첨부 파일\][\s\S]*$/m, "").trim();
+  }
+
+  function formatRelativeTime(timestamp) {
+    const diff = Date.now() - Number(timestamp || 0);
+    if (!Number.isFinite(diff) || diff < 0) return "방금 전";
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+    if (diff < minute) return "방금 전";
+    if (diff < hour) return `${Math.floor(diff / minute)}분 전`;
+    if (diff < day) return `${Math.floor(diff / hour)}시간 전`;
+    if (diff < day * 7) return `${Math.floor(diff / day)}일 전`;
+    return new Date(Number(timestamp)).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
+  }
+
+  function getTaskIconClass(task) {
+    const value = String(task || "");
+    if (value.includes("excel")) return "excel";
+    if (value.includes("translation")) return "translate";
+    if (value.includes("summary")) return "summary";
+    if (value.includes("report")) return "report";
+    if (value.includes("file")) return "file";
+    return "doc";
+  }
+
+  function getTaskIconText(task) {
+    const value = String(task || "");
+    if (value.includes("excel")) return "X";
+    if (value.includes("translation")) return "A";
+    if (value.includes("summary")) return "≡";
+    if (value.includes("report")) return "▥";
+    if (value.includes("file")) return "▰";
+    return "▤";
+  }
+
+  function restoreLocalHistory() {
+    renderRecentWorkList();
   }
 
   function setComposerDisabled(disabled) {
@@ -737,6 +1405,7 @@
         currentLoginId = data.loginId || data.login_id || currentLoginId;
         currentEmpNo = data.empNo || data.emp_no || data.rpaAuthEmpNo || currentEmpNo;
         applyHeaderProfile(data);
+        renderRecentWorkList();
       }
     } catch {}
   }
