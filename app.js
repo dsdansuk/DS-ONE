@@ -155,7 +155,7 @@
     const style = document.createElement("style");
     style.id = "ds-one-agent-runtime-style";
     style.textContent = `
-      .home-stage.ds-agent-mode{justify-content:center;align-items:stretch;padding:0;background:radial-gradient(circle at 82% 8%,rgba(47,111,237,.065),transparent 30%),#f8fbff}.home-stage.ds-agent-mode::before,.home-stage.ds-agent-mode::after{opacity:.32}.home-stage.ds-agent-mode .home-fit[hidden]{display:none!important}.ds-agent-workspace[hidden]{display:none!important}.ds-agent-workspace{position:relative;z-index:2;flex:1 1 auto;width:100%;min-width:0;min-height:0;height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto;padding:clamp(16px,2.2dvh,28px) clamp(18px,2.8vw,42px);overflow:hidden;background:radial-gradient(circle at 78% 8%,rgba(47,111,237,.08),transparent 32%),linear-gradient(145deg,rgba(232,241,255,.72),rgba(255,255,255,.84) 40%,#f8fbff)}.ds-workspace-header{display:flex;align-items:center;gap:14px;min-height:54px;padding:0 0 clamp(12px,1.6dvh,18px)}.ds-workspace-back,.ds-workspace-new-chat{min-width:42px;height:42px;display:grid;place-items:center;color:#2e3c58;background:rgba(255,255,255,.88);border:1px solid var(--line,#e1e7f0);border-radius:8px;box-shadow:0 5px 14px rgba(37,48,77,.05);transition:background .16s ease,color .16s ease,transform .16s ease,border-color .16s ease}.ds-workspace-back{font-size:30px;line-height:1}.ds-workspace-new-chat{margin-left:auto;padding:0 16px;font-weight:800}.ds-workspace-back:hover,.ds-workspace-new-chat:hover{color:var(--blue,#2f6fed);background:#fff;border-color:#c9dbff;transform:translateY(-1px)}.ds-workspace-title{display:grid;gap:4px;min-width:0}.ds-workspace-title strong{font-size:clamp(20px,2.3dvh,26px);font-weight:850;color:var(--ink,#151a24)}.ds-workspace-title span{overflow:hidden;color:#5f6878;font-size:clamp(13px,1.5dvh,15px);font-weight:600;text-overflow:ellipsis;white-space:nowrap}.ds-agent-body{min-height:0;display:flex;flex-direction:column;gap:14px;overflow-y:auto;padding:4px 4px 16px;scrollbar-width:thin}.ds-agent-empty-card{width:min(760px,100%);margin:min(8dvh,72px) auto 0;display:grid;grid-template-columns:54px minmax(0,1fr);gap:16px;padding:clamp(18px,2.2dvh,26px);background:rgba(255,255,255,.86);border:1px solid var(--line,#e1e7f0);border-radius:18px;box-shadow:0 14px 32px rgba(37,48,77,.08)}.ds-empty-badge{width:54px;height:54px;display:grid;place-items:center;color:#fff;font-size:25px;background:linear-gradient(145deg,var(--blue,#2f6fed),#8ab0ff);border-radius:16px;box-shadow:0 10px 20px rgba(47,111,237,.2)}.ds-agent-empty-card strong{display:block;margin:2px 0 8px;font-size:18px;font-weight:850}.ds-agent-empty-card p{margin:0;color:#5f6878;font-size:14px;line-height:1.55}.ds-agent-suggestion-grid{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}.ds-agent-suggestion-btn{min-height:34px;padding:0 12px;color:#2f5fb6;font-weight:800;background:#f2f7ff;border:1px solid #d8e6ff;border-radius:999px}.ds-chat-row,.ds-thinking-row{width:min(980px,100%);display:flex;gap:10px;margin:0 auto}.ds-user-row{justify-content:flex-end}.ds-bot-row{justify-content:flex-start;align-items:flex-start}.ds-chat-avatar{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:900;background:linear-gradient(145deg,var(--blue,#2f6fed),#7da8ff);border-radius:11px;box-shadow:0 8px 18px rgba(47,111,237,.15)}.ds-msg{max-width:min(760px,calc(100% - 44px));padding:13px 15px;font-size:14px;line-height:1.65;word-break:keep-all;overflow-wrap:anywhere;border:1px solid rgba(225,231,240,.9);box-shadow:0 8px 20px rgba(37,48,77,.06)}.ds-msg.user{color:#fff;background:linear-gradient(145deg,var(--blue,#2f6fed),#6e98ff);border-color:transparent;border-radius:18px 18px 4px 18px}.ds-msg.bot{color:#283144;background:rgba(255,255,255,.93);border-radius:4px 18px 18px 18px}.ds-msg-heading{margin:14px 0 6px;font-weight:900;font-size:16px;color:#121827}.ds-msg-heading:first-child{margin-top:0}.ds-msg-bullet{padding-left:2px}.ds-msg-table-wrap{margin:10px 0 14px}.ds-msg-table-toolbar{display:flex;justify-content:flex-end;margin-bottom:6px}.ds-msg-table-toolbar button,.ds-bot-copy-btn{height:28px;padding:0 10px;color:#2f5fb6;font-size:12px;font-weight:800;background:#eef5ff;border:1px solid #d8e6ff;border-radius:999px}.ds-msg-table-scroll{max-width:100%;overflow:auto;border:1px solid #e0e7f3;border-radius:12px;background:#fff}.ds-msg-table{width:max-content;min-width:100%;border-collapse:collapse;font-size:13px}.ds-msg-table th,.ds-msg-table td{padding:8px 10px;border-bottom:1px solid #edf1f7;text-align:left;vertical-align:top;white-space:nowrap}.ds-msg-table th{background:#f5f8fd;font-weight:900;color:#263146}.ds-bot-copy-btn{align-self:flex-end;opacity:.88}.ds-agent-composer{width:min(980px,100%);margin:0 auto;display:grid;gap:8px}.ds-file-chip-row,.ds-home-file-chip-row{display:flex;flex-wrap:wrap;gap:7px}.ds-file-chip{display:inline-flex;align-items:center;gap:7px;max-width:260px;min-height:30px;padding:5px 8px;color:#29456f;background:#eef5ff;border:1px solid #d8e6ff;border-radius:999px;font-size:12px;font-weight:750}.ds-file-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ds-file-chip em{font-style:normal;color:#6a7690;font-weight:700}.ds-file-chip button{width:20px;height:20px;display:grid;place-items:center;color:#6a7690;background:#fff;border:1px solid #d8e6ff;border-radius:999px}.ds-agent-input-row{display:flex;align-items:flex-end;gap:8px;padding:10px;background:rgba(255,255,255,.94);border:1px solid #dfe7f2;border-radius:18px;box-shadow:0 14px 30px rgba(37,48,77,.08)}.ds-attach-btn,.ds-agent-send-btn{width:40px;height:40px;display:grid;place-items:center;flex:0 0 auto;color:#2f5fb6;background:#f2f7ff;border:1px solid #d8e6ff;border-radius:12px}.ds-agent-send-btn{color:#fff;background:linear-gradient(145deg,var(--blue,#2f6fed),#7da8ff);border-color:transparent}.ds-agent-input-row textarea{min-height:40px;max-height:160px;flex:1;resize:none;border:0;outline:0;background:transparent;color:#1b2332;font:inherit;line-height:1.5;padding:8px 4px}.ds-agent-disclaimer{margin:0;color:#778090;font-size:12px;text-align:center}.ds-toast{position:fixed;left:50%;bottom:24px;z-index:9999;min-width:220px;max-width:min(420px,calc(100vw - 32px));padding:12px 14px;color:#fff;font-size:14px;font-weight:800;text-align:center;background:rgba(20,28,44,.92);border-radius:999px;box-shadow:0 14px 36px rgba(0,0,0,.18);transform:translate(-50%,12px);opacity:0;transition:opacity .18s ease,transform .18s ease}.ds-toast.show{opacity:1;transform:translate(-50%,0)}@media(max-width:900px){.ds-agent-workspace{padding:14px}.ds-workspace-title span{display:none}.ds-agent-empty-card{grid-template-columns:1fr}.ds-empty-badge{display:none}}
+      .home-stage.ds-agent-mode{justify-content:stretch;align-items:stretch;padding:0;background:#fff}.home-stage.ds-agent-mode::before,.home-stage.ds-agent-mode::after{display:none!important}.home-stage.ds-agent-mode .home-fit[hidden]{display:none!important}.ds-agent-workspace[hidden]{display:none!important}.ds-agent-workspace{position:relative;z-index:2;flex:1 1 auto;width:100%;min-width:0;min-height:0;height:100%;display:grid;grid-template-rows:minmax(0,1fr) auto;padding:0 clamp(18px,3vw,48px) clamp(12px,2dvh,22px);overflow:hidden;background:#fff}.ds-agent-body{min-height:0;display:flex;flex-direction:column;gap:18px;overflow-y:auto;padding:clamp(24px,7dvh,76px) 0 24px;scrollbar-width:thin}.ds-chat-row,.ds-thinking-row{width:min(960px,100%);display:flex;gap:12px;margin:0 auto}.ds-user-row{justify-content:flex-end}.ds-bot-row{justify-content:flex-start;align-items:flex-start}.ds-chat-avatar{display:none}.ds-msg{max-width:min(720px,calc(100% - 48px));padding:12px 16px;font-size:15px;line-height:1.7;word-break:keep-all;overflow-wrap:anywhere;border:0;box-shadow:none}.ds-msg.user{color:#111827;background:#f3f4f6;border-radius:20px}.ds-msg.bot{max-width:min(780px,100%);padding:0;color:#202124;background:transparent;border-radius:0}.ds-thinking-row .ds-msg{padding:0;color:#9ca3af;background:transparent;border:0;font-size:15px}.ds-msg-heading{margin:18px 0 8px;font-weight:900;font-size:16px;color:#121827}.ds-msg-heading:first-child{margin-top:0}.ds-msg-bullet{padding-left:2px}.ds-msg-table-wrap{margin:10px 0 14px}.ds-msg-table-toolbar{display:flex;justify-content:flex-end;margin-bottom:6px}.ds-msg-table-toolbar button,.ds-bot-copy-btn{height:28px;padding:0 10px;color:#2f5fb6;font-size:12px;font-weight:800;background:#eef5ff;border:1px solid #d8e6ff;border-radius:999px}.ds-msg-table-scroll{max-width:100%;overflow:auto;border:1px solid #e0e7f3;border-radius:12px;background:#fff}.ds-msg-table{width:max-content;min-width:100%;border-collapse:collapse;font-size:13px}.ds-msg-table th,.ds-msg-table td{padding:8px 10px;border-bottom:1px solid #edf1f7;text-align:left;vertical-align:top;white-space:nowrap}.ds-msg-table th{background:#f5f8fd;font-weight:900;color:#263146}.ds-bot-copy-btn{align-self:flex-start;margin-left:calc((100% - min(960px,100%))/2);opacity:.86}.ds-agent-composer{width:min(860px,100%);margin:0 auto;display:grid;gap:8px}.ds-file-chip-row,.ds-home-file-chip-row{display:flex;flex-wrap:wrap;gap:7px}.ds-file-chip{display:inline-flex;align-items:center;gap:7px;max-width:260px;min-height:30px;padding:5px 8px;color:#29456f;background:#eef5ff;border:1px solid #d8e6ff;border-radius:999px;font-size:12px;font-weight:750}.ds-file-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ds-file-chip em{font-style:normal;color:#6a7690;font-weight:700}.ds-file-chip button{width:20px;height:20px;display:grid;place-items:center;color:#6a7690;background:#fff;border:1px solid #d8e6ff;border-radius:999px}.ds-agent-input-row{display:flex;align-items:flex-end;gap:8px;padding:10px;background:#fff;border:1px solid #dfe7f2;border-radius:18px;box-shadow:0 14px 30px rgba(37,48,77,.08)}.ds-attach-btn,.ds-agent-send-btn{width:40px;height:40px;display:grid;place-items:center;flex:0 0 auto;color:#2f5fb6;background:#f2f7ff;border:1px solid #d8e6ff;border-radius:12px}.ds-agent-send-btn{color:#fff;background:linear-gradient(145deg,var(--blue,#2f6fed),#7da8ff);border-color:transparent}.ds-agent-input-row textarea{min-height:40px;max-height:160px;flex:1;resize:none;border:0;outline:0;background:transparent;color:#1b2332;font:inherit;line-height:1.5;padding:8px 4px}.ds-agent-disclaimer{margin:0;color:#8a93a5;font-size:12px;text-align:center}.ds-toast{position:fixed;left:50%;bottom:24px;z-index:9999;min-width:220px;max-width:min(420px,calc(100vw - 32px));padding:12px 14px;color:#fff;font-size:14px;font-weight:800;text-align:center;background:rgba(20,28,44,.92);border-radius:999px;box-shadow:0 14px 36px rgba(0,0,0,.18);transform:translate(-50%,12px);opacity:0;transition:opacity .18s ease,transform .18s ease}.ds-toast.show{opacity:1;transform:translate(-50%,0)}@media(max-width:900px){.ds-agent-workspace{padding:0 14px 12px}.ds-msg{max-width:min(720px,calc(100% - 24px))}.ds-agent-body{padding-top:28px}}
     `;
     document.head.appendChild(style);
   }
@@ -202,36 +202,14 @@
     panel.hidden = true;
     panel.setAttribute("aria-label", "업무 AI Agent 대화");
     panel.innerHTML = `
-      <header class="ds-workspace-header">
-        <button id="dsDocBackBtn" class="ds-workspace-back" type="button" aria-label="홈으로 돌아가기">‹</button>
-        <div class="ds-workspace-title">
-          <strong>업무 AI Agent</strong>
-          <span>문서 작성, 요약, 번역, 엑셀 분석, 파일 기반 질문을 도와드립니다.</span>
-        </div>
-        <button id="dsAgentNewChatBtn" class="ds-workspace-new-chat" type="button">새 대화</button>
-      </header>
-      <div id="dsAgentBody" class="ds-agent-body" aria-live="polite">
-        <section class="ds-agent-empty-card" aria-label="업무 AI 안내">
-          <div class="ds-empty-badge" aria-hidden="true">✦</div>
-          <div>
-            <strong>필요한 업무를 자연스럽게 입력해 주세요.</strong>
-            <p>파일을 첨부하면 문서·엑셀·PDF 내용을 기준으로 더 정확하게 답변합니다.</p>
-          </div>
-          <div class="ds-agent-suggestion-grid" aria-label="추천 요청">
-            <button class="ds-agent-suggestion-btn" type="button" data-template="아래 내용을 정중한 업무 메일로 다듬어 주세요.\n\n[내용]\n">메일 초안</button>
-            <button class="ds-agent-suggestion-btn" type="button" data-template="아래 회의 내용을 회의록으로 정리해 주세요.\n\n[회의 내용]\n">회의록</button>
-            <button class="ds-agent-suggestion-btn" type="button" data-template="첨부한 파일의 핵심 내용을 요약하고 주요 이슈를 알려주세요.">파일 요약</button>
-            <button class="ds-agent-suggestion-btn" type="button" data-template="첨부한 엑셀 파일에서 이상값, 누락, 중복, 주요 리스크를 분석해 주세요.">엑셀 분석</button>
-          </div>
-        </section>
-      </div>
+      <div id="dsAgentBody" class="ds-agent-body" aria-live="polite"></div>
       <form id="dsAgentForm" class="ds-agent-composer" autocomplete="off">
         <div id="dsAgentFileChips" class="ds-file-chip-row" hidden aria-label="첨부 파일 목록"></div>
         <div class="ds-agent-input-row">
           <button id="dsAgentAttachBtn" class="ds-attach-btn" type="button" aria-label="파일 첨부" title="파일 첨부">
             <svg class="icon" aria-hidden="true"><use href="#i-clip"></use></svg>
           </button>
-          <textarea id="dsAgentMessageInput" rows="1" placeholder="업무 요청을 입력하세요. Shift+Enter로 줄바꿈"></textarea>
+          <textarea id="dsAgentMessageInput" rows="1" placeholder="메시지를 입력하세요. Shift+Enter로 줄바꿈"></textarea>
           <button id="dsAgentSendBtn" class="ds-agent-send-btn" type="submit" aria-label="전송">
             <svg class="icon" aria-hidden="true"><use href="#i-send"></use></svg>
           </button>
@@ -248,8 +226,8 @@
     state.agentSendBtn = document.getElementById("dsAgentSendBtn");
     state.agentAttachBtn = document.getElementById("dsAgentAttachBtn");
     state.agentFileChips = document.getElementById("dsAgentFileChips");
-    state.agentNewChatBtn = document.getElementById("dsAgentNewChatBtn");
-    state.docBackBtn = document.getElementById("dsDocBackBtn");
+    state.agentNewChatBtn = null;
+    state.docBackBtn = null;
   }
 
   function bindUiEvents() {
@@ -269,8 +247,7 @@
       card.addEventListener("click", () => {
         const meta = getCardTemplate(card);
         currentTask = meta.task;
-        setMode("doc");
-        if (meta.template) setAgentInput(meta.template);
+        if (meta.template) setHomeInput(meta.template);
         if (meta.attach) state.fileInput?.click();
       });
     });
@@ -369,6 +346,13 @@
     window.setTimeout(() => state.agentMessageInput?.focus(), 30);
   }
 
+  function setHomeInput(value) {
+    if (!state.homePromptInput) return;
+    state.homePromptInput.value = String(value || "");
+    resizeTextarea(state.homePromptInput);
+    window.setTimeout(() => state.homePromptInput?.focus(), 30);
+  }
+
   function startNewConversation() {
     selectedFiles = [];
     renderFileChips();
@@ -452,7 +436,7 @@
     addMessage("user", buildDisplayUserMessage(userText));
     if (state.agentMessageInput) state.agentMessageInput.value = "";
     resizeTextarea(state.agentMessageInput);
-    const thinking = addThinkingMessage(selectedFiles.length ? "파일을 분석하고 있습니다..." : "답변을 작성하고 있습니다...");
+    const thinking = addThinkingMessage("생각 중...");
 
     try {
       const history = getRecentHistory();
