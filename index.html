@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DS ONE 업무 AI Agent 홈</title>
-  <link rel="stylesheet" href="style.css?v=20260708_groupware_108_platform">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <svg class="sr-only" aria-hidden="true">
@@ -57,25 +57,21 @@
     <div class="main-shell">
       <aside class="sidebar" aria-label="주요 메뉴">
         <nav class="nav-group">
-          <button class="menu-item is-active" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-home"></use></svg>
-            <span>홈</span>
-          </button>
           <button class="menu-item" type="button">
             <svg class="icon" aria-hidden="true"><use href="#i-chat"></use></svg>
             <span>새 대화</span>
           </button>
           <button class="menu-item" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-file"></use></svg>
-            <span>문서 파일</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <span>채팅 검색</span>
           </button>
           <button class="menu-item" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-agent"></use></svg>
-            <span>에이전트</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-star"></use></svg>
+            <span>즐겨찾기</span>
           </button>
           <button class="menu-item" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-template"></use></svg>
-            <span>템플릿</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg>
+            <span>휴지통</span>
           </button>
         </nav>
 
@@ -110,7 +106,7 @@
         </section>
       </aside>
 
-      <main id="homePanel" class="home-stage platform-panel active" aria-label="홈">
+      <main class="home-stage" aria-label="홈">
         <div class="home-fit" data-fit-home>
           <section class="hero" aria-labelledby="home-title">
             <h1 id="home-title">무엇을 도와드릴까요?<span class="sparkle">✦</span></h1>
@@ -118,25 +114,21 @@
           </section>
 
           <section class="prompt-card" aria-label="메시지 입력">
-            <textarea id="homePromptInput" aria-label="메시지 입력" placeholder="메시지를 입력하세요.   (예: 회의록 요약해줘)"></textarea>
+            <textarea aria-label="메시지 입력" placeholder="메시지를 입력하세요.   (예: 회의록 요약해줘)"></textarea>
             <div class="prompt-toolbar">
               <div class="prompt-left">
-                <button id="homeAttachBtn" class="icon-btn" type="button" aria-label="파일 첨부">
+                <button class="icon-btn" type="button" aria-label="파일 첨부">
                   <svg class="icon" aria-hidden="true"><use href="#i-clip"></use></svg>
                 </button>
               </div>
-              <button id="homeSendBtn" class="send-btn" type="button" aria-label="전송">
+              <button class="send-btn" type="button" aria-label="전송">
                 <svg class="icon" aria-hidden="true"><use href="#i-send"></use></svg>
               </button>
             </div>
-            <div id="homeFileChips" class="home-file-chip-row" hidden aria-label="첨부 파일 목록"></div>
           </section>
 
           <section class="action-grid" aria-label="빠른 작업">
-            <button id="docWriteBtn" class="action-card" type="button" data-task="document_draft" data-template="아래 내용을 바탕으로 업무용 문서 초안을 작성해 주세요.
-
-[작성할 내용]
-">
+            <button class="action-card" type="button">
               <span class="card-head">
                 <span class="app-icon doc">▤</span>
                 <span class="card-title">문서 작성</span>
@@ -144,10 +136,7 @@
               <span class="card-desc">기획서, 보고서, 메일<br>초안 작성 등</span>
             </button>
 
-            <button class="action-card" type="button" data-task="document_summary" data-template="아래 내용을 핵심만 간결하게 요약해 주세요.
-
-[요약할 내용]
-">
+            <button class="action-card" type="button">
               <span class="card-head">
                 <span class="app-icon summary">≡</span>
                 <span class="card-title">요약</span>
@@ -155,10 +144,7 @@
               <span class="card-desc">긴 문서나 회의 내용을<br>핵심만 요약</span>
             </button>
 
-            <button class="action-card" type="button" data-task="translation" data-template="아래 문서를 자연스러운 업무 문체로 번역해 주세요.
-
-[번역할 내용]
-">
+            <button class="action-card" type="button">
               <span class="card-head">
                 <span class="app-icon translate">A</span>
                 <span class="card-title">번역</span>
@@ -166,7 +152,7 @@
               <span class="card-desc">다국어 문서를<br>자연스럽게 번역</span>
             </button>
 
-            <button class="action-card" type="button" data-task="excel_analysis" data-template="첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요.">
+            <button class="action-card" type="button">
               <span class="card-head">
                 <span class="app-icon excel">X</span>
                 <span class="card-title">엑셀 분석</span>
@@ -174,10 +160,7 @@
               <span class="card-desc">데이터 분석 및<br>시각화, 인사이트 도출</span>
             </button>
 
-            <button class="action-card" type="button" data-task="file_question" data-template="첨부한 파일을 기준으로 질문에 답변해 주세요.
-
-[질문]
-">
+            <button class="action-card" type="button">
               <span class="card-head">
                 <span class="app-icon file">▰</span>
                 <span class="card-title">파일 기반 질문</span>
@@ -185,10 +168,7 @@
               <span class="card-desc">파일을 업로드하고<br>질문하기</span>
             </button>
 
-            <button class="action-card" type="button" data-task="report_summary" data-template="아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.
-
-[정리할 내용]
-">
+            <button class="action-card" type="button">
               <span class="card-head">
                 <span class="app-icon report">▥</span>
                 <span class="card-title">보고서 정리</span>
@@ -306,52 +286,242 @@
           </section>
         </div>
       </main>
-
-      <section id="docPanel" class="platform-panel agent-workspace" aria-label="업무 AI Agent 대화" hidden>
-        <header class="workspace-header">
-          <button id="docBackBtn" class="workspace-back" type="button" aria-label="홈으로 돌아가기">‹</button>
-          <div class="workspace-title-group">
-            <strong>업무 AI Agent</strong>
-            <span>문서 작성, 요약, 번역, 엑셀 분석, 파일 기반 질문을 도와드립니다.</span>
-          </div>
-          <button id="agentNewChatBtn" class="workspace-new-chat" type="button">새 대화</button>
-        </header>
-
-        <div id="agentBody" class="agent-body" aria-live="polite">
-          <section class="agent-empty-card" aria-label="업무 AI 안내">
-            <div class="empty-badge" aria-hidden="true">✦</div>
-            <div>
-              <strong>필요한 업무를 자연스럽게 입력해 주세요.</strong>
-              <p>파일을 첨부하면 문서·엑셀·PDF 내용을 기준으로 더 정확하게 답변합니다.</p>
-            </div>
-            <div class="agent-suggestion-grid" aria-label="추천 요청">
-              <button class="agent-suggestion-btn" type="button" data-template="아래 내용을 정중한 업무 메일로 다듬어 주세요.\n\n[내용]\n">메일 초안</button>
-              <button class="agent-suggestion-btn" type="button" data-template="아래 회의 내용을 회의록으로 정리해 주세요.\n\n[회의 내용]\n">회의록</button>
-              <button class="agent-suggestion-btn" type="button" data-template="첨부한 파일의 핵심 내용을 요약하고 주요 이슈를 알려주세요.">파일 요약</button>
-              <button class="agent-suggestion-btn" type="button" data-template="첨부한 엑셀 파일에서 이상값, 누락, 중복, 주요 리스크를 분석해 주세요.">엑셀 분석</button>
-            </div>
-          </section>
-        </div>
-
-        <form id="agentForm" class="agent-composer" autocomplete="off">
-          <input id="platformFileInput" class="agent-file-input" type="file" multiple hidden accept=".txt,.md,.csv,.json,.docx,.xlsx,.pptx,.pdf" />
-          <div id="agentFileChips" class="file-chip-row" hidden aria-label="첨부 파일 목록"></div>
-          <div class="agent-input-row">
-            <button id="agentAttachBtn" class="attach-btn" type="button" aria-label="파일 첨부" title="파일 첨부">
-              <svg class="icon" aria-hidden="true"><use href="#i-clip"></use></svg>
-            </button>
-            <textarea id="agentMessageInput" rows="1" placeholder="업무 요청을 입력하세요. Shift+Enter로 줄바꿈"></textarea>
-            <button id="agentSendBtn" class="agent-send-btn" type="submit" aria-label="전송">
-              <svg class="icon" aria-hidden="true"><use href="#i-send"></use></svg>
-            </button>
-          </div>
-          <p class="agent-disclaimer">AI 답변은 참고용입니다. 중요한 업무에는 근거와 원문을 확인해 주세요.</p>
-        </form>
-      </section>
     </div>
   </div>
 
-  <script src="config.js?v=20260707_groupware_108_platform"></script>
-  <script src="app.js?v=20260707_groupware_108_platform"></script>
+  <script>
+    const stage = document.querySelector(".home-stage");
+    const fitTarget = document.querySelector("[data-fit-home]");
+    const promptTextarea = document.querySelector(".prompt-card textarea");
+    const profileName = document.querySelector(".profile-button strong");
+    const profileAvatar = document.querySelector(".avatar");
+    const DS_ONE_CONFIG = window.DS_ONE_CONFIG || {};
+    const AI_API_URL = DS_ONE_CONFIG.endpoints?.aiApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/ai-api";
+    const SSO_SESSION_TOKEN_KEY = "sso_session_token";
+
+    function readSsoSessionToken() {
+      const url = new URL(location.href);
+      const tokenFromUrl = url.searchParams.get("token");
+
+      if (tokenFromUrl) {
+        sessionStorage.setItem(SSO_SESSION_TOKEN_KEY, tokenFromUrl);
+        url.searchParams.delete("token");
+        history.replaceState({}, "", url.toString());
+        return tokenFromUrl;
+      }
+
+      return sessionStorage.getItem(SSO_SESSION_TOKEN_KEY) || "";
+    }
+
+    function decodeSessionTokenPayload(token) {
+      const body = String(token || "").split(".")[0];
+      if (!body) return null;
+
+      try {
+        let base64 = body.replaceAll("-", "+").replaceAll("_", "/");
+        while (base64.length % 4) base64 += "=";
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+
+        const payload = JSON.parse(new TextDecoder().decode(bytes));
+        if (payload.exp && Number(payload.exp) * 1000 < Date.now()) {
+          sessionStorage.removeItem(SSO_SESSION_TOKEN_KEY);
+          return null;
+        }
+        return payload;
+      } catch {
+        return null;
+      }
+    }
+
+    function getDisplayName(profile) {
+      const candidates = [
+        profile?.userName,
+        profile?.user_name,
+        profile?.name,
+        profile?.displayName,
+        profile?.display_name,
+        profile?.empName,
+        profile?.empNm,
+        profile?.loginId,
+        profile?.login_id,
+        profile?.empNo,
+        profile?.emp_no,
+      ];
+
+      return candidates
+        .map((value) => String(value || "").trim())
+        .find((value) => value && value !== "undefined" && value !== "null") || "";
+    }
+
+    function applyHeaderProfile(profile) {
+      const displayName = getDisplayName(profile);
+      if (!displayName) return;
+
+      if (profileName) profileName.textContent = displayName;
+      if (profileAvatar) profileAvatar.textContent = displayName.slice(0, 1);
+    }
+
+
+    function isEmbeddedInIframe() {
+      try {
+        return window.self !== window.top;
+      } catch {
+        return true;
+      }
+    }
+
+    function buildPlatformOpenUrl() {
+      const token = sessionStorage.getItem(SSO_SESSION_TOKEN_KEY) || readSsoSessionToken();
+      const url = new URL(location.href);
+      url.searchParams.delete("launcher");
+      url.searchParams.set("open", "platform");
+      if (token) url.searchParams.set("token", token);
+      return url.toString();
+    }
+
+    function showGroupwarePlatformButton() {
+      if (document.querySelector(".iframe-launcher")) return;
+      document.body.classList.add("is-iframe-launcher");
+
+      const launcher = document.createElement("main");
+      launcher.className = "iframe-launcher";
+      launcher.innerHTML = `
+        <button
+          class="iframe-launch-button"
+          type="button"
+          title="DS ONE 업무 AI 플랫폼 새 탭 열기"
+          aria-label="DS ONE 업무 AI 플랫폼을 새 탭에서 열기"
+        >
+          <span class="iframe-launch-newtab" aria-hidden="true">↗</span>
+          <span class="iframe-launch-visual" aria-hidden="true">
+            <span class="iframe-launch-orbit"></span>
+            <span class="iframe-launch-people"><span></span><span></span><span></span></span>
+            <span class="iframe-launch-hand"></span>
+          </span>
+          <span class="iframe-launch-title">DS ONE</span>
+          <span class="iframe-launch-subtitle">업무 AI</span>
+        </button>
+      `;
+      document.body.appendChild(launcher);
+
+      const openButton = launcher.querySelector(".iframe-launch-button");
+      openButton?.addEventListener("click", () => {
+        const targetUrl = buildPlatformOpenUrl();
+        const popup = window.open(targetUrl, "_blank", "noopener,noreferrer");
+        if (!popup) {
+          let link = launcher.querySelector(".iframe-launch-fallback");
+          if (!link) {
+            link = document.createElement("a");
+            link.className = "iframe-launch-fallback";
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = "열기 ↗";
+            launcher.appendChild(link);
+          }
+          link.href = targetUrl;
+          link.focus();
+        }
+      });
+    }
+
+    async function bootstrapSsoProfile() {
+      const token = readSsoSessionToken();
+      if (!token) return;
+
+      const tokenProfile = decodeSessionTokenPayload(token);
+      if (tokenProfile) applyHeaderProfile(tokenProfile);
+
+      try {
+        const res = await fetch(AI_API_URL, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const profile = await res.json().catch(() => null);
+        if (res.ok && profile?.ok) applyHeaderProfile(profile);
+      } catch {
+        // 로컬 file:// 또는 허용되지 않은 Origin에서는 프로필 조회가 실패할 수 있습니다.
+        // 이 경우 URL 토큰 payload에서 읽은 loginId/empNo 표시만 유지합니다.
+      }
+    }
+
+    function resizePromptTextarea() {
+      if (!promptTextarea) return;
+
+      const promptCard = promptTextarea.closest(".prompt-card");
+      const styles = getComputedStyle(promptTextarea);
+      const lineHeight = Number.parseFloat(styles.lineHeight) || 24;
+      const maxHeight = Math.max(lineHeight * 3, Math.min(window.innerHeight * 0.24, 168));
+
+      promptTextarea.style.height = "auto";
+      const nextHeight = Math.min(promptTextarea.scrollHeight, maxHeight);
+      promptTextarea.style.height = `${Math.ceil(nextHeight)}px`;
+      promptTextarea.style.overflowY = promptTextarea.scrollHeight > maxHeight ? "auto" : "hidden";
+      promptCard?.classList.toggle("is-scrollable", promptTextarea.scrollHeight > maxHeight);
+    }
+
+    function fitHomeToViewport() {
+      if (!stage || !fitTarget) return;
+
+      const previousScale = Number.parseFloat(getComputedStyle(fitTarget).getPropertyValue("--home-scale")) || 1;
+      fitTarget.style.setProperty("--home-scale", "1");
+
+      const stageRect = stage.getBoundingClientRect();
+      const stageStyle = getComputedStyle(stage);
+      const availableHeight = Math.max(
+        0,
+        stage.clientHeight - parseFloat(stageStyle.paddingTop) - parseFloat(stageStyle.paddingBottom)
+      );
+      const availableWidth = Math.max(
+        0,
+        stage.clientWidth - parseFloat(stageStyle.paddingLeft) - parseFloat(stageStyle.paddingRight)
+      );
+      const naturalHeight = fitTarget.scrollHeight;
+      const naturalWidth = fitTarget.scrollWidth;
+
+      let nextScale = Math.min(1, availableHeight / naturalHeight, availableWidth / naturalWidth);
+      nextScale = Math.max(0.48, Number.isFinite(nextScale) ? nextScale : 1);
+
+      fitTarget.style.setProperty("--home-scale", nextScale.toFixed(3));
+      stage.style.alignItems = nextScale < 0.96 ? "flex-start" : "center";
+
+      if (Math.abs(previousScale - nextScale) > 0.001) {
+        requestAnimationFrame(() => {
+          const visualHeight = fitTarget.getBoundingClientRect().height;
+          if (visualHeight > stageRect.height + 1 && nextScale > 0.62) {
+            fitHomeToViewport();
+          }
+        });
+      }
+    }
+
+    const resizeObserver = new ResizeObserver(fitHomeToViewport);
+    resizeObserver.observe(document.documentElement);
+    resizeObserver.observe(stage);
+    resizeObserver.observe(fitTarget);
+    promptTextarea?.addEventListener("input", () => {
+      resizePromptTextarea();
+      fitHomeToViewport();
+    });
+    window.addEventListener("load", () => {
+      resizePromptTextarea();
+      fitHomeToViewport();
+    });
+    window.addEventListener("resize", () => {
+      resizePromptTextarea();
+      fitHomeToViewport();
+    });
+    if (isEmbeddedInIframe()) {
+      showGroupwarePlatformButton();
+    }
+    bootstrapSsoProfile();
+    resizePromptTextarea();
+    fitHomeToViewport();
+  </script>
 </body>
 </html>
+
