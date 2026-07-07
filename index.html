@@ -1,231 +1,394 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="referrer" content="no-referrer" />
-  <title>DS ONE</title>
-  <link rel="stylesheet" href="./style.css?v=20260707_agent_history_security" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DS ONE 업무 AI Agent 홈</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="wrap">
-    <header class="header" aria-label="DS ONE 인증 정보">
-      <div>
-        <div class="title">DS ONE</div>
-        <div id="userInfo" class="user-info"></div>
+  <svg class="sr-only" aria-hidden="true">
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/><path d="M8 9h8"/><path d="M8 13h5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h6"/></symbol>
+    <symbol id="i-agent" viewBox="0 0 24 24"><path d="M12 8V4"/><path d="M8 5h8"/><circle cx="12" cy="14" r="5"/><path d="M7 14H4"/><path d="M20 14h-3"/><path d="M9.5 14h.01"/><path d="M14.5 14h.01"/><path d="m10 18-2.5 3"/><path d="m14 18 2.5 3"/></symbol>
+    <symbol id="i-template" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.8 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5a3 3 0 0 1 3-3h13v17H7a3 3 0 0 0-3 3z"/><path d="M4 5v17"/><path d="M10 6h6"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 1 1 3.7 2c-.9.5-1.5 1.1-1.5 2.3"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 24 24"><path d="m21.4 11.6-8.8 8.8a5 5 0 0 1-7.1-7.1l9-9a3.3 3.3 0 0 1 4.7 4.7l-9 9a1.7 1.7 0 0 1-2.4-2.4l8.3-8.3"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 5h.01"/><path d="M12 12h.01"/><path d="M12 19h.01"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 3h7v7"/><path d="M10 14 21 3"/><path d="M21 14v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h6"/></symbol>
+  </svg>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand" aria-label="DS ONE 업무 AI Agent">
+        <div class="brand-mark"></div>
+        <div class="brand-name">DS ONE</div>
+        <div class="brand-divider"></div>
+        <div class="product-name">업무 AI Agent</div>
+      </div>
+
+      <div class="top-actions">
+        <button class="header-button" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#i-help"></use></svg>
+          <span>도움말</span>
+        </button>
+        <button class="notification" type="button" aria-label="알림">
+          <svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg>
+          <span class="badge">3</span>
+        </button>
+        <button class="profile-button" type="button">
+          <span class="avatar" aria-hidden="true">김</span>
+          <strong>김다솔</strong>
+          <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
+        </button>
       </div>
     </header>
 
-    <!-- 기존 JS 호환용 버튼입니다. 화면에는 노출하지 않습니다. -->
-    <nav class="mode-buttons" aria-label="업무 도우미 메뉴">
-      <button id="aiBtn" class="mode-btn active" type="button">사내 AI</button>
-      <button id="rpaBtn" class="mode-btn" type="button">RPA 실행</button>
-    </nav>
+    <div class="main-shell">
+      <aside class="sidebar" aria-label="주요 메뉴">
+        <nav class="nav-group">
+          <button class="menu-item" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-chat"></use></svg>
+            <span>새 대화</span>
+          </button>
+          <button class="menu-item" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <span>채팅 검색</span>
+          </button>
+          <button class="menu-item" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-star"></use></svg>
+            <span>즐겨찾기</span>
+          </button>
+          <button class="menu-item" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg>
+            <span>휴지통</span>
+          </button>
+        </nav>
 
-    <main class="main">
-      <section id="homePanel" class="panel home-panel active" aria-label="DS ONE 메뉴">
-        <div class="home-shell">
-          <div class="employee-badge" aria-label="DS단석 임직원 전용">
-            <span>DS단석 업무 AI</span>
+        <section class="recent-work" aria-labelledby="recent-work-title">
+          <div class="sidebar-section-title" id="recent-work-title">최근 작업</div>
+          <div class="recent-list">
           </div>
+          <button class="sidebar-guide-button" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-book"></use></svg>
+            <span>사용 가이드</span>
+          </button>
+        </section>
+      </aside>
 
-          <div class="hero-area">
-            <div class="hero-copy">
-              <h1>DS ONE</h1>
-              <p class="hero-title">질문부터 실행까지 하나로</p>
-              <!-- <p class="hero-desc">사내 업무를 더 빠르고 쉽게 도와드립니다</p> -->
-            </div>
-
-            <div class="hero-visual" aria-hidden="true">
-              <div class="hero-robot">
-                <img src="./robot.png" alt="" />
-              </div>
-            </div>
-          </div>
-
-          <div class="user-greeting" aria-live="polite">
-            <span id="homeGreetingText" class="greeting-text is-auth-ready">필요한 업무를 선택해 주세요</span>
-          </div>
-
-          <div class="menu-card-list" aria-label="DS ONE 기능 선택">
-            <button id="directQuestionBtn" class="menu-card" type="button">
-              <span class="menu-icon chat-icon" aria-hidden="true">
-                <img src="./rule.png" alt="">
-              </span>
-              <span class="menu-text">
-                <strong>사내 지식 문의</strong>
-                <em>규정 · 업무 절차 안내</em>
-              </span>
-              <span class="menu-arrow" aria-hidden="true"></span>
-            </button>
-
-            <button id="docWriteBtn" class="menu-card" type="button">
-              <span class="menu-icon doc-icon" aria-hidden="true">
-                <img src="./ai.png" alt="">
-              </span>
-              <span class="menu-text">
-                <strong>업무 AI Agent</strong>
-                <em>문서 작성 · 요약 · 업무 보조</em>
-              </span>
-              <span class="menu-arrow" aria-hidden="true"></span>
-            </button>
-
-            <button id="rpaEntryBtn" class="menu-card" type="button">
-              <span class="menu-icon rpa-icon" aria-hidden="true">
-                <img src="./rpa1.png" alt="">
-              </span>
-              <span class="menu-text">
-                <strong>RPA 실행</strong>
-                <em>반복 업무 자동화 시작</em>
-              </span>
-              <span class="menu-arrow" aria-hidden="true"></span>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section id="aiPanel" class="panel chat-panel" aria-label="사내 지식 문의">
-        <div class="sub-header chat-header">
-          <button id="aiBackBtn" class="back-btn" type="button" aria-label="메뉴로 돌아가기">‹</button>
-          <div class="sub-title-group">
-            <strong>사내 지식 문의</strong>
-            <span>규정 · 업무 절차 안내</span>
-          </div>
-        </div>
-
-        <div id="aiBody" class="body chat-body">
-          <section class="chat-welcome-card" aria-label="사내 AI 안내">
-            <div class="welcome-avatar" aria-hidden="true">
-              <img src="./robot.png" alt="" />
-            </div>
-            <div class="welcome-copy">
-              <strong>안녕하세요. DS ONE입니다.</strong>
-              <p>사내 규정과 업무 절차를 안내합니다.</p>
-            </div>
+      <main class="home-stage" aria-label="홈">
+        <div class="home-fit" data-fit-home>
+          <section class="hero" aria-labelledby="home-title">
+            <h1 id="home-title">무엇을 도와드릴까요?<span class="sparkle">✦</span></h1>
+            <p>업무에 필요한 다양한 작업을 AI가 빠르고 정확하게 도와드립니다.</p>
           </section>
-        </div>
 
-        <form id="chatForm" class="input-area chat-input-area">
-          <div class="chat-input-row">
-            <textarea
-              id="messageInput"
-              placeholder="질문을 입력하세요"
-              autocomplete="off"
-              rows="1"
-            ></textarea>
-            <button id="sendBtn" class="send-btn" type="submit">전송</button>
-          </div>
-          <p class="chat-disclaimer" aria-label="AI 답변 안내">
-            AI 답변은 참고용이므로 중요한 내용은 담당 부서에 확인해 주세요.
-          </p>
-        </form>
-      </section>
-
-
-      <section id="docPanel" class="panel chat-panel" aria-label="업무 AI Agent">
-        <div class="sub-header chat-header">
-          <button id="docBackBtn" class="back-btn" type="button" aria-label="메뉴로 돌아가기">‹</button>
-          <div class="sub-title-group">
-            <strong>업무 AI Agent</strong>
-            <span>문서 작성 · 요약 · 업무 보조</span>
-          </div>
-          <button id="agentNewChatBtn" class="new-chat-btn" type="button" aria-label="새 업무 대화 시작" hidden>새 대화</button>
-        </div>
-
-        <div id="agentBody" class="body chat-body">
-          <section class="chat-welcome-card agent-welcome-card" aria-label="업무 AI 안내">
-            <div class="welcome-avatar" aria-hidden="true">
-              <img src="./robot.png" alt="" />
-            </div>
-            <div class="welcome-copy">
-              <strong>무엇이든 업무 형태로 정리해 드립니다.</strong>
-              <p>메일, 보고, 회의록 등을 바로 요청해 보세요.</p>
-            </div>
-            <div class="agent-suggestion-area" aria-label="업무 AI 추천 요청">
-              <span class="agent-suggestion-title">추천 업무</span>
-              <div class="agent-suggestion-grid">
-                <button class="agent-suggestion-btn" type="button" data-template="아래 내용을 정중하고 자연스러운 업무 메일로 다듬어 주세요.&#10;&#10;[내용]&#10;" data-task="email_draft">
-                  <strong>메일 다듬기</strong>
-                  <span>정중한 업무 메일</span>
-                </button>
-                <button class="agent-suggestion-btn" type="button" data-template="아래 내용을 팀장/임원 보고용으로 정리해 주세요.&#10;형식은 핵심 요약, 주요 내용, 리스크/이슈, 확인 필요, 다음 조치로 작성해 주세요.&#10;&#10;[내용]&#10;" data-task="report_summary">
-                  <strong>보고용 요약</strong>
-                  <span>핵심 · 리스크 · 다음 조치</span>
-                </button>
-                <button class="agent-suggestion-btn" type="button" data-template="아래 회의 내용을 회의록으로 정리해 주세요.&#10;회의 요약, 결정사항, 담당자별 할 일, 미확정 사항, 후속 일정으로 구분해 주세요.&#10;&#10;[회의 내용]&#10;" data-task="meeting_minutes">
-                  <strong>회의록 정리</strong>
-                  <span>결정사항 · 할 일 추출</span>
-                </button>
-                <button class="agent-suggestion-btn" type="button" data-template="아래 내용을 검토해서 문제될 수 있는 부분, 누락된 부분, 보완 제안을 정리해 주세요.&#10;&#10;[내용]&#10;" data-task="document_review">
-                  <strong>문서 검토</strong>
-                  <span>문제점 · 보완점 확인</span>
-                </button>
-                <button class="agent-suggestion-btn" type="button" data-template="아래 업무를 진행하기 위한 체크리스트를 만들어 주세요.&#10;목적, 점검 항목, 주의사항, 완료 기준으로 정리해 주세요.&#10;&#10;[업무 내용]&#10;" data-task="checklist">
-                  <strong>체크리스트</strong>
-                  <span>실행 전 점검표</span>
-                </button>
-                <button class="agent-suggestion-btn" type="button" data-template="아래 문장을 더 자연스럽고 업무에 적합한 표현으로 다듬어 주세요.&#10;&#10;[문장]&#10;" data-task="rewrite">
-                  <strong>문장 교정</strong>
-                  <span>더 자연스럽게</span>
+          <section class="prompt-card" aria-label="메시지 입력">
+            <textarea aria-label="메시지 입력" placeholder="메시지를 입력하세요.   (예: 회의록 요약해줘)"></textarea>
+            <div class="prompt-toolbar">
+              <div class="prompt-left">
+                <button class="icon-btn" type="button" aria-label="파일 첨부">
+                  <svg class="icon" aria-hidden="true"><use href="#i-clip"></use></svg>
                 </button>
               </div>
-            </div>
-          </section>
-        </div>
-
-        <form id="agentForm" class="input-area chat-input-area agent-input-area">
-          <input
-            id="agentFileInput"
-            class="agent-file-input"
-            type="file"
-            multiple
-            accept=".txt,.md,.csv,.json,.docx,.xlsx,.pptx"
-          />
-          <div id="agentFileChips" class="file-chip-row" hidden aria-label="첨부 파일 목록"></div>
-
-          <div class="chat-input-row agent-input-row">
-            <div class="message-field agent-message-field">
-              <button id="agentAttachBtn" class="attach-btn" type="button" aria-label="파일 첨부" title="파일 첨부">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 1 1-2.83-2.83l8.49-8.48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+              <button class="send-btn" type="button" aria-label="전송">
+                <svg class="icon" aria-hidden="true"><use href="#i-send"></use></svg>
               </button>
-              <textarea
-                id="agentMessageInput"
-                placeholder="필요한 업무를 입력해 주세요"
-                autocomplete="off"
-                rows="1"
-              ></textarea>
             </div>
-            <button id="agentSendBtn" class="send-btn" type="button">전송</button>
-          </div>
-          <p class="chat-disclaimer" aria-label="AI 답변 안내">
-            AI 답변은 참고용이므로 검토 후 업무에 활용해 주세요.
-          </p>
-        </form>
-      </section>
+          </section>
 
-      <section id="rpaPanel" class="panel" aria-label="RPA 실행">
-        <div class="sub-header chat-header">
-          <button id="rpaBackBtn" class="back-btn" type="button" aria-label="메뉴로 돌아가기">‹</button>
-          <div class="sub-title-group">
-            <strong>RPA 실행</strong>
-            <span>반복 업무 자동화 시작</span>
-          </div>
-        </div>
+          <section class="action-grid" aria-label="빠른 작업">
+            <button class="action-card" type="button">
+              <span class="card-head">
+                <span class="app-icon doc">▤</span>
+                <span class="card-title">문서 작성</span>
+              </span>
+              <span class="card-desc">기획서, 보고서, 메일<br>초안 작성 등</span>
+            </button>
 
-        <div id="rpaBody" class="body">
-          <div class="msg bot">RPA 실행 모드입니다. 실행 가능한 업무 목록을 불러오세요.</div>
-        </div>
+            <button class="action-card" type="button">
+              <span class="card-head">
+                <span class="app-icon summary">≡</span>
+                <span class="card-title">요약</span>
+              </span>
+              <span class="card-desc">긴 문서나 회의 내용을<br>핵심만 요약</span>
+            </button>
 
-        <div class="input-area rpa-refresh-area">
-          <button id="reloadRpaBtn" class="send-btn wide" type="button">RPA 목록 새로고침</button>
+            <button class="action-card" type="button">
+              <span class="card-head">
+                <span class="app-icon translate">A</span>
+                <span class="card-title">번역</span>
+              </span>
+              <span class="card-desc">다국어 문서를<br>자연스럽게 번역</span>
+            </button>
+
+            <button class="action-card" type="button">
+              <span class="card-head">
+                <span class="app-icon excel">X</span>
+                <span class="card-title">엑셀 분석</span>
+              </span>
+              <span class="card-desc">데이터 분석 및<br>시각화, 인사이트 도출</span>
+            </button>
+
+            <button class="action-card" type="button">
+              <span class="card-head">
+                <span class="app-icon file">▰</span>
+                <span class="card-title">파일 기반 질문</span>
+              </span>
+              <span class="card-desc">파일을 업로드하고<br>질문하기</span>
+            </button>
+
+            <button class="action-card" type="button">
+              <span class="card-head">
+                <span class="app-icon report">▥</span>
+                <span class="card-title">보고서 정리</span>
+              </span>
+              <span class="card-desc">보고서 구조화 및<br>핵심 내용 정리</span>
+            </button>
+          </section>
+
+          <section class="lower-grid" aria-label="최근 작업과 사용 가이드" hidden>
+            <article class="panel">
+              <div class="panel-head">
+                <h2 class="panel-title">최근 작업</h2>
+                <button class="text-button" type="button">전체 보기</button>
+              </div>
+
+              <div class="task-list">
+              </div>
+            </article>
+
+            <article class="panel guide-panel">
+              <div class="guide-copy">
+                <h2>처음이신가요?</h2>
+                <p>업무 AI Agent, 이렇게 활용해 보세요!</p>
+
+                <div class="tip-list">
+                  <div class="tip">
+                    <span class="tip-symbol"><svg class="icon" aria-hidden="true"><use href="#i-chat"></use></svg></span>
+                    <span>
+                      <strong>궁금한 내용을 자연스럽게 질문해 보세요.</strong>
+                      <span>“지난주 회의 요약해줘”</span>
+                    </span>
+                  </div>
+
+                  <div class="tip">
+                    <span class="tip-symbol"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg></span>
+                    <span>
+                      <strong>파일을 업로드하면 더 정확한 답변을 받을 수 있어요.</strong>
+                      <span>문서, 엑셀, PDF 등 지원</span>
+                    </span>
+                  </div>
+
+                  <div class="tip">
+                    <span class="tip-symbol"><svg class="icon" aria-hidden="true"><use href="#i-star"></use></svg></span>
+                    <span>
+                      <strong>다양한 작업을 한 번에 해결해 보세요.</strong>
+                      <span>작성, 요약, 분석, 번역까지!</span>
+                    </span>
+                  </div>
+                </div>
+
+                <button class="guide-button" type="button">
+                  사용 가이드 보기
+                  <svg class="icon" aria-hidden="true"><use href="#i-external"></use></svg>
+                </button>
+              </div>
+
+              <div class="guide-visual" aria-hidden="true">
+                <div class="person">
+                  <div class="floating-spark">✦</div>
+                  <div class="face"><span class="smile"></span></div>
+                  <div class="body-shape"></div>
+                  <div class="arm"><span class="hand"></span></div>
+                </div>
+              </div>
+            </article>
+          </section>
         </div>
-      </section>
-    </main>
+      </main>
+    </div>
   </div>
 
-  <script src="./config.js?v=20260707_agent_history_security"></script>
-  <script src="./app.js?v=20260707_agent_history_security"></script>
+  <script src="config.js?v=20260707_v42_v40_ui_v41_features"></script>
+  <script>
+    const stage = document.querySelector(".home-stage");
+    const fitTarget = document.querySelector("[data-fit-home]");
+    const promptTextarea = document.querySelector(".prompt-card textarea");
+    const profileName = document.querySelector(".profile-button strong");
+    const profileAvatar = document.querySelector(".avatar");
+    const DS_ONE_CONFIG = window.DS_ONE_CONFIG || {};
+    const AI_API_URL = DS_ONE_CONFIG.endpoints?.aiApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/ai-api";
+    const SSO_SESSION_TOKEN_KEY = "sso_session_token";
+
+    function readSsoSessionToken() {
+      const url = new URL(location.href);
+      const tokenFromUrl = url.searchParams.get("token");
+
+      if (tokenFromUrl) {
+        sessionStorage.setItem(SSO_SESSION_TOKEN_KEY, tokenFromUrl);
+        url.searchParams.delete("token");
+        history.replaceState({}, "", url.toString());
+        return tokenFromUrl;
+      }
+
+      return sessionStorage.getItem(SSO_SESSION_TOKEN_KEY) || "";
+    }
+
+    function decodeSessionTokenPayload(token) {
+      const body = String(token || "").split(".")[0];
+      if (!body) return null;
+
+      try {
+        let base64 = body.replaceAll("-", "+").replaceAll("_", "/");
+        while (base64.length % 4) base64 += "=";
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+
+        const payload = JSON.parse(new TextDecoder().decode(bytes));
+        if (payload.exp && Number(payload.exp) * 1000 < Date.now()) {
+          sessionStorage.removeItem(SSO_SESSION_TOKEN_KEY);
+          return null;
+        }
+        return payload;
+      } catch {
+        return null;
+      }
+    }
+
+    function getDisplayName(profile) {
+      const candidates = [
+        profile?.userName,
+        profile?.user_name,
+        profile?.name,
+        profile?.displayName,
+        profile?.display_name,
+        profile?.empName,
+        profile?.empNm,
+        profile?.loginId,
+        profile?.login_id,
+        profile?.empNo,
+        profile?.emp_no,
+      ];
+
+      return candidates
+        .map((value) => String(value || "").trim())
+        .find((value) => value && value !== "undefined" && value !== "null") || "";
+    }
+
+    function applyHeaderProfile(profile) {
+      const displayName = getDisplayName(profile);
+      if (!displayName) return;
+
+      if (profileName) profileName.textContent = displayName;
+      if (profileAvatar) profileAvatar.textContent = displayName.slice(0, 1);
+    }
+
+    async function bootstrapSsoProfile() {
+      const token = readSsoSessionToken();
+      if (!token) return;
+
+      const tokenProfile = decodeSessionTokenPayload(token);
+      if (tokenProfile) applyHeaderProfile(tokenProfile);
+
+      try {
+        const res = await fetch(AI_API_URL, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const profile = await res.json().catch(() => null);
+        if (res.ok && profile?.ok) applyHeaderProfile(profile);
+      } catch {
+        // 로컬 file:// 또는 허용되지 않은 Origin에서는 프로필 조회가 실패할 수 있습니다.
+        // 이 경우 URL 토큰 payload에서 읽은 loginId/empNo 표시만 유지합니다.
+      }
+    }
+
+    function resizePromptTextarea() {
+      if (!promptTextarea) return;
+
+      const promptCard = promptTextarea.closest(".prompt-card");
+      const styles = getComputedStyle(promptTextarea);
+      const lineHeight = Number.parseFloat(styles.lineHeight) || 24;
+      const maxHeight = Math.max(lineHeight * 3, Math.min(window.innerHeight * 0.24, 168));
+
+      promptTextarea.style.height = "auto";
+      const nextHeight = Math.min(promptTextarea.scrollHeight, maxHeight);
+      promptTextarea.style.height = `${Math.ceil(nextHeight)}px`;
+      promptTextarea.style.overflowY = promptTextarea.scrollHeight > maxHeight ? "auto" : "hidden";
+      promptCard?.classList.toggle("is-scrollable", promptTextarea.scrollHeight > maxHeight);
+    }
+
+    function fitHomeToViewport() {
+      if (!stage || !fitTarget) return;
+
+      const previousScale = Number.parseFloat(getComputedStyle(fitTarget).getPropertyValue("--home-scale")) || 1;
+      fitTarget.style.setProperty("--home-scale", "1");
+
+      const stageRect = stage.getBoundingClientRect();
+      const stageStyle = getComputedStyle(stage);
+      const availableHeight = Math.max(
+        0,
+        stage.clientHeight - parseFloat(stageStyle.paddingTop) - parseFloat(stageStyle.paddingBottom)
+      );
+      const availableWidth = Math.max(
+        0,
+        stage.clientWidth - parseFloat(stageStyle.paddingLeft) - parseFloat(stageStyle.paddingRight)
+      );
+      const naturalHeight = fitTarget.scrollHeight;
+      const naturalWidth = fitTarget.scrollWidth;
+
+      let nextScale = Math.min(1, availableHeight / naturalHeight, availableWidth / naturalWidth);
+      nextScale = Math.max(0.48, Number.isFinite(nextScale) ? nextScale : 1);
+
+      fitTarget.style.setProperty("--home-scale", nextScale.toFixed(3));
+      stage.style.alignItems = nextScale < 0.96 ? "flex-start" : "center";
+
+      if (Math.abs(previousScale - nextScale) > 0.001) {
+        requestAnimationFrame(() => {
+          const visualHeight = fitTarget.getBoundingClientRect().height;
+          if (visualHeight > stageRect.height + 1 && nextScale > 0.62) {
+            fitHomeToViewport();
+          }
+        });
+      }
+    }
+
+    const resizeObserver = new ResizeObserver(fitHomeToViewport);
+    resizeObserver.observe(document.documentElement);
+    resizeObserver.observe(stage);
+    resizeObserver.observe(fitTarget);
+    promptTextarea?.addEventListener("input", () => {
+      resizePromptTextarea();
+      fitHomeToViewport();
+    });
+    window.addEventListener("load", () => {
+      resizePromptTextarea();
+      fitHomeToViewport();
+    });
+    window.addEventListener("resize", () => {
+      resizePromptTextarea();
+      fitHomeToViewport();
+    });
+    bootstrapSsoProfile();
+    resizePromptTextarea();
+    fitHomeToViewport();
+  </script>
+  <script src="app.js?v=20260707_v42_v40_ui_v41_features"></script>
 </body>
 </html>
+

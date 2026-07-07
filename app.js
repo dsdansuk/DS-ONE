@@ -1,3756 +1,1775 @@
-// DS Chatbot Frontend - 운영 분리 구조용 app.js / PPTX 생성 제거, 슬라이드 구성안 전용
-// GitHub Pages: https://dsdansuk.github.io/DS-chatbot/
-// Edge Functions:
-// - sso-login: 그룹웨어 SSO 진입 및 토큰 발급
-// - ai-api: 사내 지식 문의 / SideTalk 지식베이스 호출
-// - agent-api: 업무 AI Agent / SideTalk 일반 생성 호출
-// - file-api: 첨부 파일 본문 추출 및 Vertex/Gemini 기반 파일 분석
-// - rpa-api: UiPath RPA 호출
+(() => {
+  "use strict";
 
-const DS_ONE_CONFIG = window.DS_ONE_CONFIG || {};
-const DS_ENDPOINTS = DS_ONE_CONFIG.endpoints || {};
-const DS_TASKS = DS_ONE_CONFIG.tasks || {};
-const DS_STORAGE = DS_ONE_CONFIG.storage || {};
-const DS_UI = DS_ONE_CONFIG.ui || {};
-const DS_FILE_POLICY = DS_ONE_CONFIG.filePolicy || {};
+  // DS ONE 업무 AI Agent 기능 레이어
+  // - 메인 index.html 요소와 style.css 디자인은 건드리지 않고 기능만 런타임으로 연결합니다.
+  // - 그룹웨어 iframe에서는 108x108 런처 버튼만 표시합니다.
 
-const AI_API_URL = DS_ENDPOINTS.aiApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/ai-api";
-const AGENT_API_URL = DS_ENDPOINTS.agentApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/agent-api";
-const FILE_API_URL = DS_ENDPOINTS.fileApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api";
-const RPA_API_URL = DS_ENDPOINTS.rpaApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api";
+  const CONFIG = window.DS_ONE_CONFIG || {};
+  const ENDPOINTS = CONFIG.endpoints || {};
+  const STORAGE = CONFIG.storage || {};
+  const FILE_POLICY = CONFIG.filePolicy || {};
 
-// agent-api 안에서 세션/메시지/파일 상태도 함께 관리합니다.
-const AGENT_STATE_API_URL = AGENT_API_URL;
+  const AGENT_API_URL = ENDPOINTS.agentApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/agent-api";
+  const FILE_API_URL = ENDPOINTS.fileApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api";
+  const SESSION_TOKEN_KEY = "sso_session_token";
+  const DISPLAY_NAME_CACHE_KEY = STORAGE.displayNameCacheKey || "ds_chatbot_last_display_name_v1";
+  const DISPLAY_NAME_CACHE_TTL_MS = Number(STORAGE.displayNameCacheTtlMs || 7 * 24 * 60 * 60 * 1000);
+  const LOCAL_HISTORY_PREFIX = "ds_one_platform_recent_messages_v2_";
+  const RECENT_WORK_PREFIX = STORAGE.recentWorkPrefix || "ds_one_platform_recent_work_v1_";
+  const MAX_HISTORY = Number(STORAGE.agentHistoryCacheMaxMessages || 20);
+  const MAX_RECENT_WORK = Number(STORAGE.recentWorkMaxItems || 8);
+  const MAX_STORED_CONVERSATION_MESSAGES = Number(STORAGE.recentWorkMaxMessages || 24);
+  const REMOTE_SESSION_REFRESH_DEBOUNCE_MS = 700;
+  const REMOTE_SESSION_LIST_LIMIT = Math.max(MAX_RECENT_WORK, 20);
 
-// PPT 요청은 PPTX/Skywork 생성 경로 없이 agent-api 일반 문서 작성 경로에서 슬라이드 구성안 텍스트로만 처리합니다.
-const PPT_DRAFT_TASK = DS_TASKS.pptDraft || "ppt_draft";
-const EXCEL_DRAFT_TASK = DS_TASKS.excelDraft || "excel_draft";
-const WEB_SEARCH_TASK = DS_TASKS.webSearch || "web_search";
+  const ALLOWED_EXTENSIONS = (FILE_POLICY.allowedExtensions || ["txt", "md", "csv", "json", "docx", "xlsx", "pptx", "pdf"])
+    .map((value) => String(value || "").toLowerCase().replace(/^\./, ""))
+    .filter(Boolean);
+  const BLOCKED_EXTENSIONS = new Set((FILE_POLICY.blockedExtensions || ["exe", "dll", "msi", "bat", "cmd", "com", "scr", "ps1", "vbs", "js", "mjs", "jar", "sh", "php", "asp", "aspx", "jsp", "html", "htm", "xml", "doc", "xls", "ppt", "docm", "xlsm", "pptm", "hwp", "hwpx", "zip", "7z", "rar", "tar", "gz"])
+    .map((value) => String(value || "").toLowerCase().replace(/^\./, ""))
+    .filter(Boolean));
+  const MAX_FILE_SIZE_BYTES = Number(FILE_POLICY.maxFileSizeBytes || 50 * 1024 * 1024);
 
-const CHAT_HISTORY_TTL_MS = Number(DS_STORAGE.chatHistoryTtlMs || 60 * 60 * 1000);
-const CHAT_HISTORY_STORAGE_PREFIX = DS_STORAGE.chatHistoryPrefix || "ds_chatbot_ai_history_v1_";
-const AUTH_CACHE_STORAGE_PREFIX = DS_STORAGE.authCachePrefix || "ds_chatbot_auth_cache_v1_";
-const AUTH_CACHE_TTL_MS = Number(DS_STORAGE.authCacheTtlMs || 10 * 60 * 1000);
-const DISPLAY_NAME_CACHE_KEY = DS_STORAGE.displayNameCacheKey || "ds_chatbot_last_display_name_v1";
-const DISPLAY_NAME_CACHE_TTL_MS = Number(DS_STORAGE.displayNameCacheTtlMs || 7 * 24 * 60 * 60 * 1000);
-const AGENT_HISTORY_CACHE_PREFIX = DS_STORAGE.agentHistoryCachePrefix || "ds_one_agent_history_v1_";
-const AGENT_HISTORY_CACHE_TTL_MS = Number(DS_STORAGE.agentHistoryCacheTtlMs || 60 * 60 * 1000);
-const AGENT_HISTORY_CACHE_MAX_MESSAGES = Number(DS_STORAGE.agentHistoryCacheMaxMessages || 20);
-const DEFAULT_HOME_GREETING = DS_UI.defaultHomeGreeting || "필요한 업무를 선택해 주세요";
-const AGENT_RECENT_SESSIONS_MAX = Number(DS_UI.agentRecentSessionsMax || 20);
-const AGENT_RECENT_REFRESH_DEBOUNCE_MS = Number(DS_UI.agentRecentRefreshDebounceMs || 350);
+  let sessionToken = "";
+  let selectedFiles = [];
+  let submitInProgress = false;
+  let currentTask = "";
+  let currentLoginId = "";
+  let currentEmpNo = "";
+  let currentMode = "home";
+  let activeConversationId = "";
+  let recentContextMenu = null;
+  let recentRemoteRefreshTimer = 0;
+  let recentRemoteRefreshInProgress = false;
 
-const RPA_STATUS_POLL_INTERVAL_MS = Number(DS_UI.rpaStatusPollIntervalMs || 30 * 1000);
-const RPA_STATUS_POLL_MAX_MS = Number(DS_UI.rpaStatusPollMaxMs || 10 * 60 * 1000);
-const AGENT_ALLOWED_FILE_EXTENSIONS = (DS_FILE_POLICY.allowedExtensions || ["txt", "md", "csv", "json", "docx", "xlsx", "pptx"])
-  .map((item) => String(item || "").toLowerCase().replace(/^\./, ""))
-  .filter(Boolean);
-const AGENT_BLOCKED_FILE_EXTENSIONS = new Set((DS_FILE_POLICY.blockedExtensions || ["exe", "dll", "msi", "bat", "cmd", "com", "scr", "ps1", "vbs", "js", "mjs", "jar", "sh", "php", "asp", "aspx", "jsp", "html", "htm", "xml", "doc", "xls", "ppt", "docm", "xlsm", "pptm", "hwp", "hwpx", "zip", "7z", "rar", "tar", "gz", "png", "jpg", "jpeg", "webp"])
-  .map((item) => String(item || "").toLowerCase().replace(/^\./, ""))
-  .filter(Boolean));
-const AGENT_MAX_FILE_SIZE_BYTES = Number(DS_FILE_POLICY.maxFileSizeBytes || 15 * 1024 * 1024);
+  const state = {
+    homePanel: null,
+    homeContent: null,
+    docPanel: null,
+    homePromptInput: null,
+    homeSendBtn: null,
+    homeAttachBtn: null,
+    homeFileChips: null,
+    fileInput: null,
+    agentBody: null,
+    agentForm: null,
+    agentMessageInput: null,
+    agentSendBtn: null,
+    agentAttachBtn: null,
+    agentFileChips: null,
+    agentNewChatBtn: null,
+    docBackBtn: null,
+    profileName: null,
+    profileAvatar: null,
+    recentList: null,
+    lowerRecentList: null,
+  };
 
-let sessionToken = sessionStorage.getItem("sso_session_token") || "";
-let currentMode = "home";
-let thinkingTimer = null;
-let rpaLoaded = false;
-let selectedRpaItem = null;
-let selectedRpaButton = null;
-let runningRpaJobs = [];
-let rpaStatusPollTimer = null;
-let rpaStatusPollStartedAt = 0;
-let currentLoginId = "";
-let currentEmpNo = "";
+  function init() {
+    sessionToken = readSsoSessionToken();
+    const tokenProfile = decodeSessionTokenPayload(sessionToken);
+    if (tokenProfile) {
+      currentLoginId = tokenProfile.loginId || tokenProfile.login_id || "";
+      currentEmpNo = tokenProfile.empNo || tokenProfile.emp_no || "";
+      applyHeaderProfile(tokenProfile);
+    }
 
-const aiBtn = document.getElementById("aiBtn");
-const rpaBtn = document.getElementById("rpaBtn");
-const homePanel = document.getElementById("homePanel");
-const aiPanel = document.getElementById("aiPanel");
-const rpaPanel = document.getElementById("rpaPanel");
-const docPanel = document.getElementById("docPanel");
-const aiBody = document.getElementById("aiBody");
-const agentBody = document.getElementById("agentBody");
-const rpaBody = document.getElementById("rpaBody");
-const chatForm = document.getElementById("chatForm");
-const messageInput = document.getElementById("messageInput");
-const sendBtn = document.getElementById("sendBtn");
-const agentForm = document.getElementById("agentForm");
-const agentMessageInput = document.getElementById("agentMessageInput");
-const agentSendBtn = document.getElementById("agentSendBtn");
-const agentAttachBtn = document.getElementById("agentAttachBtn");
-const agentFileInput = document.getElementById("agentFileInput");
-const agentFileChips = document.getElementById("agentFileChips");
-const agentNewChatBtn = document.getElementById("agentNewChatBtn");
-const reloadRpaBtn = document.getElementById("reloadRpaBtn");
-const userInfo = document.getElementById("userInfo");
-const homeGreetingText = document.getElementById("homeGreetingText");
-const directQuestionBtn = document.getElementById("directQuestionBtn");
-const docWriteBtn = document.getElementById("docWriteBtn");
-const rpaEntryBtn = document.getElementById("rpaEntryBtn");
-const aiBackBtn = document.getElementById("aiBackBtn");
-const rpaBackBtn = document.getElementById("rpaBackBtn");
-const docBackBtn = document.getElementById("docBackBtn");
-
-let agentSelectedFiles = [];
-let agentSessionId = sessionStorage.getItem("ds_agent_session_id") || "";
-let agentStateReady = false;
-let agentStateLoading = false;
-let lastAgentRoute = "";
-let lastAgentFileUseAt = 0;
-let agentSubmitInProgress = false;
-let agentConversationRenderedFromCache = false;
-let agentCacheSaveTimer = null;
-let agentRecentSessions = [];
-let agentRecentRefreshTimer = null;
-let agentRecentSectionReady = false;
-let openRecentMenu = null;
-
-function isDocModeActive() {
-  return currentMode === "doc" || Boolean(docPanel?.classList.contains("active"));
-}
-
-function hasAgentVisibleConversation() {
-  if (!agentBody) return false;
-  return Boolean(agentBody.querySelector(".chat-row .msg.user, .chat-row .msg.bot, .msg.user, .msg.bot"));
-}
-
-function createAgentWelcomeCard() {
-  const card = document.createElement("section");
-  card.className = "chat-welcome-card agent-welcome-card";
-  card.setAttribute("aria-label", "업무 AI 안내");
-  card.innerHTML = `
-    <div class="welcome-avatar" aria-hidden="true">
-      <img src="./robot.png" alt="" />
-    </div>
-    <div class="welcome-copy">
-      <strong>무엇이든 업무 형태로 정리해 드립니다.</strong>
-      <p>메일, 보고, 회의록, 검토, 체크리스트를 바로 요청해 보세요.</p>
-    </div>
-    <div class="agent-suggestion-area" aria-label="업무 AI 추천 요청">
-      <span class="agent-suggestion-title">추천 업무</span>
-      <div class="agent-suggestion-grid">
-        ${buildAgentSuggestionButtonsHtml()}
-      </div>
-    </div>
-  `;
-  return card;
-}
-
-function ensureAgentWelcomeCard() {
-  if (!agentBody) return null;
-
-  let card = agentBody.querySelector(".chat-welcome-card");
-  if (!card) {
-    card = createAgentWelcomeCard();
-  }
-
-  if (agentBody.firstElementChild !== card) {
-    agentBody.prepend(card);
-  }
-
-  return card;
-}
-
-function resetAgentMessagesKeepingWelcome() {
-  if (!agentBody) return;
-
-  const card = ensureAgentWelcomeCard();
-  Array.from(agentBody.children).forEach((child) => {
-    if (child !== card) child.remove();
-  });
-
-  if (card && agentBody.firstElementChild !== card) {
-    agentBody.prepend(card);
-  }
-}
-
-function updateAgentNewChatButtonVisibility() {
-  if (!agentNewChatBtn) return;
-
-  const hasConversation = hasAgentVisibleConversation();
-  agentNewChatBtn.hidden = !hasConversation;
-  agentNewChatBtn.disabled = !hasConversation || agentStateLoading || agentSubmitInProgress;
-}
-
-function clearAgentConversationCache() {
-  const key = getAgentHistoryCacheKey();
-  if (!key) return;
-  try {
-    sessionStorage.removeItem(key);
-  } catch {
-  }
-}
-
-async function startNewAgentConversation() {
-  if (!agentBody || agentStateLoading || agentSubmitInProgress) return;
-
-  if (agentSelectedFiles.length) {
-    const ok = window.confirm("첨부한 파일이 사라집니다. 새 대화를 시작할까요?");
-    if (!ok) {
-      focusInputWhenPanelReady(agentMessageInput);
+    if (isEmbeddedInIframe()) {
+      showIframeLauncher(tokenProfile);
       return;
+    }
+
+    restoreCachedDisplayName();
+    injectRuntimeStyles();
+    attachToExistingHome();
+    createRuntimeAgentWorkspace();
+    bootstrapProfile();
+    bindUiEvents();
+    renderRecentWorkList();
+    scheduleRemoteRecentRefresh(120);
+    resizeTextarea(state.homePromptInput);
+    resizeTextarea(state.agentMessageInput);
+  }
+
+  function readSsoSessionToken() {
+    const url = new URL(window.location.href);
+    const tokenFromUrl = String(url.searchParams.get("token") || "").trim();
+    if (tokenFromUrl) {
+      sessionStorage.setItem(SESSION_TOKEN_KEY, tokenFromUrl);
+      url.searchParams.delete("token");
+      url.searchParams.delete("open");
+      window.history.replaceState({}, document.title, url.toString());
+      return tokenFromUrl;
+    }
+    return sessionStorage.getItem(SESSION_TOKEN_KEY) || "";
+  }
+
+  function isEmbeddedInIframe() {
+    try {
+      return window.self !== window.top;
+    } catch {
+      return true;
     }
   }
 
-  const previousLabel = agentNewChatBtn?.textContent || "새 대화";
-  if (agentNewChatBtn) {
-    agentNewChatBtn.disabled = true;
-    agentNewChatBtn.textContent = "시작 중";
-  }
+  function showIframeLauncher(profile) {
+    const displayName = getDisplayName(profile) || getCachedDisplayName() || "DS ONE";
+    const targetUrl = buildPlatformOpenUrl();
+    document.documentElement.style.width = "108px";
+    document.documentElement.style.height = "108px";
+    document.body.style.width = "108px";
+    document.body.style.height = "108px";
+    document.body.style.minWidth = "0";
+    document.body.style.margin = "0";
+    document.body.style.overflow = "hidden";
+    document.body.style.background = "transparent";
+    document.body.innerHTML = `
+      <button id="dsOneOpenButton" type="button" aria-label="DS ONE 업무 AI 새 탭 열기" title="DS ONE 업무 AI 새 탭 열기">
+        <span class="ds-one-btn-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48" focusable="false">
+            <path d="M24 5 40.5 14.5v19L24 43 7.5 33.5v-19L24 5Z" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"/>
+            <path d="M24 13.5 33.2 18.8v10.4L24 34.5l-9.2-5.3V18.8L24 13.5Z" fill="currentColor" opacity=".92"/>
+          </svg>
+        </span>
+        <span class="ds-one-btn-text"><strong>DS ONE</strong><em>업무 AI</em></span>
+        <span class="ds-one-btn-open" aria-hidden="true">↗</span>
+      </button>
+      <style>
+        #dsOneOpenButton{position:relative;width:108px;height:108px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:10px 8px;border:0;border-radius:22px;color:#fff;background:linear-gradient(145deg,#8ea7ff 0%,#6f87f7 54%,#5f7ff1 100%);box-shadow:0 12px 24px rgba(40,76,190,.24),inset 0 1px 0 rgba(255,255,255,.28);cursor:pointer;overflow:hidden;font-family:Pretendard,'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}#dsOneOpenButton:before{content:"";position:absolute;inset:-38px auto auto -42px;width:110px;height:110px;border-radius:999px;background:rgba(255,255,255,.14)}#dsOneOpenButton:hover{transform:translateY(-1px);filter:saturate(1.05);box-shadow:0 14px 28px rgba(40,76,190,.3),inset 0 1px 0 rgba(255,255,255,.32)}#dsOneOpenButton:active{transform:translateY(0)}.ds-one-btn-icon{position:relative;z-index:1;width:34px;height:34px;display:grid;place-items:center}.ds-one-btn-icon svg{width:34px;height:34px;display:block}.ds-one-btn-text{position:relative;z-index:1;display:grid;gap:0;text-align:center;line-height:1.04;text-shadow:0 2px 7px rgba(22,43,120,.18)}.ds-one-btn-text strong{font-size:16px;font-weight:900;letter-spacing:-.02em}.ds-one-btn-text em{font-style:normal;font-size:13px;font-weight:850;letter-spacing:-.03em}.ds-one-btn-open{position:absolute;right:8px;top:7px;z-index:1;font-size:13px;font-weight:900;opacity:.9}.ds-one-fallback{position:absolute;inset:0;display:grid;place-items:center;padding:10px;text-align:center;color:#fff;font-size:12px;font-weight:800;text-decoration:none;background:linear-gradient(145deg,#2f6fed,#7da8ff);border-radius:22px}
+      </style>
+    `;
 
-  try {
-    if (sessionToken) {
-      const data = await agentStateRequest({ action: "clear_state", sessionId: agentSessionId });
-      if (data?.session?.id) {
-        agentSessionId = data.session.id;
-        sessionStorage.setItem("ds_agent_session_id", agentSessionId);
-      } else {
-        agentSessionId = "";
-        sessionStorage.removeItem("ds_agent_session_id");
+    document.getElementById("dsOneOpenButton")?.addEventListener("click", () => {
+      const popup = window.open(targetUrl, "_blank", "noopener,noreferrer");
+      if (!popup) {
+        const link = document.createElement("a");
+        link.href = targetUrl;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.className = "ds-one-fallback";
+        link.textContent = `${displayName}님, 여기를 눌러 새 탭으로 열기`;
+        document.body.appendChild(link);
       }
+    });
+  }
+
+  function buildPlatformOpenUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("launcher");
+    url.searchParams.set("open", "platform");
+    if (sessionToken) url.searchParams.set("token", sessionToken);
+    return url.toString();
+  }
+
+  function injectRuntimeStyles() {
+    if (document.getElementById("ds-one-agent-runtime-style")) return;
+    const style = document.createElement("style");
+    style.id = "ds-one-agent-runtime-style";
+    style.textContent = `
+      .home-stage.ds-agent-mode {
+        justify-content: stretch;
+        align-items: stretch;
+        padding: 0;
+        background:
+          radial-gradient(circle at 82% 8%, rgba(99, 142, 255, 0.08), transparent 30%),
+          linear-gradient(180deg, #fbfdff 0%, #ffffff 48%, #ffffff 100%);
+      }
+      .home-stage.ds-agent-mode::before,
+      .home-stage.ds-agent-mode::after { display: none !important; }
+      .home-stage.ds-agent-mode .home-fit[hidden],
+      .ds-agent-workspace[hidden] { display: none !important; }
+      .ds-agent-workspace {
+        position: relative;
+        z-index: 2;
+        flex: 1 1 auto;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+        height: 100%;
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        padding: 0 clamp(18px, 4vw, 72px) clamp(12px, 2dvh, 22px);
+        overflow: hidden;
+      }
+      .ds-agent-body {
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        overflow-y: auto;
+        padding: clamp(28px, 7dvh, 78px) 0 28px;
+        scrollbar-width: thin;
+      }
+      .ds-chat-row,
+      .ds-thinking-row {
+        width: min(900px, 100%);
+        display: flex;
+        gap: 12px;
+        margin: 0 auto;
+      }
+      .ds-user-row { justify-content: flex-end; }
+      .ds-bot-row { justify-content: flex-start; align-items: flex-start; }
+      .ds-chat-avatar {
+        width: 30px;
+        height: 30px;
+        flex: 0 0 auto;
+        display: grid;
+        place-items: center;
+        margin-top: 2px;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+        border-radius: 10px;
+        background: linear-gradient(145deg, #2f6fed, #80a7ff);
+        box-shadow: 0 10px 24px rgba(47, 111, 237, 0.18);
+      }
+      .ds-msg {
+        max-width: min(720px, calc(100% - 48px));
+        font-size: 15px;
+        line-height: 1.76;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+      }
+      .ds-msg.user {
+        padding: 12px 16px;
+        color: #111827;
+        background: #f3f4f6;
+        border: 1px solid rgba(226, 232, 240, 0.85);
+        border-radius: 20px 20px 6px 20px;
+        box-shadow: 0 8px 22px rgba(17, 24, 39, 0.04);
+        white-space: pre-wrap;
+      }
+      .ds-msg.bot {
+        max-width: min(820px, 100%);
+        padding: 0;
+        color: #202124;
+        background: transparent;
+      }
+      .ds-thinking-row .ds-msg {
+        padding: 0;
+        color: #8b95a8;
+        background: transparent;
+        border: 0;
+      }
+      .ds-thinking-dots {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding-top: 4px;
+      }
+      .ds-thinking-dots i {
+        width: 6px;
+        height: 6px;
+        display: block;
+        border-radius: 999px;
+        background: #9aa8bd;
+        animation: dsThinkingPulse 1.25s ease-in-out infinite;
+      }
+      .ds-thinking-dots i:nth-child(2) { animation-delay: .15s; }
+      .ds-thinking-dots i:nth-child(3) { animation-delay: .3s; }
+      @keyframes dsThinkingPulse { 0%, 80%, 100% { opacity: .35; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+      .ds-msg-heading {
+        margin: 24px 0 10px;
+        font-size: 17px;
+        line-height: 1.45;
+        font-weight: 900;
+        letter-spacing: -0.035em;
+        color: #121827;
+      }
+      .ds-msg-heading:first-child { margin-top: 0; }
+      .ds-msg-heading::before {
+        content: "";
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        margin: 0 8px 3px 0;
+        border-radius: 999px;
+        background: #2f6fed;
+      }
+      .ds-msg-paragraph,
+      .ds-msg-line {
+        margin: 0 0 12px;
+        color: #202937;
+      }
+      .ds-msg-paragraph:last-child,
+      .ds-msg-line:last-child { margin-bottom: 0; }
+      .ds-msg-spacer { height: 6px; }
+      .ds-msg-bullet,
+      .ds-msg-numbered {
+        position: relative;
+        margin: 5px 0;
+        padding-left: 18px;
+        color: #253146;
+      }
+      .ds-msg-bullet::before {
+        content: "";
+        position: absolute;
+        left: 4px;
+        top: .82em;
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: #6b8ff7;
+      }
+      .ds-msg-numbered .ds-num {
+        position: absolute;
+        left: 0;
+        color: #2f6fed;
+        font-weight: 900;
+      }
+      .ds-msg-quote {
+        margin: 10px 0 14px;
+        padding: 10px 14px;
+        color: #3e4c63;
+        background: #f8fbff;
+        border-left: 3px solid #8fb3ff;
+        border-radius: 0 12px 12px 0;
+      }
+      .ds-msg-codeblock {
+        margin: 12px 0 16px;
+        padding: 14px 16px;
+        overflow: auto;
+        color: #e5e7eb;
+        background: #111827;
+        border-radius: 14px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 13px;
+        line-height: 1.65;
+        white-space: pre;
+      }
+      .ds-msg code {
+        padding: 2px 5px;
+        color: #1e4eb3;
+        background: #eef5ff;
+        border-radius: 6px;
+        font-size: .92em;
+      }
+      .ds-msg-table-wrap { margin: 12px 0 18px; }
+      .ds-msg-table-toolbar { display: flex; justify-content: flex-end; margin-bottom: 7px; }
+      .ds-msg-table-toolbar button,
+      .ds-bot-copy-btn {
+        height: 28px;
+        padding: 0 10px;
+        color: #2f5fb6;
+        font-size: 12px;
+        font-weight: 850;
+        background: #eef5ff;
+        border: 1px solid #d8e6ff;
+        border-radius: 999px;
+      }
+      .ds-msg-table-scroll {
+        max-width: 100%;
+        overflow: auto;
+        border: 1px solid #e0e7f3;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 10px 26px rgba(37, 48, 77, 0.05);
+      }
+      .ds-msg-table {
+        width: max-content;
+        min-width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .ds-msg-table th,
+      .ds-msg-table td {
+        padding: 9px 11px;
+        border-bottom: 1px solid #edf1f7;
+        text-align: left;
+        vertical-align: top;
+        white-space: nowrap;
+      }
+      .ds-msg-table th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #f5f8fd;
+        font-weight: 900;
+        color: #263146;
+      }
+      .ds-bot-copy-btn {
+        align-self: flex-start;
+        margin-left: 42px;
+        opacity: 0;
+        transform: translateY(-2px);
+        transition: opacity .16s ease, transform .16s ease;
+      }
+      .ds-bot-row:hover .ds-bot-copy-btn,
+      .ds-bot-copy-btn:focus-visible { opacity: .92; transform: translateY(0); }
+      .ds-agent-composer {
+        width: min(860px, 100%);
+        margin: 0 auto;
+        display: grid;
+        gap: 8px;
+      }
+      .ds-file-chip-row,
+      .ds-home-file-chip-row { display: flex; flex-wrap: wrap; gap: 7px; }
+      .ds-file-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        max-width: 260px;
+        min-height: 30px;
+        padding: 5px 8px;
+        color: #29456f;
+        background: #eef5ff;
+        border: 1px solid #d8e6ff;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 750;
+      }
+      .ds-file-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .ds-file-chip em { font-style: normal; color: #6a7690; font-weight: 700; }
+      .ds-file-chip button {
+        width: 20px;
+        height: 20px;
+        display: grid;
+        place-items: center;
+        color: #6a7690;
+        background: #fff;
+        border: 1px solid #d8e6ff;
+        border-radius: 999px;
+      }
+      .ds-agent-input-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid #dfe7f2;
+        border-radius: 20px;
+        box-shadow: 0 18px 40px rgba(37, 48, 77, 0.10);
+        backdrop-filter: blur(14px);
+      }
+      .ds-attach-btn,
+      .ds-agent-send-btn {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        color: #2f5fb6;
+        background: #f2f7ff;
+        border: 1px solid #d8e6ff;
+        border-radius: 13px;
+      }
+      .ds-agent-send-btn {
+        color: #fff;
+        background: linear-gradient(145deg, var(--blue, #2f6fed), #7da8ff);
+        border-color: transparent;
+        box-shadow: 0 10px 20px rgba(47, 111, 237, 0.22);
+      }
+      .ds-agent-input-row textarea {
+        min-height: 40px;
+        max-height: 160px;
+        flex: 1;
+        resize: none;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: #1b2332;
+        font: inherit;
+        line-height: 1.5;
+        padding: 8px 4px;
+      }
+      .ds-agent-disclaimer { margin: 0; color: #8a93a5; font-size: 12px; text-align: center; }
+      .ds-recent-empty {
+        min-height: 92px;
+        display: grid;
+        place-items: center;
+        padding: 14px;
+        color: #8a93a5;
+        font-size: 13px;
+        line-height: 1.55;
+        text-align: center;
+        white-space: pre-line;
+        border: 1px dashed #d9e3f3;
+        border-radius: 16px;
+        background: rgba(248, 251, 255, 0.74);
+      }
+      .recent-item.is-active {
+        background: #eef5ff;
+        border-color: #c9dcff;
+      }
+
+      .recent-item-wrap {
+        position: relative;
+        min-width: 0;
+        display: flex;
+        align-items: stretch;
+      }
+      .recent-item-wrap .recent-item {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding-right: 42px;
+      }
+      .recent-item-wrap.is-favorite .recent-item-title::before {
+        content: "★ ";
+        color: #f6a400;
+        font-size: 12px;
+      }
+      .recent-more-btn {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.82);
+        color: #667083;
+        font-size: 18px;
+        font-weight: 900;
+        line-height: 1;
+        opacity: 0;
+        transform: translateY(-50%);
+        cursor: pointer;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+        transition: opacity 140ms ease, background 140ms ease, color 140ms ease, transform 140ms ease;
+      }
+      .recent-item-wrap:hover .recent-more-btn,
+      .recent-item-wrap:focus-within .recent-more-btn {
+        opacity: 1;
+      }
+      .recent-more-btn:hover {
+        color: #2f6fed;
+        background: #ffffff;
+        transform: translateY(-50%) scale(1.03);
+      }
+      .recent-context-menu {
+        position: absolute;
+        z-index: 80;
+        right: 8px;
+        top: calc(100% - 3px);
+        width: 132px;
+        padding: 6px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.98);
+        box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+        backdrop-filter: blur(12px);
+      }
+      .recent-context-menu button {
+        width: 100%;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: #334155;
+        font-size: 13px;
+        font-weight: 750;
+        text-align: left;
+        cursor: pointer;
+      }
+      .recent-context-menu button:hover {
+        background: #f1f6ff;
+        color: #2f6fed;
+      }
+      .recent-context-menu button.danger:hover {
+        background: #fff1f2;
+        color: #e11d48;
+      }
+
+      .ds-toast {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        z-index: 9999;
+        min-width: 220px;
+        max-width: min(420px, calc(100vw - 32px));
+        padding: 12px 14px;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 800;
+        text-align: center;
+        background: rgba(20, 28, 44, .92);
+        border-radius: 999px;
+        box-shadow: 0 14px 36px rgba(0, 0, 0, .18);
+        transform: translate(-50%, 12px);
+        opacity: 0;
+        transition: opacity .18s ease, transform .18s ease;
+      }
+      .ds-toast.show { opacity: 1; transform: translate(-50%, 0); }
+      @media (max-width: 900px) {
+        .ds-agent-workspace { padding: 0 14px 12px; }
+        .ds-chat-avatar { display: none; }
+        .ds-msg { max-width: min(720px, calc(100% - 24px)); }
+        .ds-agent-body { padding-top: 28px; }
+        .ds-bot-copy-btn { margin-left: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function attachToExistingHome() {
+    state.homePanel = document.querySelector(".home-stage");
+    state.homeContent = document.querySelector(".home-fit");
+    state.homePromptInput = document.querySelector(".prompt-card textarea");
+    state.homeSendBtn = document.querySelector(".prompt-card .send-btn");
+    state.homeAttachBtn = document.querySelector(".prompt-card .icon-btn");
+    state.profileName = document.querySelector(".profile-button strong");
+    state.profileAvatar = document.querySelector(".avatar");
+    state.recentList = document.querySelector(".recent-list");
+    state.lowerRecentList = document.querySelector(".task-list");
+
+    const promptCard = document.querySelector(".prompt-card");
+    if (promptCard && !document.getElementById("dsHomeFileChips")) {
+      const chips = document.createElement("div");
+      chips.id = "dsHomeFileChips";
+      chips.className = "ds-home-file-chip-row";
+      chips.hidden = true;
+      chips.setAttribute("aria-label", "첨부 파일 목록");
+      promptCard.appendChild(chips);
+      state.homeFileChips = chips;
     } else {
-      agentSessionId = "";
-      sessionStorage.removeItem("ds_agent_session_id");
+      state.homeFileChips = document.getElementById("dsHomeFileChips");
     }
 
-    agentStateReady = true;
-    agentStateLoading = false;
-    agentConversationRenderedFromCache = false;
-    clearAgentConversationCache();
-    clearAgentFiles();
-    clearAgentComposerInput();
-    resetAgentMessagesKeepingWelcome();
-    clearAgentConversationCache();
-    if (agentBody) agentBody.scrollTop = 0;
-    scheduleRecentSessionsRefresh();
-    setMode("home");
-    focusInputWhenPanelReady(agentMessageInput);
-  } catch (err) {
-    addMessage(agentBody, "bot", "새 대화를 시작하지 못했습니다.\n" + getErrorMessage(err), true);
-  } finally {
-    if (agentNewChatBtn) {
-      agentNewChatBtn.textContent = previousLabel;
+    if (!state.fileInput) {
+      const input = document.createElement("input");
+      input.id = "dsPlatformFileInput";
+      input.type = "file";
+      input.multiple = true;
+      input.hidden = true;
+      input.accept = ".txt,.md,.csv,.json,.docx,.xlsx,.pptx,.pdf";
+      document.body.appendChild(input);
+      state.fileInput = input;
     }
-    updateAgentNewChatButtonVisibility();
   }
-}
 
-function getAgentHistoryCacheKey() {
-  const userKey = currentEmpNo || currentLoginId || agentSessionId || getSessionTokenCachePart();
-  if (!userKey) return "";
-  return AGENT_HISTORY_CACHE_PREFIX + String(userKey).replace(/[^a-zA-Z0-9_.:-]/g, "_");
-}
-
-function getSessionTokenCachePart() {
-  if (!sessionToken) return "";
-  const parts = sessionToken.split(".");
-  return String(parts[1] || parts[0] || sessionToken).slice(0, 24);
-}
-
-function getAgentConversationMessages(maxMessages = AGENT_HISTORY_CACHE_MAX_MESSAGES) {
-  if (!agentBody) return [];
-
-  return Array.from(agentBody.querySelectorAll(".chat-row .msg"))
-    .filter((el) => !el.classList.contains("debug"))
-    .map((el) => {
-      const role = el.classList.contains("user") ? "user" : "assistant";
-      const text = String(el.textContent || "").trim();
-      return { role, text };
-    })
-    .filter((msg) => msg.text)
-    .slice(-maxMessages);
-}
-
-function saveAgentConversationCacheNow() {
-  const key = getAgentHistoryCacheKey();
-  if (!key) return;
-
-  const messages = getAgentConversationMessages();
-
-  try {
-    if (!messages.length) {
-      sessionStorage.removeItem(key);
-      return;
-    }
-
-    sessionStorage.setItem(
-      key,
-      JSON.stringify({
-        savedAt: Date.now(),
-        sessionId: agentSessionId || "",
-        messages,
-      })
-    );
-  } catch {
+  function createRuntimeAgentWorkspace() {
+    if (document.getElementById("dsAgentWorkspace")) return;
+    const panel = document.createElement("section");
+    panel.id = "dsAgentWorkspace";
+    panel.className = "ds-agent-workspace";
+    panel.hidden = true;
+    panel.setAttribute("aria-label", "업무 AI Agent 대화");
+    panel.innerHTML = `
+      <div id="dsAgentBody" class="ds-agent-body" aria-live="polite"></div>
+      <form id="dsAgentForm" class="ds-agent-composer" autocomplete="off">
+        <div id="dsAgentFileChips" class="ds-file-chip-row" hidden aria-label="첨부 파일 목록"></div>
+        <div class="ds-agent-input-row">
+          <button id="dsAgentAttachBtn" class="ds-attach-btn" type="button" aria-label="파일 첨부" title="파일 첨부">
+            <svg class="icon" aria-hidden="true"><use href="#i-clip"></use></svg>
+          </button>
+          <textarea id="dsAgentMessageInput" rows="1" placeholder="메시지를 입력하세요. Shift+Enter로 줄바꿈"></textarea>
+          <button id="dsAgentSendBtn" class="ds-agent-send-btn" type="submit" aria-label="전송">
+            <svg class="icon" aria-hidden="true"><use href="#i-send"></use></svg>
+          </button>
+        </div>
+        <p class="ds-agent-disclaimer">AI 답변은 참고용입니다. 중요한 업무에는 근거와 원문을 확인해 주세요.</p>
+      </form>
+    `;
+    const host = state.homePanel || document.querySelector(".home-stage") || document.querySelector(".main-shell") || document.body;
+    host.appendChild(panel);
+    state.docPanel = panel;
+    state.agentBody = document.getElementById("dsAgentBody");
+    state.agentForm = document.getElementById("dsAgentForm");
+    state.agentMessageInput = document.getElementById("dsAgentMessageInput");
+    state.agentSendBtn = document.getElementById("dsAgentSendBtn");
+    state.agentAttachBtn = document.getElementById("dsAgentAttachBtn");
+    state.agentFileChips = document.getElementById("dsAgentFileChips");
+    state.agentNewChatBtn = null;
+    state.docBackBtn = null;
   }
-}
 
-function saveAgentConversationCacheDebounced() {
-  window.clearTimeout(agentCacheSaveTimer);
-  agentCacheSaveTimer = window.setTimeout(saveAgentConversationCacheNow, 120);
-}
+  function bindUiEvents() {
+    document.querySelectorAll(".menu-item").forEach((button) => {
+      const label = button.textContent.trim();
+      if (label.includes("새 대화")) {
+        button.addEventListener("click", () => {
+          startNewConversation({ showToast: true });
+          setMode("home");
+        });
+      } else if (label.includes("검색") || label.includes("즐겨찾기") || label.includes("휴지통")) {
+        button.addEventListener("click", () => showToast("해당 기능은 추후 연동 예정입니다."));
+      }
+    });
 
-function restoreAgentConversationFromCache() {
-  if (!agentBody || hasAgentVisibleConversation()) return false;
-
-  const key = getAgentHistoryCacheKey();
-  if (!key) return false;
-
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (!raw) return false;
-
-    const payload = JSON.parse(raw);
-    const savedAt = Number(payload.savedAt || 0);
-    const messages = Array.isArray(payload.messages) ? payload.messages : [];
-
-    if (!savedAt || Date.now() - savedAt > AGENT_HISTORY_CACHE_TTL_MS) {
-      sessionStorage.removeItem(key);
-      return false;
-    }
-
-    if (!messages.length) return false;
-
-    resetAgentMessagesKeepingWelcome();
-
-    messages.forEach((msg) => {
-      const role = msg.role === "user" ? "user" : "bot";
-      addMessage(agentBody, role, String(msg.text || ""), false, {
-        skipAgentSave: true,
-        skipAgentCache: true,
+    document.querySelectorAll(".action-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const meta = getCardTemplate(card);
+        currentTask = meta.task;
+        if (meta.template) setHomeInput(meta.template);
+        if (meta.attach) state.fileInput?.click();
       });
     });
 
-    agentConversationRenderedFromCache = true;
-    agentBody.scrollTop = agentBody.scrollHeight;
-    updateAgentNewChatButtonVisibility();
-    return true;
-  } catch {
-    sessionStorage.removeItem(key);
-    return false;
+    state.homeAttachBtn?.addEventListener("click", () => state.fileInput?.click());
+    state.agentAttachBtn?.addEventListener("click", () => state.fileInput?.click());
+    state.fileInput?.addEventListener("change", () => {
+      addFiles(state.fileInput.files || []);
+      state.fileInput.value = "";
+    });
+
+    state.homeSendBtn?.addEventListener("click", submitFromHome);
+    state.homePromptInput?.addEventListener("input", () => resizeTextarea(state.homePromptInput));
+    state.homePromptInput?.addEventListener("keydown", (event) => {
+      if (!isPlainEnterSubmitEvent(event)) return;
+      event.preventDefault();
+      submitFromHome();
+    });
+
+    state.docBackBtn?.addEventListener("click", () => setMode("home"));
+    state.agentNewChatBtn?.addEventListener("click", startNewConversation);
+    state.agentBody?.addEventListener("click", (event) => {
+      const button = event.target.closest(".ds-agent-suggestion-btn");
+      if (!button) return;
+      setAgentInput(button.getAttribute("data-template") || "");
+    });
+    state.agentMessageInput?.addEventListener("input", () => resizeTextarea(state.agentMessageInput));
+    state.agentMessageInput?.addEventListener("keydown", (event) => {
+      if (!isPlainEnterSubmitEvent(event)) return;
+      event.preventDefault();
+      handleAgentSubmit();
+    });
+    state.agentForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      handleAgentSubmit();
+    });
+
+    document.querySelectorAll(".sidebar-guide-button,.header-button,.task-row").forEach((button) => {
+      button.addEventListener("click", () => showToast("해당 기능은 추후 연동 예정입니다."));
+    });
+    document.addEventListener("click", (event) => {
+      if (recentContextMenu && !event.target.closest(".recent-context-menu") && !event.target.closest(".recent-more-btn")) closeRecentContextMenu();
+    });
+    window.addEventListener("resize", () => {
+      closeRecentContextMenu();
+      resizeTextarea(state.homePromptInput);
+      resizeTextarea(state.agentMessageInput);
+    });
   }
-}
 
-// PPTX/Skywork 생성 잠금·폴링 기능은 제거했습니다.
-// 아래 상수는 기존 조건문 호환용이며 항상 false입니다.
-const isAgentPptGenerating = false;
-const AGENT_DEFAULT_PLACEHOLDER = agentMessageInput?.getAttribute("placeholder") || "메일 초안, 보고용 요약, 회의록 정리 등 필요한 업무를 입력해 주세요";
-const AGENT_SUGGESTIONS = [
-  {
-    id: "email_draft",
-    label: "메일 다듬기",
-    hint: "정중한 업무 메일",
-    template: "아래 내용을 정중하고 자연스러운 업무 메일로 다듬어 주세요.\n\n[내용]\n",
-  },
-  {
-    id: "report_summary",
-    label: "보고용 요약",
-    hint: "핵심·리스크·다음 조치",
-    template: "아래 내용을 팀장/임원 보고용으로 정리해 주세요.\n형식은 핵심 요약, 주요 내용, 리스크/이슈, 확인 필요, 다음 조치로 작성해 주세요.\n\n[내용]\n",
-  },
-  {
-    id: "meeting_minutes",
-    label: "회의록 정리",
-    hint: "결정사항·할 일 추출",
-    template: "아래 회의 내용을 회의록으로 정리해 주세요.\n회의 요약, 결정사항, 담당자별 할 일, 미확정 사항, 후속 일정으로 구분해 주세요.\n\n[회의 내용]\n",
-  },
-  {
-    id: "document_review",
-    label: "문서 검토",
-    hint: "문제점·보완점 확인",
-    template: "아래 내용을 검토해서 문제될 수 있는 부분, 누락된 부분, 보완 제안을 정리해 주세요.\n\n[내용]\n",
-  },
-  {
-    id: "checklist",
-    label: "체크리스트",
-    hint: "실행 전 점검표",
-    template: "아래 업무를 진행하기 위한 체크리스트를 만들어 주세요.\n목적, 점검 항목, 주의사항, 완료 기준으로 정리해 주세요.\n\n[업무 내용]\n",
-  },
-  {
-    id: "rewrite",
-    label: "문장 교정",
-    hint: "더 자연스럽게",
-    template: "아래 문장을 더 자연스럽고 업무에 적합한 표현으로 다듬어 주세요.\n\n[문장]\n",
-  },
-];
-
-
-function buildAgentSuggestionButtonsHtml() {
-  return AGENT_SUGGESTIONS.map((item) => `
-    <button class="agent-suggestion-btn" type="button" data-template="${escapeHtml(item.template)}" data-task="${escapeHtml(item.id)}">
-      <strong>${escapeHtml(item.label)}</strong>
-      <span>${escapeHtml(item.hint)}</span>
-    </button>
-  `).join("");
-}
-
-function applyAgentSuggestionTemplate(template = "") {
-  if (!agentMessageInput) return;
-  const current = agentMessageInput.value.trim();
-  const next = String(template || "").trimEnd();
-  agentMessageInput.value = current ? `${current}\n\n${next}` : next;
-  autoResizeTextarea(agentMessageInput);
-  focusInputWhenPanelReady(agentMessageInput);
-  const marker = "[내용]";
-  const markerIndex = agentMessageInput.value.indexOf(marker);
-  if (markerIndex >= 0 && typeof agentMessageInput.setSelectionRange === "function") {
-    const start = markerIndex;
-    const end = markerIndex + marker.length;
-    window.setTimeout(() => agentMessageInput.setSelectionRange(start, end), 0);
+  function getCardTemplate(card) {
+    const title = card.querySelector(".card-title")?.textContent.trim() || card.textContent.trim();
+    if (title.includes("문서")) return { task: "document_draft", attach: false, template: "아래 내용을 바탕으로 업무용 문서 초안을 작성해 주세요.\n\n[작성할 내용]\n" };
+    if (title.includes("요약")) return { task: "document_summary", attach: false, template: "아래 내용을 핵심만 간결하게 요약해 주세요.\n\n[요약할 내용]\n" };
+    if (title.includes("번역")) return { task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" };
+    if (title.includes("엑셀")) return { task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요." };
+    if (title.includes("파일")) return { task: "file_question", attach: true, template: "첨부한 파일을 기준으로 질문에 답변해 주세요.\n\n[질문]\n" };
+    if (title.includes("보고서")) return { task: "report_summary", attach: false, template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" };
+    return { task: "", attach: false, template: "" };
   }
-}
 
-function syncAgentPptGeneratingControls() {
-  if (agentMessageInput) {
-    agentMessageInput.disabled = false;
-    agentMessageInput.placeholder = AGENT_DEFAULT_PLACEHOLDER;
-  }
-  if (agentSendBtn) agentSendBtn.disabled = false;
-  if (agentAttachBtn) agentAttachBtn.disabled = false;
-  if (agentFileInput) agentFileInput.disabled = false;
-}
+  function setMode(mode) {
+    currentMode = mode;
+    const isDocMode = mode === "doc";
 
-function getAuthCacheKey() {
-  if (!sessionToken) return "";
-  const parts = sessionToken.split(".");
-  const signaturePart = parts[1] || sessionToken;
-  return AUTH_CACHE_STORAGE_PREFIX + signaturePart.slice(0, 24);
-}
-
-function getCachedAuth() {
-  const key = getAuthCacheKey();
-  if (!key) return null;
-
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (!raw) return null;
-
-    const cached = JSON.parse(raw);
-    const savedAt = Number(cached.savedAt || 0);
-
-    if (!savedAt || Date.now() - savedAt > AUTH_CACHE_TTL_MS) {
-      sessionStorage.removeItem(key);
-      return null;
+    // ChatGPT처럼 같은 메인 화면 영역 안에서 홈 → 대화 화면으로 전환합니다.
+    // .home-stage 자체를 숨기면 grid 레이아웃 밖에 대화 패널이 붙어 화면이 깨지므로,
+    // 홈 콘텐츠(.home-fit)만 숨기고 대화 워크스페이스를 같은 영역에 표시합니다.
+    if (state.homePanel) {
+      state.homePanel.hidden = false;
+      state.homePanel.classList.toggle("ds-agent-mode", isDocMode);
     }
+    if (state.homeContent) state.homeContent.hidden = isDocMode;
+    if (state.docPanel) state.docPanel.hidden = !isDocMode;
 
-    return cached;
-  } catch {
-    sessionStorage.removeItem(key);
-    return null;
-  }
-}
-
-function setCachedAuth(profile) {
-  const key = getAuthCacheKey();
-  if (!key || !profile) return;
-
-  try {
-    sessionStorage.setItem(
-      key,
-      JSON.stringify({
-        savedAt: Date.now(),
-        empNo: profile.empNo || "",
-        loginId: profile.loginId || "",
-        userName: getDisplayUserName(profile),
-        defaultProvider: profile.defaultProvider || "",
-      })
-    );
-  } catch (err) {
-  }
-}
-
-function clearCachedAuth() {
-  const key = getAuthCacheKey();
-  if (key) sessionStorage.removeItem(key);
-}
-
-function getCachedDisplayName() {
-  try {
-    const raw = localStorage.getItem(DISPLAY_NAME_CACHE_KEY);
-    if (!raw) return "";
-
-    const cached = JSON.parse(raw);
-    const savedAt = Number(cached.savedAt || 0);
-    const name = String(cached.name || "").trim();
-
-    if (!name || !savedAt || Date.now() - savedAt > DISPLAY_NAME_CACHE_TTL_MS) {
-      localStorage.removeItem(DISPLAY_NAME_CACHE_KEY);
-      return "";
+    if (isDocMode) {
+      window.setTimeout(() => state.agentMessageInput?.focus(), 60);
+    } else {
+      window.setTimeout(() => state.homePromptInput?.focus(), 60);
     }
+  }
 
-    return name;
-  } catch {
-    localStorage.removeItem(DISPLAY_NAME_CACHE_KEY);
+  function submitFromHome() {
+    const message = String(state.homePromptInput?.value || "").trim();
+    if (!message && !selectedFiles.length) {
+      state.homePromptInput?.focus();
+      return;
+    }
+    setMode("doc");
+    if (message) setAgentInput(message);
+    if (state.homePromptInput) state.homePromptInput.value = "";
+    resizeTextarea(state.homePromptInput);
+    handleAgentSubmit();
+  }
+
+  function setAgentInput(value) {
+    if (!state.agentMessageInput) return;
+    state.agentMessageInput.value = String(value || "");
+    resizeTextarea(state.agentMessageInput);
+    window.setTimeout(() => state.agentMessageInput?.focus(), 30);
+  }
+
+  function setHomeInput(value) {
+    if (!state.homePromptInput) return;
+    state.homePromptInput.value = String(value || "");
+    resizeTextarea(state.homePromptInput);
+    window.setTimeout(() => state.homePromptInput?.focus(), 30);
+  }
+
+  function startNewConversation(options = {}) {
+    const { showToast: shouldShowToast = false } = options || {};
+    closeRecentContextMenu();
+    activeConversationId = "";
+    currentTask = "";
+    selectedFiles = [];
+    renderFileChips();
+    clearMessages();
+    if (state.agentMessageInput) state.agentMessageInput.value = "";
+    if (state.homePromptInput) state.homePromptInput.value = "";
+    resizeTextarea(state.agentMessageInput);
+    resizeTextarea(state.homePromptInput);
+    sessionStorage.removeItem(getLocalHistoryKey());
+    renderRecentWorkList();
+    if (shouldShowToast) showToast("새 대화를 시작했습니다.");
+  }
+
+  function clearMessages() {
+    if (!state.agentBody) return;
+    state.agentBody.querySelectorAll(".ds-chat-row,.ds-thinking-row").forEach((node) => node.remove());
+    const emptyCard = state.agentBody.querySelector(".ds-agent-empty-card");
+    if (emptyCard) emptyCard.hidden = false;
+  }
+
+  function addFiles(fileList) {
+    const files = Array.from(fileList || []);
+    const rejected = [];
+    files.forEach((file) => {
+      const reason = validateFile(file);
+      if (reason) {
+        rejected.push(reason);
+        return;
+      }
+      const duplicated = selectedFiles.some((item) => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified);
+      if (!duplicated) selectedFiles.push(file);
+    });
+    renderFileChips();
+    if (rejected.length) showToast(rejected[0]);
+  }
+
+  function validateFile(file) {
+    const name = String(file?.name || "");
+    const ext = getFileExtension(name);
+    if (!ext) return `${name || "파일"}의 확장자를 확인할 수 없습니다.`;
+    if (BLOCKED_EXTENSIONS.has(ext)) return `${name} 파일 형식은 보안 정책상 첨부할 수 없습니다.`;
+    if (ALLOWED_EXTENSIONS.length && !ALLOWED_EXTENSIONS.includes(ext)) return `${name} 파일 형식은 지원하지 않습니다.`;
+    if (file.size > MAX_FILE_SIZE_BYTES) return `${name} 파일은 ${formatFileSize(MAX_FILE_SIZE_BYTES)} 이하만 첨부할 수 있습니다.`;
     return "";
   }
-}
 
-function setCachedDisplayName(name) {
-  const safeName = String(name || "").trim();
-  if (!safeName || safeName === "사용자") return;
-
-  try {
-    localStorage.setItem(
-      DISPLAY_NAME_CACHE_KEY,
-      JSON.stringify({
-        name: safeName,
-        savedAt: Date.now(),
-      })
-    );
-  } catch (err) {
-  }
-}
-
-function applyAuthenticatedProfile(profile) {
-  currentEmpNo = String(profile.empNo || "");
-  currentLoginId = String(profile.loginId || "");
-  const displayUserName = getDisplayUserName(profile);
-
-  userInfo.textContent = "로그인ID: " + currentLoginId;
-  setCachedDisplayName(displayUserName);
-  setHomeGreeting(displayUserName, true);
-  restoreChatHistory();
-  enableApp();
-  ensureRecentSessionsSection();
-  scheduleRecentSessionsRefresh();
-
-  // 홈 화면 초기 로딩 속도를 위해 업무 AI Agent 세션 복원은 화면 진입 후 비동기로 수행합니다.
-  if (isDocModeActive()) {
-    scheduleAgentSessionRestore();
-  }
-}
-
-function getDisplayUserName(profile) {
-  const candidates = [
-    profile?.userName,
-    profile?.user_name,
-    profile?.name,
-    profile?.displayName,
-    profile?.display_name,
-    profile?.empName,
-    profile?.empNm,
-    profile?.employeeName,
-    profile?.korName,
-    profile?.koreanName,
-  ];
-
-  const found = candidates
-    .map((value) => String(value || "").trim())
-    .find((value) => value && value !== "undefined" && value !== "null");
-
-  return found || "사용자";
-}
-
-function setHomeGreeting(name, isAuthenticated = true) {
-  if (!homeGreetingText) return;
-
-  homeGreetingText.classList.remove("is-waiting-auth", "is-auth-ready", "is-auth-pending");
-
-  if (!isAuthenticated) {
-    homeGreetingText.textContent = "인증 후 이용 가능합니다";
-    homeGreetingText.classList.add("is-auth-ready");
-    return;
+  function getFileExtension(name) {
+    const match = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
+    return match ? match[1] : "";
   }
 
-  const safeName = String(name || "").trim();
-  homeGreetingText.textContent = safeName
-    ? safeName + "님, 필요한 업무를 선택해 주세요"
-    : DEFAULT_HOME_GREETING;
-  homeGreetingText.classList.add("is-auth-ready");
-}
-
-function showInitialHomeGreeting() {
-  const cachedName = getCachedDisplayName();
-  setHomeGreeting(cachedName, true);
-
-  if (homeGreetingText && !cachedName) {
-    homeGreetingText.classList.add("is-auth-pending");
-  }
-}
-
-bootstrap();
-
-async function bootstrap() {
-  cleanupExpiredChatHistories();
-  showInitialHomeGreeting();
-
-  // RPA 목록 새로고침 버튼은 최종 사용자용 UI에서는 숨깁니다.
-  if (reloadRpaBtn) {
-    reloadRpaBtn.style.display = "none";
-    reloadRpaBtn.disabled = true;
-  }
-
-  const url = new URL(location.href);
-  const tokenFromUrl = url.searchParams.get("token");
-
-  if (tokenFromUrl) {
-    sessionToken = tokenFromUrl;
-    sessionStorage.setItem("sso_session_token", sessionToken);
-    url.searchParams.delete("token");
-    history.replaceState({}, "", url.toString());
-  }
-
-  if (!sessionToken) {
-    userInfo.textContent = "인증 정보가 없습니다. 그룹웨어에서 다시 접속하세요.";
-    setHomeGreeting("", false);
-    disableApp();
-    return;
-  }
-
-  const cachedAuth = getCachedAuth();
-  if (cachedAuth) {
-    applyAuthenticatedProfile(cachedAuth);
-    return;
-  }
-
-  try {
-    const me = await apiJson(AI_API_URL, { method: "GET" });
-
-    if (!me.ok) {
-      throw new Error(me.message || "인증 확인 실패");
-    }
-
-    setCachedAuth(me);
-    applyAuthenticatedProfile(me);
-  } catch (err) {
-    clearCachedAuth();
-    sessionStorage.removeItem("sso_session_token");
-    sessionToken = "";
-    userInfo.textContent = "인증 실패: " + getErrorMessage(err);
-    setHomeGreeting("", false);
-    disableApp();
-  }
-}
-
-function enableApp() {
-  if (messageInput) messageInput.disabled = false;
-  if (sendBtn) sendBtn.disabled = false;
-  syncAgentPptGeneratingControls();
-
-  if (directQuestionBtn) directQuestionBtn.disabled = false;
-  if (docWriteBtn) docWriteBtn.disabled = false;
-  if (rpaEntryBtn) rpaEntryBtn.disabled = false;
-  if (aiBtn) aiBtn.disabled = false;
-  if (rpaBtn) rpaBtn.disabled = false;
-
-  if (currentMode === "doc" && !isAgentPptGenerating) focusInputWhenPanelReady(agentMessageInput);
-}
-
-function disableApp() {
-  if (messageInput) messageInput.disabled = true;
-  if (sendBtn) sendBtn.disabled = true;
-  if (agentMessageInput) agentMessageInput.disabled = true;
-  if (agentSendBtn) agentSendBtn.disabled = true;
-  if (agentAttachBtn) agentAttachBtn.disabled = true;
-  if (agentFileInput) agentFileInput.disabled = true;
-  if (reloadRpaBtn) reloadRpaBtn.disabled = true;
-
-  if (directQuestionBtn) directQuestionBtn.disabled = true;
-  if (docWriteBtn) docWriteBtn.disabled = true;
-  if (rpaEntryBtn) rpaEntryBtn.disabled = true;
-  if (aiBtn) aiBtn.disabled = true;
-  if (rpaBtn) rpaBtn.disabled = true;
-}
-
-function focusInputWhenPanelReady(input) {
-  if (!input || input.disabled) return;
-
-  const focus = () => {
-    if (!input.disabled) input.focus();
-  };
-
-  requestAnimationFrame(focus);
-  setTimeout(focus, 80);
-  setTimeout(focus, 180);
-}
-
-function setMode(mode) {
-  currentMode = mode;
-
-  if (aiBtn) aiBtn.classList.toggle("active", mode === "ai");
-  if (rpaBtn) rpaBtn.classList.toggle("active", mode === "rpa");
-  if (homePanel) homePanel.classList.toggle("active", mode === "home");
-  if (aiPanel) aiPanel.classList.toggle("active", mode === "ai");
-  if (docPanel) docPanel.classList.toggle("active", mode === "doc");
-  if (rpaPanel) rpaPanel.classList.toggle("active", mode === "rpa");
-
-  if (mode === "rpa" && !rpaLoaded) {
-    // RPA 화면 진입 시 1회만 목록 + 상태를 조회합니다.
-    loadRpaList();
-  }
-
-  if (mode === "ai") {
-    focusInputWhenPanelReady(messageInput);
-  }
-
-  if (mode === "doc") {
-    if (docWriteBtn) docWriteBtn.blur();
-    ensureAgentWelcomeCard();
-    restoreAgentConversationFromCache();
-    syncAgentPptGeneratingControls();
-    updateAgentNewChatButtonVisibility();
-    if (!isAgentPptGenerating) focusInputWhenPanelReady(agentMessageInput);
-    scheduleAgentSessionRestore();
-  }
-}
-
-function showComingSoonNotice() {
-  // 두 번째 버튼은 아직 기능 연동 전이므로 화면 전환 없이 안내만 표시합니다.
-  const originalTitle = docWriteBtn?.querySelector("strong")?.textContent || "AI 문서 작성";
-  const originalDesc = docWriteBtn?.querySelector("em")?.textContent || "이메일, 결재문, 보고서 작성";
-  const title = docWriteBtn?.querySelector("strong");
-  const desc = docWriteBtn?.querySelector("em");
-
-  if (!title || !desc) return;
-
-  title.textContent = "AI 문서 작성";
-  desc.textContent = "준비 중입니다";
-
-  window.clearTimeout(showComingSoonNotice.timer);
-  showComingSoonNotice.timer = window.setTimeout(() => {
-    title.textContent = originalTitle;
-    desc.textContent = originalDesc;
-  }, 1400);
-}
-
-function normalizeBotMessageText(text) {
-  let value = String(text || "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .trimEnd();
-
-  if (!value) return "";
-
-  const sectionLabels = [
-    "제목:",
-    "본문:",
-    "수정 포인트:",
-    "후속 작업 제안:",
-    "결론:",
-    "파일 구조 요약:",
-    "핵심 이슈:",
-    "주요 리스크:",
-    "우선 조치:",
-    "요약:",
-    "검토 결과 요약:",
-    "문제/리스크:",
-    "보완 제안:",
-    "확인 필요:",
-    "기준 및 근거:",
-    "기준/근거:",
-    "근거:",
-    "다음 조치:",
-    "참고:",
-  ];
-
-  sectionLabels.forEach((label) => {
-    const escaped = escapeRegExp(label);
-    value = value.replace(new RegExp(`([^\\n])\\s*(${escaped})`, "g"), "$1\n\n$2");
-  });
-
-  // 모델이 굵게 표시 기호를 줄바꿈과 섞어 반환하는 경우를 보정합니다.
-  value = value
-    .replace(/\n\s*\*\*\s*\n+\s*([^\n*][^\n]{0,40}:?)\s*\*\*/g, "\n## $1")
-    .replace(/\*\*\s*\n+\s*([^\n*][^\n]{0,40}:?)\s*\*\*/g, "## $1")
-    .replace(/^\s*\*\*\s*$/gm, "")
-    .replace(/기준\s*\/\s*\n+\s*근거\s*:?/g, "기준 및 근거")
-    .replace(/기준\s*\/\s*근거\s*:?/g, "기준 및 근거");
-
-  // 모델이 한 문단 안에 목록을 붙여서 반환하는 경우를 화면에서 읽기 좋게 보정합니다.
-  value = value
-    .replace(/(^|\n)\s*(\d+)[.)]\s*\n+\s*([^\n]+)/g, "$1$2. $3")
-    .replace(/(^|\n)\s*[-•·]\s*\n+\s*([^\n]+)/g, "$1• $2")
-    .replace(/([^\n])\s+(\d+\.\s+[^\n])/g, "$1\n$2")
-    .replace(/([^\n])\s+(·\s+[^\n])/g, "$1\n$2")
-    .replace(/([^\n])\s+([-•]\s+[^\n])/g, "$1\n$2")
-    .replace(/Excel\s*정밀\s*구조\s*분석\s*JSON의?\s*[A-Za-z0-9_.\[\],\s]+\s*정보를\s*활용하였습니다\.?/gi, "업로드된 Excel 파일의 시트별 구조, 주요 컬럼, 계산값, 데이터 품질 신호를 기준으로 작성되었습니다.")
-    .replace(/riskRegister|metricIndex|groupSummaryIndex|topRowsIndex|bottomRowsIndex|questionReady|primaryTables|businessViews|workbookIntelligence|answerGuide|sheetMeta|visualLayout|detectedTables/gi, "분석 근거")
-    .replace(/\n{3,}/g, "\n\n");
-
-  return value;
-}
-
-function escapeRegExp(value) {
-  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function renderMessageContent(div, text) {
-  div.textContent = "";
-  const normalizedText = normalizeBotMessageText(text);
-  const lines = normalizedText.split(/\n/);
-
-  let index = 0;
-  let lastWasSpacer = false;
-
-  while (index < lines.length) {
-    const rawLine = lines[index] || "";
-    const trimmed = rawLine.trim();
-
-    if (!trimmed) {
-      if (!lastWasSpacer && div.childNodes.length) {
-        const spacer = document.createElement("div");
-        spacer.className = "msg-block-spacer";
-        div.appendChild(spacer);
-        lastWasSpacer = true;
-      }
-      index += 1;
-      continue;
-    }
-
-    if (/^```/.test(trimmed)) {
-      const codeLines = [];
-      index += 1;
-      while (index < lines.length && !/^```/.test(String(lines[index] || "").trim())) {
-        codeLines.push(lines[index] || "");
-        index += 1;
-      }
-      if (index < lines.length) index += 1;
-      appendCodeBlock(div, codeLines.join("\n"));
-      lastWasSpacer = false;
-      continue;
-    }
-
-    if (isMarkdownTableStart(lines, index)) {
-      const tableLines = [];
-      while (index < lines.length && isMarkdownTableLine(lines[index])) {
-        tableLines.push(lines[index]);
-        index += 1;
-      }
-      appendMarkdownTable(div, tableLines);
-      lastWasSpacer = false;
-      continue;
-    }
-
-    appendFormattedLine(div, trimmed);
-    lastWasSpacer = false;
-    index += 1;
-  }
-}
-
-function appendFormattedLine(parent, line) {
-  const headingText = getMessageHeadingText(line);
-  const labelMatch = line.match(/^(제목|본문|수정 포인트|후속 작업 제안|결론|파일 구조 요약|핵심 이슈|주요 리스크|우선 조치|요약|검토 결과 요약|문제\/리스크|보완 제안|확인 필요|기준 및 근거|기준\/근거|근거|다음 조치|참고)\s*:\s+(.+)$/);
-  const numberedMatch = line.match(/^(\d+)[.)]\s+(.+)$/);
-  const bulletMatch = line.match(/^[-•·*]\s+(.+)$/);
-
-  const lineDiv = document.createElement("div");
-
-  if (headingText) {
-    lineDiv.className = "msg-line msg-heading";
-    appendInlineMarkdown(lineDiv, headingText);
-  } else if (labelMatch) {
-    lineDiv.className = "msg-line msg-label-line";
-    const label = document.createElement("strong");
-    label.textContent = labelMatch[1] + ": ";
-    lineDiv.appendChild(label);
-    appendInlineMarkdown(lineDiv, labelMatch[2]);
-  } else if (numberedMatch) {
-    lineDiv.className = "msg-line msg-numbered";
-    const marker = document.createElement("span");
-    marker.className = "msg-list-marker";
-    marker.textContent = numberedMatch[1] + ".";
-    const body = document.createElement("span");
-    body.className = "msg-list-body";
-    appendInlineMarkdown(body, numberedMatch[2]);
-    lineDiv.appendChild(marker);
-    lineDiv.appendChild(body);
-  } else if (bulletMatch) {
-    lineDiv.className = "msg-line msg-bullet";
-    const marker = document.createElement("span");
-    marker.className = "msg-list-marker";
-    marker.textContent = "•";
-    const body = document.createElement("span");
-    body.className = "msg-list-body";
-    appendInlineMarkdown(body, bulletMatch[1]);
-    lineDiv.appendChild(marker);
-    lineDiv.appendChild(body);
-  } else {
-    lineDiv.className = "msg-line";
-    appendInlineMarkdown(lineDiv, line);
-  }
-
-  parent.appendChild(lineDiv);
-}
-
-function getMessageHeadingText(line) {
-  const value = String(line || "").trim();
-  if (!value) return "";
-
-  const markdownHeading = value.match(/^#{1,4}\s+(.+)$/);
-  if (markdownHeading) return markdownHeading[1].trim();
-
-  const boldHeading = value.match(/^\*\*([^*]+)\*\*:?$/);
-  if (boldHeading) return boldHeading[1].trim().replace(/:$/, "");
-
-  const sectionHeading = value.match(/^(본문|수정 포인트|후속 작업 제안|결론|파일 구조 요약|핵심 이슈|주요 리스크|우선 조치|요약|검토 결과 요약|문제\/리스크|보완 제안|확인 필요|기준 및 근거|기준\/근거|근거|다음 조치|참고)\s*:?$/);
-  if (sectionHeading) return sectionHeading[1].trim();
-
-  return "";
-}
-
-function isMarkdownTableLine(line) {
-  const value = String(line || "").trim();
-  return /^\|.+\|$/.test(value);
-}
-
-function isMarkdownTableSeparator(line) {
-  const value = String(line || "").trim();
-  return /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(value);
-}
-
-function isMarkdownTableStart(lines, index) {
-  return isMarkdownTableLine(lines[index]) && isMarkdownTableSeparator(lines[index + 1] || "");
-}
-
-function parseMarkdownTableRow(line) {
-  return String(line || "")
-    .trim()
-    .replace(/^\|/, "")
-    .replace(/\|$/, "")
-    .split("|")
-    .map((cell) => cell.trim());
-}
-
-function cleanMarkdownTableCellForCopy(value) {
-  return String(value || "")
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/<br\s*\/?\s*>/gi, " ")
-    .replace(/[\t\r\n]+/g, " ")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
-
-function buildTsvFromMarkdownTable(tableLines) {
-  const rows = [];
-  tableLines.forEach((line, index) => {
-    if (!isMarkdownTableLine(line) || isMarkdownTableSeparator(line)) return;
-    const cells = parseMarkdownTableRow(line).map(cleanMarkdownTableCellForCopy);
-    if (index === 0 || cells.some((cell) => cell)) rows.push(cells.join("\t"));
-  });
-  return rows.join("\n");
-}
-
-async function copyTextToClipboard(value) {
-  const text = String(value || "");
-  if (!text) return false;
-
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    // 아래 fallback으로 재시도합니다.
-  }
-
-  try {
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.setAttribute("readonly", "");
-    textarea.style.position = "fixed";
-    textarea.style.left = "-9999px";
-    textarea.style.top = "0";
-    textarea.style.opacity = "0";
-    document.body.appendChild(textarea);
-    textarea.select();
-    textarea.setSelectionRange(0, textarea.value.length);
-    const ok = document.execCommand("copy");
-    textarea.remove();
-    return ok;
-  } catch {
-    return false;
-  }
-}
-
-function extractMessageTextForCopy(messageDiv, fallback = "") {
-  if (!messageDiv) return String(fallback || "").trim();
-  const clone = messageDiv.cloneNode(true);
-  clone.querySelectorAll?.(".msg-table-toolbar").forEach((el) => el.remove());
-  return String(clone.textContent || fallback || "").trim();
-}
-
-function setTemporaryButtonText(button, text, delay = 1200) {
-  if (!button) return;
-  const original = button.dataset.originalText || button.textContent || "";
-  button.dataset.originalText = original;
-  button.textContent = text;
-  window.setTimeout(() => {
-    button.textContent = button.dataset.originalText || original;
-  }, delay);
-}
-
-function appendMarkdownTable(parent, tableLines) {
-  if (!tableLines.length) return;
-
-  const wrapper = document.createElement("div");
-  wrapper.className = "msg-table-wrap";
-
-  const toolbar = document.createElement("div");
-  toolbar.className = "msg-table-toolbar";
-
-  const copyBtn = document.createElement("button");
-  copyBtn.type = "button";
-  copyBtn.className = "msg-table-copy-btn";
-  copyBtn.textContent = "표 복사";
-  copyBtn.title = "표를 Excel에 붙여넣기 가능한 형식으로 복사";
-  copyBtn.setAttribute("aria-label", "표를 Excel 붙여넣기용으로 복사");
-  copyBtn.addEventListener("click", async () => {
-    const copied = await copyTextToClipboard(buildTsvFromMarkdownTable(tableLines));
-    copyBtn.classList.toggle("copied", copied);
-    setTemporaryButtonText(copyBtn, copied ? "복사 완료" : "복사 실패", copied ? 1200 : 1600);
-    if (copied) {
-      window.setTimeout(() => copyBtn.classList.remove("copied"), 1200);
-    }
-  });
-
-  toolbar.appendChild(copyBtn);
-  wrapper.appendChild(toolbar);
-
-  const scroll = document.createElement("div");
-  scroll.className = "msg-table-scroll";
-
-  const table = document.createElement("table");
-  table.className = "msg-table";
-
-  const headerCells = parseMarkdownTableRow(tableLines[0]);
-  const thead = document.createElement("thead");
-  const headerRow = document.createElement("tr");
-  headerCells.forEach((cell) => {
-    const th = document.createElement("th");
-    appendInlineMarkdown(th, cell);
-    headerRow.appendChild(th);
-  });
-  thead.appendChild(headerRow);
-  table.appendChild(thead);
-
-  const tbody = document.createElement("tbody");
-  tableLines.slice(2).forEach((line) => {
-    if (!isMarkdownTableLine(line) || isMarkdownTableSeparator(line)) return;
-    const tr = document.createElement("tr");
-    parseMarkdownTableRow(line).forEach((cell) => {
-      const td = document.createElement("td");
-      appendInlineMarkdown(td, cell);
-      tr.appendChild(td);
+  function renderFileChips() {
+    [state.agentFileChips, state.homeFileChips].filter(Boolean).forEach((container) => {
+      container.innerHTML = "";
+      container.hidden = selectedFiles.length === 0;
+      selectedFiles.forEach((file, index) => {
+        const chip = document.createElement("span");
+        chip.className = "ds-file-chip";
+        chip.innerHTML = `<span>${escapeHtml(file.name)}</span><em>${formatFileSize(file.size)}</em><button type="button" aria-label="첨부 파일 제거">×</button>`;
+        chip.querySelector("button")?.addEventListener("click", () => {
+          selectedFiles.splice(index, 1);
+          renderFileChips();
+        });
+        container.appendChild(chip);
+      });
     });
-    tbody.appendChild(tr);
-  });
-  table.appendChild(tbody);
-
-  scroll.appendChild(table);
-  wrapper.appendChild(scroll);
-  parent.appendChild(wrapper);
-}
-
-function appendCodeBlock(parent, code) {
-  const pre = document.createElement("pre");
-  pre.className = "msg-code-block";
-  const codeEl = document.createElement("code");
-  codeEl.textContent = String(code || "");
-  pre.appendChild(codeEl);
-  parent.appendChild(pre);
-}
-
-function appendInlineMarkdown(parent, line) {
-  const value = String(line || "");
-  const pattern = /(\*\*(.+?)\*\*|`([^`]+)`)/g;
-  let lastIndex = 0;
-  let match;
-
-  while ((match = pattern.exec(value)) !== null) {
-    if (match.index > lastIndex) {
-      parent.appendChild(document.createTextNode(value.slice(lastIndex, match.index)));
-    }
-
-    if (match[2] !== undefined) {
-      const strong = document.createElement("strong");
-      strong.textContent = match[2];
-      parent.appendChild(strong);
-    } else if (match[3] !== undefined) {
-      const code = document.createElement("code");
-      code.className = "msg-inline-code";
-      code.textContent = match[3];
-      parent.appendChild(code);
-    }
-
-    lastIndex = pattern.lastIndex;
   }
 
-  if (lastIndex < value.length) {
-    parent.appendChild(document.createTextNode(value.slice(lastIndex)));
-  }
-}
-
-
-function appendBotCopyAction(row, messageDiv, text, options = {}) {
-  if (!row || !messageDiv || options.hideCopy) return;
-
-  const actions = document.createElement("div");
-  actions.className = "bot-message-actions";
-
-  const copyBtn = document.createElement("button");
-  copyBtn.type = "button";
-  copyBtn.className = "bot-copy-btn";
-  copyBtn.title = "답변 복사";
-  copyBtn.setAttribute("aria-label", "답변 복사");
-  copyBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 8.5A2.5 2.5 0 0 1 10.5 6H18a2.5 2.5 0 0 1 2.5 2.5V16A2.5 2.5 0 0 1 18 18.5h-7.5A2.5 2.5 0 0 1 8 16V8.5Z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 15.5H5A2.5 2.5 0 0 1 2.5 13V5.5A2.5 2.5 0 0 1 5 3h7.5A2.5 2.5 0 0 1 15 5.5V6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
-
-  copyBtn.addEventListener("click", async () => {
-    const value = extractMessageTextForCopy(messageDiv, text);
-    if (!value) return;
-
-    const copied = await copyTextToClipboard(value);
-    if (copied) {
-      copyBtn.classList.add("copied");
-      copyBtn.setAttribute("aria-label", "복사 완료");
-      setTimeout(() => {
-        copyBtn.classList.remove("copied");
-        copyBtn.setAttribute("aria-label", "답변 복사");
-      }, 1200);
+  async function handleAgentSubmit() {
+    if (submitInProgress) return;
+    const message = String(state.agentMessageInput?.value || "").trim();
+    if (!message && !selectedFiles.length) {
+      state.agentMessageInput?.focus();
+      return;
     }
-  });
-
-  actions.appendChild(copyBtn);
-  row.appendChild(actions);
-}
-
-function isKnowledgeRedirectText(text) {
-  const value = String(text || "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!value) return false;
-
-  return (
-    value.includes("사내 지식 문의") &&
-    (
-      value.includes("사내 규정") ||
-      value.includes("업무 절차") ||
-      value.includes("정확한 답변") ||
-      value.includes("확인해") ||
-      value.includes("확인해 주세요")
-    )
-  );
-}
-
-function removeBotCopyAction(row) {
-  if (!row) return;
-  row.querySelectorAll(".bot-message-actions").forEach((el) => el.remove());
-}
-
-function appendKnowledgeRedirectButton(row, originalMessage = "") {
-  if (!row || row.querySelector(".knowledge-redirect-actions")) return;
-
-  removeBotCopyAction(row);
-
-  const actions = document.createElement("div");
-  actions.className = "knowledge-redirect-actions";
-
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "knowledge-redirect-btn";
-  btn.textContent = "사내 지식 문의로 이동";
-  btn.addEventListener("click", () => {
-    setMode("ai");
-    if (messageInput) {
-      messageInput.value = originalMessage || "";
-      autoResizeTextarea(messageInput);
-      focusInputWhenPanelReady(messageInput);
+    if (!sessionToken) {
+      addMessage("bot", "그룹웨어 SSO 인증 정보가 없습니다. 그룹웨어 버튼을 통해 다시 접속해 주세요.");
+      return;
     }
-  });
 
-  actions.appendChild(btn);
-  row.appendChild(actions);
-}
+    submitInProgress = true;
+    setComposerDisabled(true);
+    const userText = message || "첨부한 파일을 분석해 주세요.";
+    const history = getRecentHistory();
+    const displayUserMessage = buildDisplayUserMessage(userText);
+    ensureActiveConversation(userText, displayUserMessage);
+    appendConversationMessage("user", displayUserMessage);
+    void saveRemoteConversationMessage("user", displayUserMessage, { route: selectedFiles.length ? "file-api" : "agent-api", task: normalizeTask(currentTask) || currentTask || "general" });
+    addMessage("user", displayUserMessage);
+    if (state.agentMessageInput) state.agentMessageInput.value = "";
+    resizeTextarea(state.agentMessageInput);
+    const thinking = addThinkingMessage("생각 중");
 
-function applyKnowledgeRedirectAction(messageDiv, originalMessage = "") {
-  const row = messageDiv?.closest ? messageDiv.closest(".chat-row") : null;
-  if (!row) return;
-  appendKnowledgeRedirectButton(row, originalMessage);
-}
-
-function setMessageContent(div, text) {
-  if (!div) return;
-  renderMessageContent(div, text);
-
-  if (agentBody && div.closest && div.closest("#agentBody")) {
-    saveAgentConversationCacheDebounced();
+    try {
+      const data = selectedFiles.length ? await requestFileAnalysis(userText, history) : await requestAgentAnswer(userText, history);
+      thinking.remove();
+      const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
+      addMessage("bot", answer);
+      appendConversationMessage("assistant", answer);
+      void saveRemoteConversationMessage("assistant", answer, { route: selectedFiles.length ? "file-api" : "agent-api", task: normalizeTask(currentTask) || currentTask || "general" });
+      saveLocalHistory(userText, answer);
+      renderRecentWorkList();
+    } catch (error) {
+      thinking.remove();
+      const errorText = `업무 AI Agent 처리 중 오류가 발생했습니다.\n${getErrorMessage(error)}`;
+      addMessage("bot", errorText);
+      appendConversationMessage("assistant", errorText);
+      renderRecentWorkList();
+    } finally {
+      submitInProgress = false;
+      setComposerDisabled(false);
+      state.agentMessageInput?.focus();
+    }
   }
-}
 
-function addMessage(targetBody, type, text, debug = false, options = {}) {
-  const div = document.createElement("div");
-  div.className = debug ? "msg bot debug" : "msg " + type;
-
-  if (!debug && type === "bot") {
-    renderMessageContent(div, text);
-  } else {
-    div.textContent = text;
+  function buildDisplayUserMessage(message) {
+    if (!selectedFiles.length) return message;
+    const lines = selectedFiles.map((file, index) => `${index + 1}. ${file.name} (${formatFileSize(file.size)})`);
+    return `${message}\n\n[첨부 파일]\n${lines.join("\n")}`;
   }
 
-  if ((targetBody === aiBody || targetBody === agentBody) && !debug) {
+  async function requestAgentAnswer(message, history) {
+    const res = await fetch(AGENT_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionToken}` },
+      body: JSON.stringify({ message, stream: false, task: normalizeTask(currentTask), history }),
+    });
+    return readApiResponse(res);
+  }
+
+  async function requestFileAnalysis(message, history) {
+    const formData = new FormData();
+    formData.append("message", message);
+    formData.append("stream", "false");
+    formData.append("history", JSON.stringify(history));
+    const normalizedTask = normalizeTask(currentTask);
+    if (normalizedTask) formData.append("task", normalizedTask);
+    selectedFiles.forEach((file) => formData.append("files", file, file.name));
+    const res = await fetch(FILE_API_URL, { method: "POST", headers: { Authorization: `Bearer ${sessionToken}` }, body: formData });
+    return readApiResponse(res);
+  }
+
+  async function readApiResponse(res) {
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch { data = { ok: false, message: text }; }
+    if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`);
+    return data;
+  }
+
+  function normalizeTask(task) {
+    const value = String(task || "").trim();
+    if (!value || value === "excel_analysis" || value === "file_question" || value === "document_draft") return "";
+    if (value === "document_summary") return "document_summary";
+    if (value === "translation") return "translation";
+    if (value === "report_summary") return "report_summary";
+    return value;
+  }
+
+  function extractAnswerText(data) {
+    if (!data) return "";
+    return String(data.answer || data.text || data.message || data.raw || "").trim();
+  }
+
+  function addMessage(role, text) {
+    if (!state.agentBody) return null;
+    const emptyCard = state.agentBody.querySelector(".ds-agent-empty-card");
+    if (emptyCard) emptyCard.hidden = true;
     const row = document.createElement("div");
-    row.className = type === "user" ? "chat-row user-row" : "chat-row bot-row";
-
-    if (type !== "user") {
+    row.className = role === "user" ? "ds-chat-row ds-user-row" : "ds-chat-row ds-bot-row";
+    if (role === "bot") {
       const avatar = document.createElement("span");
-      avatar.className = "chat-avatar";
-      avatar.setAttribute("aria-hidden", "true");
-      avatar.innerHTML = '<img src="./robot.png" alt="" />';
+      avatar.className = "ds-chat-avatar";
+      avatar.textContent = "AI";
       row.appendChild(avatar);
     }
-
-    row.appendChild(div);
-    if (type === "bot") appendBotCopyAction(row, div, text, options);
-    targetBody.appendChild(row);
-  } else {
-    targetBody.appendChild(div);
+    const msg = document.createElement("div");
+    msg.className = `ds-msg ${role === "user" ? "user" : "bot"}`;
+    if (role === "bot") renderMessageContent(msg, text); else msg.textContent = text;
+    row.appendChild(msg);
+    if (role === "bot") addCopyButton(row, msg);
+    state.agentBody.appendChild(row);
+    state.agentBody.scrollTop = state.agentBody.scrollHeight;
+    return row;
   }
 
-  targetBody.scrollTop = targetBody.scrollHeight;
-
-  if (targetBody === aiBody && !debug && !options.skipSave) {
-    saveChatHistory();
+  function addThinkingMessage(text) {
+    const row = document.createElement("div");
+    row.className = "ds-thinking-row ds-bot-row";
+    row.innerHTML = `
+      <span class="ds-chat-avatar">AI</span>
+      <div class="ds-msg bot" aria-label="${escapeHtml(text)}">
+        <span class="ds-thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>`;
+    state.agentBody.appendChild(row);
+    state.agentBody.scrollTop = state.agentBody.scrollHeight;
+    return row;
   }
 
-  if (targetBody === agentBody && !debug && !options.skipAgentCache) {
-    agentConversationRenderedFromCache = false;
-    saveAgentConversationCacheDebounced();
-    updateAgentNewChatButtonVisibility();
-  }
-
-  return div;
-}
-
-
-function appendExcelDownloadButton(targetBody, excel) {
-  appendArtifactDownloadButton(targetBody, excel, { label: "엑셀 다운로드", className: "excel-download-row" });
-}
-
-function isArtifactLinkExpired(artifact, messageCreatedAt) {
-  if (!artifact || artifact.ok !== true || !artifact.downloadUrl) return true;
-
-  const expiresInMs = Number(artifact.expiresIn || 0) * 1000;
-  if (!expiresInMs) return false;
-
-  const createdAtMs = Date.parse(artifact.createdAt || artifact.created_at || messageCreatedAt || "");
-  if (!createdAtMs) return false;
-
-  // 새로고침 직후 링크가 사라지지 않도록 10초의 안전 여유를 둡니다.
-  return Date.now() - createdAtMs > Math.max(0, expiresInMs - 10 * 1000);
-}
-
-function appendSavedArtifactDownloads(targetBody, metadata = {}, messageCreatedAt = "") {
-  if (!targetBody || !metadata) return;
-
-  const excel = metadata.excel || null;
-
-  if (excel?.ok && excel.downloadUrl && !isArtifactLinkExpired(excel, messageCreatedAt)) {
-    appendExcelDownloadButton(targetBody, excel);
-  }
-}
-
-function isArtifactMessageMetadata(metadata = {}) {
-  return Boolean(metadata?.artifact || metadata?.excel?.ok);
-}
-
-function appendArtifactDownloadButton(targetBody, artifact, options = {}) {
-  if (!artifact || artifact.ok !== true || !artifact.downloadUrl) return;
-
-  const row = document.createElement("div");
-  row.className = "chat-row bot-row ppt-download-row " + (options.className || "");
-
-  const spacer = document.createElement("span");
-  spacer.className = "ppt-download-spacer";
-  spacer.setAttribute("aria-hidden", "true");
-
-  const wrap = document.createElement("div");
-  wrap.className = "ppt-download-wrap";
-
-  const link = document.createElement("a");
-  link.className = "ppt-download-btn";
-  link.href = artifact.downloadUrl;
-  if (String(artifact.downloadUrl || "").startsWith("blob:")) {
-    link.download = artifact.fileName || artifact.filename || "download.xlsx";
-  } else {
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-  }
-  link.textContent = options.label || "다운로드";
-
-  const meta = document.createElement("span");
-  meta.className = "ppt-download-meta";
-  meta.textContent = formatPptExpiresText(artifact.expiresIn);
-
-  wrap.appendChild(link);
-  wrap.appendChild(meta);
-  row.appendChild(spacer);
-  row.appendChild(wrap);
-  targetBody.appendChild(row);
-  targetBody.scrollTop = targetBody.scrollHeight;
-}
-
-function appendEvidenceBox(targetBody, data) {
-  if (!targetBody || !data) return;
-
-  const parts = [];
-  if (Array.isArray(data.files) && data.files.length) {
-    const names = data.files.map((file) => file.original_name || file.name).filter(Boolean).slice(0, 3);
-    parts.push("근거: 업로드 파일 " + data.files.length + "개" + (names.length ? " · " + names.join(", ") : ""));
-  }
-  if (data.task === WEB_SEARCH_TASK || data.grounding) {
-    parts.push("근거: 웹 검색/최신 정보 라우팅");
-  }
-  if (!parts.length) return;
-
-  const row = document.createElement("div");
-  row.className = "chat-row bot-row evidence-row";
-  const spacer = document.createElement("span");
-  spacer.className = "ppt-download-spacer";
-  spacer.setAttribute("aria-hidden", "true");
-  const box = document.createElement("div");
-  box.className = "evidence-box";
-  box.textContent = parts.join(" / ");
-  row.appendChild(spacer);
-  row.appendChild(box);
-  targetBody.appendChild(row);
-  targetBody.scrollTop = targetBody.scrollHeight;
-}
-
-function formatPptExpiresText(expiresIn) {
-  const seconds = Number(expiresIn || 0);
-  if (!seconds) return "임시 링크";
-  const minutes = Math.max(1, Math.round(seconds / 60));
-  if (minutes >= 60) {
-    const hours = Math.round(minutes / 60);
-    return `${hours}시간 유효`;
-  }
-  return `${minutes}분 유효`;
-}
-
-function clearBody(targetBody) {
-  targetBody.innerHTML = "";
-
-  if (targetBody === aiBody) {
-    saveChatHistory();
-  }
-}
-
-function createThinkingBox(targetBody = aiBody, customSteps = null) {
-  const steps = Array.isArray(customSteps) && customSteps.length
-    ? customSteps
-    : [
-      "질문을 이해하는 중",
-      "관련 내용을 확인하는 중",
-      "답변을 정리하는 중",
-      "곧 답변드릴게요",
-    ];
-
-  const wrap = document.createElement("div");
-  wrap.className = "thinking";
-
-  const title = document.createElement("div");
-  title.className = "thinking-title";
-  title.textContent = "처리 중";
-
-  const list = document.createElement("ul");
-  list.className = "thinking-list";
-
-  steps.forEach((step, index) => {
-    const li = document.createElement("li");
-    li.dataset.index = String(index);
-    if (index === 0) li.className = "active";
-    li.innerHTML = '<span class="dot"></span><span>' + escapeHtml(step) + "</span>";
-    list.appendChild(li);
-  });
-
-  wrap.appendChild(title);
-  wrap.appendChild(list);
-  targetBody.appendChild(wrap);
-  targetBody.scrollTop = targetBody.scrollHeight;
-
-  let current = 0;
-  thinkingTimer = setInterval(() => {
-    const items = Array.from(list.querySelectorAll("li"));
-    items.forEach((li, idx) => {
-      li.classList.toggle("done", idx < current);
-      li.classList.toggle("active", idx === current);
-    });
-
-    current = Math.min(current + 1, steps.length - 1);
-    targetBody.scrollTop = targetBody.scrollHeight;
-  }, 900);
-
-  return wrap;
-}
-
-function removeThinkingBox(box) {
-  if (thinkingTimer) {
-    clearInterval(thinkingTimer);
-    thinkingTimer = null;
-  }
-
-  if (box) {
-    box.remove();
-  }
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function getErrorMessage(err) {
-  if (err instanceof Error) return err.message;
-  return String(err || "알 수 없는 오류");
-}
-
-function parseMaybeJsonText(value, fallback = "") {
-  const text = String(value || "").trim();
-  if (!text) return fallback || "";
-
-  const looksJson =
-    (text.startsWith("{") && text.endsWith("}")) ||
-    (text.startsWith("[") && text.endsWith("]"));
-
-  if (!looksJson) return text;
-
-  try {
-    const parsed = JSON.parse(text);
-    return getApiAnswerText(parsed, fallback || text);
-  } catch {
-    return text;
-  }
-}
-
-function parseStreamPayloadText(data) {
-  if (typeof data === "string") return parseMaybeJsonText(data, data);
-  if (!data || typeof data !== "object") return "";
-
-  const candidates = [
-    data.chunk,
-    data.answer,
-    data.message?.content,
-    data.delta?.content,
-    data.choices?.[0]?.delta?.content,
-    data.choices?.[0]?.message?.content,
-    data.content,
-    data.text,
-    data.message,
-  ];
-
-  for (const candidate of candidates) {
-    if (candidate === undefined || candidate === null) continue;
-    const text = parseMaybeJsonText(candidate, "");
-    if (text) return text;
-  }
-
-  return "";
-}
-
-function parseStreamText(text) {
-  if (!text) return "";
-
-  if (!text.includes("data:")) {
-    return parseMaybeJsonText(text, text);
-  }
-
-  let output = "";
-  const lines = text.split(/\r?\n/);
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("data:")) continue;
-
-    const payload = trimmed.slice(5).trim();
-    if (!payload || payload === "[DONE]") continue;
-
-    try {
-      const data = JSON.parse(payload);
-      output += parseStreamPayloadText(data);
-    } catch {
-      output += parseMaybeJsonText(payload, payload);
-    }
-  }
-
-  return output;
-}
-
-async function readResponseData(res) {
-  const contentType = res.headers.get("content-type") || "";
-  const text = await res.text();
-
-  if (contentType.includes("application/json")) {
-    try {
-      return text ? JSON.parse(text) : {};
-    } catch {
-      return { ok: false, message: text || "JSON 응답 파싱 실패" };
-    }
-  }
-
-  try {
-    const parsed = text ? JSON.parse(text) : {};
-    if (parsed && typeof parsed === "object") return parsed;
-  } catch {
-    // plain text response
-  }
-
-  return { ok: res.ok, answer: text || "" };
-}
-
-function getApiAnswerText(data, fallback = "") {
-  if (typeof data === "string") {
-    return parseMaybeJsonText(data, fallback) || fallback || "";
-  }
-
-  if (!data || typeof data !== "object") return fallback || "";
-
-  const candidates = [
-    data.answer,
-    data.message?.content,
-    data.choices?.[0]?.message?.content,
-    data.choices?.[0]?.delta?.content,
-    data.content,
-    data.text,
-    data.message,
-  ];
-
-  for (const candidate of candidates) {
-    if (candidate === undefined || candidate === null) continue;
-    const text = parseMaybeJsonText(candidate, "");
-    if (text) return text;
-  }
-
-  return fallback || "답변을 생성하지 못했습니다.";
-}
-
-
-function buildUserFriendlyFileErrorMessage(rawMessage = "") {
-  const text = String(rawMessage || "").trim();
-  const normalized = text.replace(/\s+/g, " ");
-
-  if (/운영 보안 정책상 업로드할 수 없습니다|운영 보안 정책에 따라 파일 분석을 중단|차단 사유|차단|보안 정책/.test(normalized)) {
-    return [
-      "파일 보안 정책에 따라 해당 파일은 분석할 수 없습니다.",
-      "주민등록번호·외국인등록번호·계좌·카드·급여·인사평가·대외비·기밀정보 또는 실행성 파일이 포함되어 있지 않은지 확인한 뒤 다시 업로드해 주세요.",
-    ].join("\n");
-  }
-
-  if (/PDF|pdf/.test(normalized) && (/FILE_INLINE_AI_ENABLED|Vertex|본문을 추출|안전하게 본문|현재 설정/.test(normalized))) {
-    return [
-      "현재 이 PDF 파일은 바로 분석할 수 없습니다.",
-      "PDF 본문을 안정적으로 읽을 수 없는 상태라 분석을 중단했습니다.",
-      "",
-      "가능한 방법",
-      "- PDF 내용을 복사해 입력창에 붙여넣어 주세요.",
-      "- PDF를 Word(.docx), Excel(.xlsx), 텍스트(.txt) 파일로 변환해 업로드해 주세요.",
-      "- PDF 파일 분석이 꼭 필요하면 IT팀에 기능 설정을 요청해 주세요.",
-    ].join("\n");
-  }
-
-  if (/(?:이미지 파일|image\/|png 파일|jpg 파일|jpeg 파일|webp 파일|\.png|\.jpg|\.jpeg|\.webp)/i.test(normalized) && /업로드|분석|정책|설정|지원/.test(normalized)) {
-    return [
-      "현재 이미지 파일은 바로 분석할 수 없습니다.",
-      "이미지 안의 내용을 텍스트로 입력하거나, 문서 파일로 변환해 업로드해 주세요.",
-    ].join("\n");
-  }
-
-  if (/허용 목록|파일 형식/.test(normalized)) {
-    return [
-      "현재 지원하지 않는 파일 형식입니다.",
-      "Word(.docx), Excel(.xlsx), PowerPoint(.pptx), 텍스트(.txt), CSV(.csv) 형식으로 변환해 업로드해 주세요.",
-    ].join("\n");
-  }
-
-  if (/분석할 파일을 첨부/.test(normalized)) {
-    return "분석할 파일을 첨부해 주세요.";
-  }
-
-  if (/FILE_INLINE|Vertex|Gemini|GOOGLE_|SIDETALK_|OPENAI_|HTTP\s*5\d{2}|환경변수|토큰|service_role/i.test(normalized)) {
-    return [
-      "일시적으로 파일 분석을 처리하지 못했습니다.",
-      "잠시 후 다시 시도해 주세요. 같은 문제가 반복되면 IT팀에 문의해 주세요.",
-    ].join("\n");
-  }
-
-  return text || "파일 분석을 진행하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-}
-
-function getFileIdsFromResponses(files = []) {
-  return (Array.isArray(files) ? files : [])
-    .map((file) => String(file?.id || file?.fileId || ""))
-    .filter(Boolean);
-}
-
-async function apiJson(url, options = {}) {
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + sessionToken,
-      ...(options.headers || {}),
-    },
-  });
-
-  const text = await res.text();
-
-  let data = {};
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    data = {
-      ok: false,
-      message: text || "JSON 파싱 실패",
-    };
-  }
-
-  if (!res.ok) {
-    throw new Error(data.message || data.raw || "HTTP " + res.status);
-  }
-
-  return data;
-}
-
-function getChatHistoryKey() {
-  const userKey = currentLoginId || currentEmpNo || "unknown";
-  return CHAT_HISTORY_STORAGE_PREFIX + userKey;
-}
-
-function getAllAiMessages() {
-  return Array.from(aiBody.querySelectorAll(".msg"))
-    .filter((el) => !el.classList.contains("debug"))
-    .map((el) => {
-      const role = el.classList.contains("user") ? "user" : "bot";
-      return {
-        role,
-        text: el.textContent || "",
-      };
-    })
-    .filter((msg) => msg.text.trim());
-}
-
-function getRecentChatMessages(targetBody, maxMessages = 10, maxChars = 6000) {
-  if (!targetBody) return [];
-
-  const messages = Array.from(targetBody.querySelectorAll(".msg"))
-    .filter((el) => !el.classList.contains("debug"))
-    .map((el) => {
-      const role = el.classList.contains("user") ? "user" : "assistant";
-      const text = String(el.textContent || "").trim();
-      return { role, text };
-    })
-    .filter((msg) => msg.text);
-
-  const recent = messages.slice(-maxMessages);
-  let total = 0;
-  const selected = [];
-
-  for (let i = recent.length - 1; i >= 0; i -= 1) {
-    const item = recent[i];
-    const remaining = maxChars - total;
-    if (remaining <= 0) break;
-
-    const text = item.text.slice(0, remaining);
-    selected.unshift({ role: item.role, text });
-    total += text.length;
-  }
-
-  return selected;
-}
-
-function saveChatHistory() {
-  if (!currentLoginId && !currentEmpNo) return;
-
-  const messages = getAllAiMessages();
-  const key = getChatHistoryKey();
-
-  try {
-    if (!messages.length) {
-      sessionStorage.removeItem(key);
-      return;
-    }
-
-    sessionStorage.setItem(
-      key,
-      JSON.stringify({
-        savedAt: Date.now(),
-        messages,
-      })
-    );
-  } catch (err) {
-  }
-}
-
-function restoreChatHistory() {
-  if (!currentLoginId && !currentEmpNo) return;
-
-  const key = getChatHistoryKey();
-  const raw = sessionStorage.getItem(key);
-
-  if (!raw) return;
-
-  try {
-    const payload = JSON.parse(raw);
-    const savedAt = Number(payload.savedAt || 0);
-    const messages = Array.isArray(payload.messages) ? payload.messages : [];
-
-    if (!savedAt || Date.now() - savedAt > CHAT_HISTORY_TTL_MS) {
-      sessionStorage.removeItem(key);
-      return;
-    }
-
-    if (!messages.length) return;
-
-    aiBody.innerHTML = "";
-
-    messages.forEach((msg) => {
-      const role = msg.role === "user" ? "user" : "bot";
-      addMessage(aiBody, role, String(msg.text || ""), false, { skipSave: true });
-    });
-
-    aiBody.scrollTop = aiBody.scrollHeight;
-  } catch (err) {
-    sessionStorage.removeItem(key);
-  }
-}
-
-function cleanupExpiredChatHistories() {
-  const now = Date.now();
-  cleanupChatHistoryStorage(sessionStorage, now, false);
-  // 이전 버전은 사내 지식 문의 대화를 localStorage에 저장했습니다.
-  // 운영 보안 기준에 맞춰 남아 있는 과거 캐시를 복원하지 않고 정리합니다.
-  cleanupChatHistoryStorage(localStorage, now, true);
-}
-
-function cleanupChatHistoryStorage(storage, now, removeAll = false) {
-  try {
-    for (let i = storage.length - 1; i >= 0; i--) {
-      const key = storage.key(i);
-
-      if (!key || !key.startsWith(CHAT_HISTORY_STORAGE_PREFIX)) continue;
-
-      if (removeAll) {
-        storage.removeItem(key);
+  function renderMessageContent(container, text) {
+    container.innerHTML = "";
+    const rawLines = normalizeAnswerText(text).split(/\r?\n/);
+    let inCode = false;
+    let codeLines = [];
+
+    for (let i = 0; i < rawLines.length; i += 1) {
+      const line = rawLines[i];
+      const trimmed = line.trim();
+
+      if (/^```/.test(trimmed)) {
+        if (inCode) {
+          appendCodeBlock(container, codeLines.join("\n"));
+          codeLines = [];
+          inCode = false;
+        } else {
+          inCode = true;
+          codeLines = [];
+        }
+        continue;
+      }
+      if (inCode) {
+        codeLines.push(line);
+        continue;
+      }
+      if (!trimmed) {
+        appendSpacer(container);
+        continue;
+      }
+      if (trimmed === "표 복사") continue;
+      if (isMarkdownTableStart(rawLines, i)) {
+        const tableLines = [];
+        while (i < rawLines.length && isMarkdownTableLine(rawLines[i])) {
+          tableLines.push(rawLines[i]);
+          i += 1;
+        }
+        i -= 1;
+        appendMarkdownTable(container, tableLines);
+        continue;
+      }
+      if (/^---+$/.test(trimmed)) {
+        appendSpacer(container, true);
         continue;
       }
 
-      try {
-        const payload = JSON.parse(storage.getItem(key) || "{}");
-        const savedAt = Number(payload.savedAt || 0);
-
-        if (!savedAt || now - savedAt > CHAT_HISTORY_TTL_MS) {
-          storage.removeItem(key);
-        }
-      } catch {
-        storage.removeItem(key);
+      const headingText = getHeadingText(trimmed);
+      if (headingText) {
+        const div = document.createElement("div");
+        div.className = "ds-msg-heading";
+        div.textContent = headingText;
+        container.appendChild(div);
+        continue;
       }
+
+      if (/^>\s+/.test(trimmed)) {
+        const div = document.createElement("div");
+        div.className = "ds-msg-quote";
+        appendInlineMarkdown(div, trimmed.replace(/^>\s+/, ""));
+        container.appendChild(div);
+        continue;
+      }
+
+      const numbered = trimmed.match(/^(\d+)[.)]\s+(.+)$/);
+      if (numbered) {
+        const div = document.createElement("div");
+        div.className = "ds-msg-numbered";
+        const num = document.createElement("span");
+        num.className = "ds-num";
+        num.textContent = `${numbered[1]}.`;
+        div.appendChild(num);
+        appendInlineMarkdown(div, numbered[2]);
+        container.appendChild(div);
+        continue;
+      }
+
+      if (/^[-•]\s+/.test(trimmed)) {
+        const div = document.createElement("div");
+        div.className = "ds-msg-bullet";
+        appendInlineMarkdown(div, trimmed.replace(/^[-•]\s+/, ""));
+        container.appendChild(div);
+        continue;
+      }
+
+      const div = document.createElement("div");
+      div.className = "ds-msg-paragraph";
+      appendInlineMarkdown(div, line);
+      container.appendChild(div);
     }
-  } catch {
+
+    if (inCode && codeLines.length) appendCodeBlock(container, codeLines.join("\n"));
   }
-}
 
-async function loadRpaList() {
-  clearBody(rpaBody);
-  selectedRpaItem = null;
-  selectedRpaButton = null;
+  function getHeadingText(line) {
+    const markdown = line.match(/^#{1,4}\s+(.+)$/);
+    if (markdown) return markdown[1].replace(/[:：]\s*$/, "").trim();
+    const section = line.match(/^\s*(결론|요약|분석 결과|파일 구조 요약|핵심 이슈|우선 조치|기준 및 근거|확인 필요|확인되지 않은 항목|다음 조치|상세 내용|참고 사항)\s*[:：]?\s*$/);
+    return section ? section[1] : "";
+  }
 
-  addMessage(rpaBody, "bot", "RPA 목록을 불러오는 중입니다.");
+  function appendSpacer(container, strong = false) {
+    if (!container.lastElementChild) return;
+    const spacer = document.createElement("div");
+    spacer.className = "ds-msg-spacer";
+    if (strong) spacer.style.height = "12px";
+    container.appendChild(spacer);
+  }
 
-  try {
-    const data = await apiJson(RPA_API_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "list" }),
+  function appendCodeBlock(container, code) {
+    const pre = document.createElement("pre");
+    pre.className = "ds-msg-codeblock";
+    pre.textContent = String(code || "");
+    container.appendChild(pre);
+  }
+
+  function normalizeAnswerText(text) {
+    return String(text || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .replace(/기준\s*\/\s*근거/g, "기준 및 근거")
+      .replace(/\n{4,}/g, "\n\n\n")
+      .trim();
+  }
+
+
+  function isMarkdownTableLine(line) { return /^\s*\|.+\|\s*$/.test(String(line || "")); }
+  function isMarkdownTableSeparator(line) { return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(String(line || "")); }
+  function isMarkdownTableStart(lines, index) { return isMarkdownTableLine(lines[index]) && isMarkdownTableSeparator(lines[index + 1] || ""); }
+  function parseTableRow(line) { return String(line || "").trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim()); }
+
+  function appendMarkdownTable(container, tableLines) {
+    const wrap = document.createElement("div");
+    wrap.className = "ds-msg-table-wrap";
+    const toolbar = document.createElement("div");
+    toolbar.className = "ds-msg-table-toolbar";
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.textContent = "표 복사";
+    copyBtn.addEventListener("click", async () => {
+      const tsv = tableLines.filter((line) => !isMarkdownTableSeparator(line)).map((line) => parseTableRow(line).join("\t")).join("\n");
+      const ok = await copyToClipboard(tsv);
+      copyBtn.textContent = ok ? "복사 완료" : "복사 실패";
+      setTimeout(() => { copyBtn.textContent = "표 복사"; }, 1200);
     });
-
-    if (!data.ok) {
-      addMessage(
-        rpaBody,
-        "bot",
-        "RPA 목록 조회 실패\n" + (data.raw || data.message || JSON.stringify(data, null, 2)),
-        true
-      );
-      return;
-    }
-
-    updateRunningRpaJobsFromApi(data.jobs);
-
-    if (!data.releases || data.releases.length === 0) {
-      clearBody(rpaBody);
-      renderRunningRpaNotice();
-      addMessage(
-        rpaBody,
-        "bot",
-        "사용 가능한 RPA 업무가 없습니다.\n관리자에게 권한을 요청하세요."
-      );
-      syncRpaPollingByCurrentJobs();
-      return;
-    }
-
-    renderRpaList(data.releases || []);
-    rpaLoaded = true;
-    syncRpaPollingByCurrentJobs();
-  } catch (err) {
-    addMessage(rpaBody, "bot", "RPA 목록 조회 중 오류 발생: " + getErrorMessage(err));
-  }
-}
-
-async function refreshRpaStatus() {
-  if (!sessionToken) return;
-
-  try {
-    const data = await apiJson(RPA_API_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "status" }),
+    toolbar.appendChild(copyBtn);
+    wrap.appendChild(toolbar);
+    const scroll = document.createElement("div");
+    scroll.className = "ds-msg-table-scroll";
+    const table = document.createElement("table");
+    table.className = "ds-msg-table";
+    const thead = document.createElement("thead");
+    const hr = document.createElement("tr");
+    parseTableRow(tableLines[0]).forEach((cell) => { const th = document.createElement("th"); appendInlineMarkdown(th, cell); hr.appendChild(th); });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    tableLines.slice(2).forEach((line) => {
+      if (!isMarkdownTableLine(line) || isMarkdownTableSeparator(line)) return;
+      const tr = document.createElement("tr");
+      parseTableRow(line).forEach((cell) => { const td = document.createElement("td"); appendInlineMarkdown(td, cell); tr.appendChild(td); });
+      tbody.appendChild(tr);
     });
-
-    if (!data.ok) return;
-
-    updateRunningRpaJobsFromApi(data.jobs);
-    renderRunningRpaNotice();
-    syncRpaPollingByCurrentJobs();
-  } catch (err) {
+    table.appendChild(tbody);
+    scroll.appendChild(table);
+    wrap.appendChild(scroll);
+    container.appendChild(wrap);
   }
-}
 
-function updateRunningRpaJobsFromApi(jobs) {
-  if (!Array.isArray(jobs)) return;
+  function appendInlineMarkdown(parent, text) {
+    const value = String(text || "");
+    const regex = /(\*\*(.+?)\*\*|`([^`]+)`)/g;
+    let last = 0;
+    let match;
+    while ((match = regex.exec(value))) {
+      if (match.index > last) parent.appendChild(document.createTextNode(value.slice(last, match.index)));
+      if (match[2]) { const strong = document.createElement("strong"); strong.textContent = match[2]; parent.appendChild(strong); }
+      else if (match[3]) { const code = document.createElement("code"); code.textContent = match[3]; parent.appendChild(code); }
+      last = regex.lastIndex;
+    }
+    if (last < value.length) parent.appendChild(document.createTextNode(value.slice(last)));
+  }
 
-  runningRpaJobs = jobs
-    .map((job) => ({
-      name: job.name || job.Name || "이름 없음",
-      status: convertJobState(job.status || job.State || job.state),
-      robotName: job.robotName || job.RobotName || job.robot_name || "",
-      startedAt: job.startedAt || job.StartTime || job.createdAt || job.CreationTime || "",
-    }))
-    .filter((job) => {
-      return job.status === "대기 중" || job.status === "실행 중" || job.status === "실행 요청 중";
+  function addCopyButton(row, msg) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "ds-bot-copy-btn";
+    button.textContent = "복사";
+    button.addEventListener("click", async () => {
+      const ok = await copyToClipboard(msg.textContent || "");
+      button.textContent = ok ? "복사 완료" : "복사 실패";
+      setTimeout(() => { button.textContent = "복사"; }, 1200);
     });
-}
-
-function syncRpaPollingByCurrentJobs() {
-  if (runningRpaJobs.length > 0) {
-    startRpaStatusPolling();
-  } else {
-    stopRpaStatusPolling();
+    row.appendChild(button);
   }
-}
 
-function startRpaStatusPolling() {
-  if (rpaStatusPollTimer) return;
+  async function copyToClipboard(text) {
+    try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; } } catch {}
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand("copy");
+      textarea.remove();
+      return ok;
+    } catch { return false; }
+  }
 
-  rpaStatusPollStartedAt = Date.now();
+  function getStorageUserKey() {
+    return String(currentEmpNo || currentLoginId || "anonymous").replace(/[^a-zA-Z0-9_.:-]/g, "_");
+  }
 
-  rpaStatusPollTimer = setInterval(() => {
-    if (Date.now() - rpaStatusPollStartedAt > RPA_STATUS_POLL_MAX_MS) {
-      stopRpaStatusPolling();
-      return;
+  function getLocalHistoryKey() {
+    return LOCAL_HISTORY_PREFIX + getStorageUserKey();
+  }
+
+  function getRecentWorkKey() {
+    return RECENT_WORK_PREFIX + getStorageUserKey();
+  }
+
+  function getRecentHistory() {
+    const active = getActiveConversation();
+    if (active?.messages?.length) {
+      return active.messages
+        .slice(-MAX_HISTORY)
+        .map((message) => ({ role: message.role === "assistant" ? "assistant" : "user", text: message.text || "" }));
     }
-
-    if (!runningRpaJobs.length) {
-      stopRpaStatusPolling();
-      return;
-    }
-
-    refreshRpaStatus();
-  }, RPA_STATUS_POLL_INTERVAL_MS);
-}
-
-function stopRpaStatusPolling() {
-  if (rpaStatusPollTimer) {
-    clearInterval(rpaStatusPollTimer);
-    rpaStatusPollTimer = null;
+    try {
+      const raw = sessionStorage.getItem(getLocalHistoryKey());
+      const data = raw ? JSON.parse(raw) : [];
+      return Array.isArray(data) ? data.slice(-MAX_HISTORY) : [];
+    } catch { return []; }
   }
 
-  rpaStatusPollStartedAt = 0;
-}
-
-function renderRpaList(releases) {
-  clearBody(rpaBody);
-
-  if (runningRpaJobs.length) {
-    renderRunningRpaNotice();
+  function saveLocalHistory(userText, assistantText) {
+    try {
+      const history = getRecentHistory().filter((message) => message.text);
+      history.push({ role: "user", text: userText });
+      if (assistantText) history.push({ role: "assistant", text: assistantText });
+      sessionStorage.setItem(getLocalHistoryKey(), JSON.stringify(history.slice(-MAX_HISTORY)));
+    } catch {}
   }
 
-  addMessage(rpaBody, "bot", "실행할 RPA 업무를 선택하세요.");
+  function loadRecentWorkItems() {
+    try {
+      const raw = localStorage.getItem(getRecentWorkKey());
+      const data = raw ? JSON.parse(raw) : [];
+      return Array.isArray(data) ? data.filter((item) => item && item.id).slice(0, MAX_RECENT_WORK) : [];
+    } catch { return []; }
+  }
 
-  const wrap = document.createElement("div");
-  wrap.className = "rpa-list";
+  function saveRecentWorkItems(items) {
+    try {
+      localStorage.setItem(getRecentWorkKey(), JSON.stringify((items || []).slice(0, MAX_RECENT_WORK)));
+    } catch {}
+  }
 
-  releases.forEach((item) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "rpa-item";
-
-    const name = item.Name || "이름 없음";
-    const source = item.source || "";
-    const folderId = item.folderId || "";
-    const releaseKey = item.Key || "";
-
-    const rpaItem = {
-      name,
-      releaseKey,
-      folderId,
-      source,
+  function ensureActiveConversation(userText, displayUserMessage) {
+    if (activeConversationId) return activeConversationId;
+    activeConversationId = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const now = Date.now();
+    const title = createConversationTitle(userText);
+    const item = {
+      id: activeConversationId,
+      title,
+      preview: createConversationPreview(displayUserMessage || userText),
+      task: normalizeTask(currentTask) || currentTask || "general",
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
     };
-
-    btn.innerHTML =
-      '<div class="rpa-name">' +
-      escapeHtml(name) +
-      "</div>";
-
-    btn.addEventListener("click", () => {
-      selectRpaJob(rpaItem, btn);
-    });
-
-    wrap.appendChild(btn);
-  });
-
-  rpaBody.appendChild(wrap);
-  rpaBody.scrollTop = rpaBody.scrollHeight;
-}
-
-function renderRunningRpaNotice() {
-  const oldBox = rpaBody.querySelector(".rpa-running-box");
-
-  if (oldBox) {
-    oldBox.remove();
+    const items = loadRecentWorkItems().filter((entry) => entry.id !== activeConversationId);
+    saveRecentWorkItems([item, ...items]);
+    renderRecentWorkList();
+    return activeConversationId;
   }
 
-  if (!runningRpaJobs.length) return;
-
-  const div = document.createElement("div");
-  div.className = "rpa-running-box";
-
-  let html = '<div class="rpa-state-label">진행 중인 작업</div>';
-
-  runningRpaJobs.forEach((job) => {
-    html +=
-      '<div class="rpa-running-item">' +
-      '<span class="rpa-running-name">' +
-      escapeHtml(job.name) +
-      "</span>" +
-      '<span class="rpa-running-status">' +
-      escapeHtml(job.status) +
-      (job.robotName ? " · " + escapeHtml(job.robotName) : "") +
-      "</span>" +
-      "</div>";
-  });
-
-  div.innerHTML = html;
-
-  const firstChild = rpaBody.firstElementChild;
-  if (firstChild) {
-    rpaBody.insertBefore(div, firstChild);
-  } else {
-    rpaBody.appendChild(div);
-  }
-}
-
-function selectRpaJob(item, button) {
-  clearSelectedRpaInline();
-
-  selectedRpaItem = item;
-  selectedRpaButton = button;
-
-  button.classList.add("selected");
-
-  const actionBox = document.createElement("div");
-  actionBox.className = "rpa-inline-action";
-  actionBox.dataset.role = "rpa-inline-action";
-  actionBox.innerHTML =
-    '<div class="rpa-inline-title">' + escapeHtml(item.name) + "</div>" +
-    '<div class="rpa-inline-buttons">' +
-    '<button type="button" class="rpa-execute-btn">실행</button>' +
-    '<button type="button" class="rpa-cancel-btn">취소</button>' +
-    "</div>";
-
-  const executeBtn = actionBox.querySelector(".rpa-execute-btn");
-  const cancelBtn = actionBox.querySelector(".rpa-cancel-btn");
-
-  executeBtn.addEventListener("click", (event) => {
-    event.stopPropagation();
-    runRpaJob(item, executeBtn, cancelBtn);
-  });
-
-  cancelBtn.addEventListener("click", (event) => {
-    event.stopPropagation();
-    clearSelectedRpaInline();
-  });
-
-  button.insertAdjacentElement("afterend", actionBox);
-  actionBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
-}
-
-function clearSelectedRpaInline() {
-  const currentActionBox = rpaBody.querySelector('[data-role="rpa-inline-action"]');
-  if (currentActionBox) {
-    currentActionBox.remove();
+  function appendConversationMessage(role, text) {
+    if (!activeConversationId) return;
+    const now = Date.now();
+    const items = loadRecentWorkItems();
+    const index = items.findIndex((item) => item.id === activeConversationId);
+    if (index < 0) return;
+    const item = { ...items[index] };
+    const messages = Array.isArray(item.messages) ? item.messages.slice(-MAX_STORED_CONVERSATION_MESSAGES) : [];
+    messages.push({ role, text: String(text || ""), at: now });
+    item.messages = messages.slice(-MAX_STORED_CONVERSATION_MESSAGES);
+    item.updatedAt = now;
+    if (role === "user") item.preview = createConversationPreview(text);
+    if (!item.title || item.title === "새 업무 요청") item.title = createConversationTitle(text);
+    items.splice(index, 1);
+    saveRecentWorkItems([item, ...items]);
+    renderRecentWorkList();
   }
 
-  if (selectedRpaButton) {
-    selectedRpaButton.classList.remove("selected");
+  function getActiveConversation() {
+    if (!activeConversationId) return null;
+    return loadRecentWorkItems().find((item) => item.id === activeConversationId) || null;
   }
 
-  selectedRpaItem = null;
-  selectedRpaButton = null;
-}
-
-function addTemporaryRpaMessage(text, timeoutMs = 8000) {
-  const msg = addMessage(rpaBody, "bot", text);
-
-  setTimeout(() => {
-    if (msg && msg.parentNode) {
-      msg.remove();
-    }
-
-    // 안내 메시지가 사라진 뒤 상단 상태창이 보이도록 이동
-    rpaBody.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  }, timeoutMs);
-
-  return msg;
-}
-
-function getRunStateFromResponse(data) {
-  const rawText = String(data?.raw || "");
-
-  if (
-    rawText.includes('"State":"Pending"') ||
-    rawText.includes('"State": "Pending"') ||
-    rawText.includes("Pending") ||
-    rawText.includes("Queued")
-  ) {
-    return "queued";
+  function renderRecentWorkList() {
+    const items = loadRecentWorkItems();
+    renderSidebarRecentList(items);
+    renderLowerRecentList(items);
   }
 
-  if (
-    rawText.includes('"State":"Running"') ||
-    rawText.includes('"State": "Running"') ||
-    rawText.includes("Running")
-  ) {
-    return "running";
-  }
-
-  return "running";
-}
-
-function setRunningJob(name, status) {
-  runningRpaJobs = [
-    {
-      name,
-      status,
-    },
-  ];
-
-  refreshRunningRpaNotice();
-  syncRpaPollingByCurrentJobs();
-}
-
-function addOrUpdateRunningJob(name, status) {
-  const exists = runningRpaJobs.find((job) => job.name === name);
-
-  if (exists) {
-    exists.status = status;
-  } else {
-    runningRpaJobs.push({ name, status });
-  }
-
-  refreshRunningRpaNotice();
-  syncRpaPollingByCurrentJobs();
-}
-
-async function runRpaJob(item, executeBtn, cancelBtn) {
-  if (!item) return;
-
-  const confirmed = window.confirm(item.name + " RPA를 실행하시겠습니까?\n\n실행 후 실제 자동화 작업이 시작됩니다.");
-  if (!confirmed) return;
-
-  if (executeBtn) {
-    executeBtn.disabled = true;
-    executeBtn.textContent = "실행 요청 중";
-  }
-
-  if (cancelBtn) {
-    cancelBtn.disabled = true;
-  }
-
-  setRunningJob(item.name, "실행 요청 중");
-
-  try {
-    const data = await apiJson(RPA_API_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        action: "run",
-        releaseKey: item.releaseKey,
-        folderId: item.folderId,
-      }),
-    });
-
-    if (data.ok) {
-      if (Array.isArray(data.jobs)) {
-        updateRunningRpaJobsFromApi(data.jobs);
-        refreshRunningRpaNotice();
-      }
-
-      const currentJob = Array.isArray(data.jobs)
-        ? data.jobs.find((job) => {
-            const name = job.name || job.Name || "";
-            return name === item.name;
-          })
-        : null;
-
-      if (currentJob) {
-        const currentStatus = convertJobState(
-          currentJob.status || currentJob.State || currentJob.state
-        );
-
-        if (currentStatus === "대기 중") {
-          addOrUpdateRunningJob(item.name, "대기 중");
-          addTemporaryRpaMessage(
-            "다른 작업이 실행 중입니다.\n작업이 대기열에 등록되었습니다.",
-            8000
-          );
-        } else {
-          addOrUpdateRunningJob(item.name, "실행 중");
-          addTemporaryRpaMessage(item.name + " 실행 요청이 완료되었습니다.", 8000);
-        }
-      } else {
-        runningRpaJobs = [];
-        refreshRunningRpaNotice();
-        addTemporaryRpaMessage(item.name + " 실행 요청이 완료되었습니다.", 8000);
-      }
-
-      clearSelectedRpaInline();
-      syncRpaPollingByCurrentJobs();
+  function renderSidebarRecentList(items) {
+    if (!state.recentList) return;
+    state.recentList.innerHTML = "";
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "ds-recent-empty";
+      empty.textContent = "아직 최근 작업이 없습니다.\n업무를 요청하면 자동으로 쌓입니다.";
+      state.recentList.appendChild(empty);
       return;
     }
+    items.slice(0, MAX_RECENT_WORK).forEach((item) => {
+      const wrap = document.createElement("div");
+      wrap.className = `recent-item-wrap${item.id === activeConversationId ? " is-active" : ""}${item.isFavorite ? " is-favorite" : ""}`;
+      wrap.dataset.conversationId = item.id;
 
-    addMessage(
-      rpaBody,
-      "bot",
-      "RPA 실행 실패\n" + (data.message || "실행 요청 처리 중 오류가 발생했습니다.")
-    );
+      const button = document.createElement("button");
+      button.className = `recent-item${item.id === activeConversationId ? " is-active" : ""}`;
+      button.type = "button";
+      button.dataset.conversationId = item.id;
+      button.innerHTML = `<span class="recent-item-title">${escapeHtml(item.title || "새 업무 요청")}</span><span class="recent-item-meta">${escapeHtml(formatRelativeTime(item.updatedAt))}</span>`;
+      button.addEventListener("click", () => openRecentConversation(item.id));
 
+      const more = document.createElement("button");
+      more.className = "recent-more-btn";
+      more.type = "button";
+      more.setAttribute("aria-label", `${item.title || "최근 작업"} 메뉴 열기`);
+      more.textContent = "⋯";
+      more.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleRecentContextMenu(wrap, item);
+      });
 
-    restoreInlineButtons(executeBtn, cancelBtn);
-  } catch (err) {
-    addMessage(rpaBody, "bot", "RPA 실행 중 오류 발생: " + getErrorMessage(err));
-    restoreInlineButtons(executeBtn, cancelBtn);
-  }
-}
-
-function restoreInlineButtons(executeBtn, cancelBtn) {
-  if (executeBtn) {
-    executeBtn.disabled = false;
-    executeBtn.textContent = "실행";
-  }
-
-  if (cancelBtn) {
-    cancelBtn.disabled = false;
-  }
-}
-
-function refreshRunningRpaNotice() {
-  renderRunningRpaNotice();
-}
-
-function convertJobState(state) {
-  const value = String(state || "").toLowerCase();
-
-  if (value === "pending") return "대기 중";
-  if (value === "running") return "실행 중";
-  if (value === "successful") return "완료";
-  if (value === "faulted") return "오류";
-  if (value === "stopped") return "중지됨";
-
-  return state || "상태 확인 중";
-}
-
-function formatFileSize(bytes) {
-  const size = Number(bytes || 0);
-  if (!size) return "0B";
-  if (size < 1024) return size + "B";
-  if (size < 1024 * 1024) return Math.round(size / 1024) + "KB";
-  return (size / 1024 / 1024).toFixed(1).replace(/\.0$/, "") + "MB";
-}
-
-function getAttachmentName(item) {
-  return item?.name || item?.file?.name || "uploaded-file";
-}
-
-function getAttachmentSize(item) {
-  return Number(item?.size ?? item?.file?.size ?? item?.sizeBytes ?? 0);
-}
-
-function getAttachmentType(item) {
-  return item?.type || item?.mimeType || item?.file?.type || "";
-}
-
-function getAttachmentFile(item) {
-  return item instanceof File ? item : item?.file || null;
-}
-
-function getAttachmentId(item) {
-  return String(item?.id || item?.fileId || "");
-}
-
-function hasUnuploadedAgentFiles(files = agentSelectedFiles) {
-  return files.some((item) => Boolean(getAttachmentFile(item) && !getAttachmentId(item)));
-}
-
-function getAgentFileIds(files = agentSelectedFiles) {
-  return files.map(getAttachmentId).filter(Boolean);
-}
-
-function renderAgentFileChips() {
-  if (!agentFileChips) return;
-
-  agentFileChips.innerHTML = "";
-  agentFileChips.hidden = agentSelectedFiles.length === 0;
-
-  agentSelectedFiles.forEach((item, index) => {
-    const chip = document.createElement("span");
-    chip.className = "file-chip" + (getAttachmentId(item) ? " persisted" : "");
-    chip.title = getAttachmentName(item) + " · " + formatFileSize(getAttachmentSize(item));
-
-    const name = document.createElement("span");
-    name.className = "file-chip-name";
-    name.textContent = getAttachmentName(item);
-
-    const removeBtn = document.createElement("button");
-    removeBtn.className = "file-chip-remove";
-    removeBtn.type = "button";
-    removeBtn.setAttribute("aria-label", getAttachmentName(item) + " 첨부 제거");
-    removeBtn.textContent = "×";
-    removeBtn.addEventListener("click", () => {
-      agentSelectedFiles.splice(index, 1);
-      syncAgentFileInput();
-      renderAgentFileChips();
-      focusInputWhenPanelReady(agentMessageInput);
+      wrap.appendChild(button);
+      wrap.appendChild(more);
+      state.recentList.appendChild(wrap);
     });
-
-    chip.appendChild(name);
-    chip.appendChild(removeBtn);
-    agentFileChips.appendChild(chip);
-  });
-
-  updateAgentNewChatButtonVisibility();
-}
-
-function syncAgentFileInput() {
-  if (!agentFileInput || typeof DataTransfer === "undefined") return;
-
-  const transfer = new DataTransfer();
-  agentSelectedFiles.forEach((item) => {
-    const file = getAttachmentFile(item);
-    if (file) transfer.items.add(file);
-  });
-  agentFileInput.files = transfer.files;
-}
-
-function validateAgentFileForUpload(file) {
-  const name = String(file?.name || "uploaded-file");
-  const ext = getFileExtension(name);
-  if (!ext) return name + " 파일은 확장자가 없어 업로드할 수 없습니다.";
-  if (ext === "pdf" && !AGENT_ALLOWED_FILE_EXTENSIONS.includes(ext)) {
-    return name + " PDF 파일은 현재 바로 분석할 수 없습니다. PDF 내용을 복사해 입력창에 붙여넣거나, Word(.docx) 또는 텍스트(.txt) 파일로 변환해 업로드해 주세요.";
   }
-  if (["png", "jpg", "jpeg", "webp"].includes(ext) && !AGENT_ALLOWED_FILE_EXTENSIONS.includes(ext)) {
-    return name + " 이미지 파일은 현재 바로 분석할 수 없습니다. 이미지 내용을 텍스트로 입력하거나 문서 파일로 변환해 업로드해 주세요.";
+
+  function closeRecentContextMenu() {
+    if (recentContextMenu) {
+      recentContextMenu.remove();
+      recentContextMenu = null;
+    }
   }
-  if (AGENT_BLOCKED_FILE_EXTENSIONS.has(ext)) return name + " 파일은 현재 업로드할 수 없는 형식입니다. 문서 파일로 변환한 뒤 다시 업로드해 주세요.";
-  if (!AGENT_ALLOWED_FILE_EXTENSIONS.includes(ext)) return name + " 파일 형식(." + ext + ")은 현재 지원하지 않습니다. Word(.docx), Excel(.xlsx), PowerPoint(.pptx), 텍스트(.txt), CSV(.csv) 형식으로 변환해 업로드해 주세요.";
-  if (file.size > AGENT_MAX_FILE_SIZE_BYTES) return name + " 파일은 최대 " + formatFileSize(AGENT_MAX_FILE_SIZE_BYTES) + "까지 업로드할 수 있습니다.";
-  return "";
-}
 
-function getFileExtension(name) {
-  const text = String(name || "").toLowerCase();
-  const index = text.lastIndexOf(".");
-  return index >= 0 ? text.slice(index + 1) : "";
-}
-
-function formatFileSize(size) {
-  const value = Number(size || 0);
-  if (value < 1024) return value + "B";
-  if (value < 1024 * 1024) return Math.round(value / 1024) + "KB";
-  return (value / 1024 / 1024).toFixed(1) + "MB";
-}
-
-function addAgentFiles(files) {
-  const incomingFiles = Array.from(files || []);
-  if (!incomingFiles.length) return;
-
-  const rejected = [];
-
-  incomingFiles.forEach((file) => {
-    const validationMessage = validateAgentFileForUpload(file);
-    if (validationMessage) {
-      rejected.push(validationMessage);
+  function toggleRecentContextMenu(container, item) {
+    if (!container || !item) return;
+    if (recentContextMenu && container.contains(recentContextMenu)) {
+      closeRecentContextMenu();
       return;
     }
-
-    const duplicate = agentSelectedFiles.some((saved) =>
-      getAttachmentName(saved) === file.name &&
-      getAttachmentSize(saved) === file.size &&
-      Number(saved?.lastModified || saved?.file?.lastModified || 0) === file.lastModified
-    );
-
-    if (!duplicate) {
-      agentSelectedFiles.push({
-        id: "",
-        file,
-        name: file.name,
-        size: file.size,
-        type: file.type || "",
-        lastModified: file.lastModified || 0,
-        persisted: false,
-      });
-    }
-  });
-
-  if (rejected.length) {
-    addMessage(agentBody, "bot", "첨부할 수 없는 파일이 제외되었습니다.\n" + rejected.slice(0, 5).map((item) => "- " + item).join("\n"));
-  }
-
-  syncAgentFileInput();
-  renderAgentFileChips();
-  focusInputWhenPanelReady(agentMessageInput);
-}
-
-function clearAgentComposerFiles() {
-  agentSelectedFiles = [];
-  if (agentFileInput) agentFileInput.value = "";
-  renderAgentFileChips();
-}
-
-function clearAgentFiles() {
-  clearAgentComposerFiles();
-  lastAgentRoute = "";
-  lastAgentFileUseAt = 0;
-}
-
-function clearAgentComposerInput() {
-  if (!agentMessageInput) return;
-  agentMessageInput.value = "";
-  autoResizeTextarea(agentMessageInput);
-}
-
-function mergePersistedAgentFiles(files = []) {
-  if (!Array.isArray(files) || !files.length) return;
-
-  files.forEach((file) => {
-    const id = String(file.id || file.fileId || "");
-    const name = file.original_name || file.originalName || file.name || "uploaded-file";
-    const size = Number(file.size_bytes || file.sizeBytes || file.size || 0);
-    if (!id && !name) return;
-
-    const existingIndex = agentSelectedFiles.findIndex((item) => {
-      const sameId = id && getAttachmentId(item) === id;
-      const sameNameSize = getAttachmentName(item) === name && getAttachmentSize(item) === size;
-      return sameId || sameNameSize;
-    });
-
-    const next = {
-      id,
-      file: existingIndex >= 0 ? getAttachmentFile(agentSelectedFiles[existingIndex]) : null,
-      name,
-      size,
-      type: file.mime_type || file.mimeType || file.type || "",
-      extractionStatus: file.extraction_status || file.extractionStatus || "",
-      persisted: Boolean(id),
-      createdAt: file.created_at || file.createdAt || "",
-    };
-
-    if (existingIndex >= 0) {
-      agentSelectedFiles[existingIndex] = { ...agentSelectedFiles[existingIndex], ...next };
-    } else {
-      agentSelectedFiles.push(next);
-    }
-  });
-
-  syncAgentFileInput();
-  renderAgentFileChips();
-}
-
-async function agentStateRequest(payload) {
-  const res = await fetch(AGENT_STATE_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + sessionToken,
-    },
-    body: JSON.stringify(payload || {}),
-  });
-
-  const text = await res.text();
-  let data = {};
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    data = { ok: false, message: text };
-  }
-
-  if (!res.ok) throw new Error(data.message || "HTTP " + res.status);
-  return data;
-}
-
-function scheduleAgentSessionRestore() {
-  if (!sessionToken || agentStateReady || agentStateLoading) return;
-
-  const run = () => {
-    // 화면 표시와 입력 가능 상태가 먼저 잡힌 뒤, 이전 대화/파일 상태만 조용히 복원합니다.
-    initAgentSessionState();
-  };
-
-  if (typeof requestIdleCallback === "function") {
-    requestIdleCallback(run, { timeout: 1200 });
-    return;
-  }
-
-  setTimeout(run, 0);
-}
-
-async function initAgentSessionState() {
-  if (!sessionToken || agentStateReady || agentStateLoading) return;
-
-  agentStateLoading = true;
-
-  try {
-    const data = await agentStateRequest({ action: "get_state", sessionId: agentSessionId });
-    if (!data.ok) return;
-
-    agentSessionId = data.session?.id || data.sessionId || agentSessionId || "";
-    if (agentSessionId) sessionStorage.setItem("ds_agent_session_id", agentSessionId);
-
-    if (Array.isArray(data.messages) && data.messages.length) {
-      // 사용자가 이미 화면에서 메시지를 입력/전송한 경우, 늦게 도착한 세션 복원 응답이
-      // 현재 대화를 지워버리지 않도록 복원 렌더링을 생략합니다.
-      if ((hasAgentVisibleConversation() && !agentConversationRenderedFromCache) || agentSubmitInProgress) {
-        agentStateReady = true;
-        return;
-      }
-
-      resetAgentMessagesKeepingWelcome();
-      agentConversationRenderedFromCache = false;
-      let lastRestoredUserMessage = "";
-      const completedPptJobIds = new Set();
-
-      data.messages.forEach((msg) => {
-        const metadata = msg.metadata || {};
-        const jobId = metadata?.pptJob?.id;
-        if (jobId && (metadata?.ppt?.ok || metadata.route === "skywork-pull-completed")) {
-          completedPptJobIds.add(jobId);
-        }
-      });
-
-      data.messages.forEach((msg) => {
-        const role = msg.role === "user" ? "user" : "bot";
-        const metadata = msg.metadata || {};
-        const content = String(msg.content || msg.text || "");
-        const isArtifact = role === "bot" && isArtifactMessageMetadata(metadata);
-        const isKnowledgeRedirect = role === "bot" && (metadata.route === "knowledge-redirect" || isKnowledgeRedirectText(content));
-
-        const messageDiv = addMessage(agentBody, role, content, false, {
-          skipAgentSave: true,
-          hideCopy: isArtifact || isKnowledgeRedirect,
-        });
-
-        if (role === "user") {
-          lastRestoredUserMessage = content;
-        }
-
-        // 새로고침 후에도 1시간 유효한 엑셀 다운로드 버튼을 다시 표시합니다.
-        // 엑셀 다운로드 버튼은 메시지 본문 복사보다 파일 다운로드가 핵심 액션이므로 복사 버튼은 숨깁니다.
-        if (isArtifact) {
-          appendSavedArtifactDownloads(agentBody, metadata, metadata.artifactSavedAt || msg.created_at || msg.createdAt || "");
-        }
-
-        // 사내 규정/업무 절차 안내 메시지는 복사 버튼을 숨기고 이동 버튼만 복원합니다.
-        if (isKnowledgeRedirect) {
-          applyKnowledgeRedirectAction(messageDiv, metadata.originalMessage || lastRestoredUserMessage);
-        }
-      });
-      agentBody.scrollTop = agentBody.scrollHeight;
-      saveAgentConversationCacheNow();
-      updateAgentNewChatButtonVisibility();
-    } else if (agentConversationRenderedFromCache) {
-      resetAgentMessagesKeepingWelcome();
-      agentConversationRenderedFromCache = false;
-      saveAgentConversationCacheNow();
-    }
-
-    if (Array.isArray(data.files) && data.files.length) {
-      // 파일 분석 후속 질문에서 "이 파일", "리스크", "부서별" 같은 표현이
-      // 일반 지식베이스로 빠지지 않도록 현재 분석 파일 칩을 복원합니다.
-      // 사용자가 X를 누르거나 새 대화를 시작하기 전까지 같은 파일을 기준으로 file-api를 사용합니다.
-      mergePersistedAgentFiles(data.files);
-    }
-
-    agentStateReady = true;
-  } catch (err) {
-    agentStateReady = true;
-  } finally {
-    agentStateLoading = false;
-    updateAgentNewChatButtonVisibility();
-  }
-}
-
-function saveAgentMessage(role, content, metadata = {}) {
-  const text = String(content || "").trim();
-  if (!text || !sessionToken) return Promise.resolve(null);
-
-  return agentStateRequest({
-    action: "save_message",
-    sessionId: agentSessionId,
-    role,
-    content: text,
-    route: metadata.route || lastAgentRoute || "",
-    metadata,
-  }).then((data) => {
-    if (data.session?.id) {
-      agentSessionId = data.session.id;
-      sessionStorage.setItem("ds_agent_session_id", agentSessionId);
-    }
-    saveAgentConversationCacheDebounced();
-    scheduleRecentSessionsRefresh();
-    return data;
-  }).catch((err) => {
-    return null;
-  });
-}
-
-function normalizeAgentText(value) {
-  return String(value || "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-}
-
-function hasPattern(text, patterns) {
-  return patterns.some((pattern) => pattern.test(text));
-}
-
-function isShortText(text, maxLength = 45) {
-  return text.replace(/\s+/g, "").length <= maxLength;
-}
-
-function hasRecentFileConversation(history = []) {
-  const recent = Array.isArray(history) ? history.slice(-6) : [];
-
-  return recent.some((item) => {
-    const text = normalizeAgentText(item?.text || "");
-
-    return (
-      text.includes("[첨부 파일]") ||
-      text.includes("업로드한 파일") ||
-      text.includes("첨부한 파일") ||
-      text.includes("파일 기준") ||
-      text.includes("파일 내용") ||
-      text.includes("업로드된 파일") ||
-      text.includes("위 내용은 업로드된 파일") ||
-      text.includes("업로드하신")
-    );
-  });
-}
-
-
-
-function scheduleRecentSessionsRefresh() {
-  window.clearTimeout(agentRecentRefreshTimer);
-  agentRecentRefreshTimer = window.setTimeout(refreshAgentRecentSessions, AGENT_RECENT_REFRESH_DEBOUNCE_MS);
-}
-
-function ensureRecentSessionsSection() {
-  if (agentRecentSectionReady) return document.getElementById("agentRecentSection");
-
-  const homeShell = document.querySelector(".home-shell");
-  if (!homeShell) return null;
-
-  let section = document.getElementById("agentRecentSection");
-  if (!section) {
-    section = document.createElement("section");
-    section.id = "agentRecentSection";
-    section.className = "agent-recent-section";
-    section.setAttribute("aria-label", "최근 작업");
-    section.innerHTML = `
-      <div class="agent-recent-head">
-        <strong>최근 작업</strong>
-        <button id="agentRecentRefreshBtn" class="agent-recent-refresh" type="button" aria-label="최근 작업 새로고침">새로고침</button>
-      </div>
-      <div id="agentRecentList" class="agent-recent-list" role="list"></div>
+    closeRecentContextMenu();
+    const menu = document.createElement("div");
+    menu.className = "recent-context-menu";
+    menu.innerHTML = `
+      <button type="button" data-action="rename">이름 바꾸기</button>
+      <button type="button" data-action="favorite">${item.isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}</button>
+      <button type="button" data-action="delete" class="danger">삭제</button>
     `;
-
-    const menuList = homeShell.querySelector(".menu-card-list");
-    if (menuList && menuList.parentNode) {
-      menuList.parentNode.insertBefore(section, menuList.nextSibling);
-    } else {
-      homeShell.appendChild(section);
-    }
-  }
-
-  section.querySelector("#agentRecentRefreshBtn")?.addEventListener("click", (event) => {
-    event.preventDefault();
-    refreshAgentRecentSessions();
-  });
-
-  agentRecentSectionReady = true;
-  return section;
-}
-
-function getRecentListEl() {
-  ensureRecentSessionsSection();
-  return document.getElementById("agentRecentList");
-}
-
-function normalizeSessionRows(rows) {
-  return (Array.isArray(rows) ? rows : [])
-    .map((item) => ({
-      id: String(item.id || item.sessionId || ""),
-      title: String(item.title || "새 업무 대화").trim() || "새 업무 대화",
-      isFavorite: Boolean(item.is_favorite ?? item.isFavorite),
-      lastMessageAt: item.last_message_at || item.lastMessageAt || item.updated_at || item.updatedAt || item.created_at || item.createdAt || "",
-      updatedAt: item.updated_at || item.updatedAt || item.last_message_at || item.lastMessageAt || "",
-    }))
-    .filter((item) => item.id);
-}
-
-async function refreshAgentRecentSessions() {
-  if (!sessionToken) return;
-  const list = getRecentListEl();
-  if (!list) return;
-
-  try {
-    const data = await agentStateRequest({ action: "list_sessions", limit: AGENT_RECENT_SESSIONS_MAX });
-    agentRecentSessions = normalizeSessionRows(data.sessions || []);
-    renderAgentRecentSessions();
-  } catch {
-    renderAgentRecentSessions();
-  }
-}
-
-function renderAgentRecentSessions() {
-  const list = getRecentListEl();
-  if (!list) return;
-  list.textContent = "";
-
-  if (!agentRecentSessions.length) {
-    const empty = document.createElement("div");
-    empty.className = "agent-recent-empty";
-    empty.textContent = "아직 최근 작업이 없습니다. 업무 요청을 보내면 이곳에 자동으로 쌓입니다.";
-    list.appendChild(empty);
-    return;
-  }
-
-  agentRecentSessions.forEach((item) => {
-    const row = document.createElement("div");
-    row.className = "agent-recent-item" + (item.isFavorite ? " is-favorite" : "");
-    row.setAttribute("role", "listitem");
-
-    const openBtn = document.createElement("button");
-    openBtn.type = "button";
-    openBtn.className = "agent-recent-open";
-    openBtn.innerHTML = `
-      <span class="agent-recent-title">${escapeHtml(item.title)}</span>
-      <span class="agent-recent-meta">${escapeHtml(formatRecentTime(item.lastMessageAt))}</span>
-    `;
-    openBtn.addEventListener("click", () => loadAgentSession(item.id));
-
-    const moreWrap = document.createElement("div");
-    moreWrap.className = "agent-recent-more-wrap";
-
-    const moreBtn = document.createElement("button");
-    moreBtn.type = "button";
-    moreBtn.className = "agent-recent-more";
-    moreBtn.setAttribute("aria-label", `${item.title} 메뉴 열기`);
-    moreBtn.textContent = "⋯";
-    moreBtn.addEventListener("click", (event) => {
+    menu.addEventListener("click", async (event) => {
+      const actionButton = event.target.closest("button[data-action]");
+      if (!actionButton) return;
       event.preventDefault();
       event.stopPropagation();
-      toggleRecentMenu(moreWrap, item);
+      const action = actionButton.dataset.action;
+      closeRecentContextMenu();
+      if (action === "rename") return renameRecentConversation(item.id);
+      if (action === "favorite") return toggleFavoriteRecentConversation(item.id);
+      if (action === "delete") return deleteRecentConversation(item.id);
     });
-
-    moreWrap.appendChild(moreBtn);
-    row.appendChild(openBtn);
-    row.appendChild(moreWrap);
-    list.appendChild(row);
-  });
-}
-
-function formatRecentTime(value) {
-  if (!value) return "방금 전";
-  const ts = new Date(value).getTime();
-  if (!Number.isFinite(ts)) return "방금 전";
-  const diff = Math.max(0, Date.now() - ts);
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return "방금 전";
-  if (min < 60) return `${min}분 전`;
-  const hour = Math.floor(min / 60);
-  if (hour < 24) return `${hour}시간 전`;
-  const day = Math.floor(hour / 24);
-  if (day < 7) return `${day}일 전`;
-  return new Date(ts).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" });
-}
-
-function closeRecentMenu() {
-  if (openRecentMenu) {
-    openRecentMenu.remove();
-    openRecentMenu = null;
+    container.appendChild(menu);
+    recentContextMenu = menu;
   }
-}
 
-function toggleRecentMenu(container, item) {
-  if (!container) return;
-  if (openRecentMenu && container.contains(openRecentMenu)) {
-    closeRecentMenu();
-    return;
-  }
-  closeRecentMenu();
-
-  const menu = document.createElement("div");
-  menu.className = "agent-recent-menu";
-  menu.innerHTML = `
-    <button type="button" data-action="rename">이름 바꾸기</button>
-    <button type="button" data-action="favorite">${item.isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}</button>
-    <button type="button" data-action="delete" class="danger">삭제</button>
-  `;
-  menu.addEventListener("click", async (event) => {
-    const target = event.target?.closest?.("button[data-action]");
-    if (!target) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const action = target.dataset.action;
-    closeRecentMenu();
-    if (action === "rename") return renameAgentSession(item);
-    if (action === "favorite") return toggleFavoriteAgentSession(item);
-    if (action === "delete") return deleteAgentSession(item);
-  });
-
-  container.appendChild(menu);
-  openRecentMenu = menu;
-}
-
-async function loadAgentSession(sessionId) {
-  if (!sessionId || agentSubmitInProgress) return;
-  try {
-    const data = await agentStateRequest({ action: "load_session", sessionId });
-    if (data?.session?.id) {
-      agentSessionId = data.session.id;
-      sessionStorage.setItem("ds_agent_session_id", agentSessionId);
-    }
-    agentStateReady = true;
-    agentStateLoading = false;
-    agentConversationRenderedFromCache = false;
-    clearAgentFiles();
-    resetAgentMessagesKeepingWelcome();
-    const messages = Array.isArray(data.messages) ? data.messages : [];
-    messages.forEach((msg) => {
-      const role = msg.role === "user" ? "user" : "bot";
-      addMessage(agentBody, role, String(msg.content || msg.text || ""), false, {
-        skipAgentSave: true,
-        skipAgentCache: true,
-        hideCopy: msg.role === "system",
-      });
+  function renderLowerRecentList(items) {
+    if (!state.lowerRecentList) return;
+    state.lowerRecentList.innerHTML = "";
+    items.slice(0, 5).forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "task-row";
+      row.innerHTML = `
+        <span class="app-icon ${getTaskIconClass(item.task)}">${escapeHtml(getTaskIconText(item.task))}</span>
+        <div class="task-copy">
+          <p class="task-title">${escapeHtml(item.title || "새 업무 요청")}</p>
+          <p class="task-desc">${escapeHtml(item.preview || "최근 업무 요청")}</p>
+        </div>
+        <span class="time">${escapeHtml(formatRelativeTime(item.updatedAt))}</span>
+        <button class="more-btn" type="button" aria-label="대화 열기"><svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg></button>`;
+      row.addEventListener("click", () => openRecentConversation(item.id));
+      state.lowerRecentList.appendChild(row);
     });
-    if (Array.isArray(data.files) && data.files.length) mergePersistedAgentFiles(data.files);
-    saveAgentConversationCacheNow();
+  }
+
+  async function openRecentConversation(conversationId) {
+    const item = loadRecentWorkItems().find((entry) => entry.id === conversationId);
+    if (!item) return;
+    activeConversationId = item.id;
+    currentTask = item.task || "";
+    selectedFiles = [];
+    renderFileChips();
+    clearMessages();
     setMode("doc");
-    if (agentBody) agentBody.scrollTop = agentBody.scrollHeight;
-  } catch (err) {
-    addMessage(agentBody || document.body, "bot", "최근 작업을 불러오지 못했습니다.\n" + getErrorMessage(err), true);
-  }
-}
 
-async function renameAgentSession(item) {
-  const nextTitle = window.prompt("대화 이름을 입력하세요.", item.title || "새 업무 대화");
-  if (nextTitle === null) return;
-  const title = String(nextTitle || "").trim();
-  if (!title) return;
-  try {
-    await agentStateRequest({ action: "rename_session", sessionId: item.id, title });
-    scheduleRecentSessionsRefresh();
-  } catch (err) {
-    window.alert("이름을 변경하지 못했습니다.\n" + getErrorMessage(err));
-  }
-}
+    const remoteId = getRemoteSessionId(item);
+    if (remoteId && sessionToken) {
+      try {
+        const data = await agentStateRequest({ action: "load_session", sessionId: remoteId });
+        const messages = Array.isArray(data.messages) ? data.messages : [];
+        messages.forEach((message) => addMessage(message.role === "assistant" ? "bot" : "user", message.content || message.text || ""));
+        if (messages.length) {
+          item.messages = messages.map((message) => ({ role: message.role === "assistant" ? "assistant" : "user", text: message.content || message.text || "", at: Date.now() })).slice(-MAX_STORED_CONVERSATION_MESSAGES);
+          upsertRecentWorkItem(item);
+        }
+      } catch {
+        renderLocalConversationMessages(item);
+      }
+    } else {
+      renderLocalConversationMessages(item);
+    }
 
-async function toggleFavoriteAgentSession(item) {
-  try {
-    await agentStateRequest({ action: "toggle_favorite", sessionId: item.id, favorite: !item.isFavorite });
-    scheduleRecentSessionsRefresh();
-  } catch (err) {
-    window.alert("즐겨찾기를 변경하지 못했습니다.\n" + getErrorMessage(err));
+    const active = getActiveConversation();
+    try {
+      const apiHistory = (active?.messages || []).map((message) => ({ role: message.role === "assistant" ? "assistant" : "user", text: message.text || "" })).slice(-MAX_HISTORY);
+      sessionStorage.setItem(getLocalHistoryKey(), JSON.stringify(apiHistory));
+    } catch {}
+    renderRecentWorkList();
   }
-}
 
-async function deleteAgentSession(item) {
-  const ok = window.confirm(`'${item.title}' 대화를 삭제할까요?`);
-  if (!ok) return;
-  try {
-    await agentStateRequest({ action: "delete_session", sessionId: item.id });
-    if (agentSessionId === item.id) {
-      agentSessionId = "";
-      sessionStorage.removeItem("ds_agent_session_id");
-      clearAgentConversationCache();
-      resetAgentMessagesKeepingWelcome();
+  function renderLocalConversationMessages(item) {
+    const messages = Array.isArray(item?.messages) ? item.messages : [];
+    messages.forEach((message) => addMessage(message.role === "assistant" ? "bot" : "user", message.text || ""));
+  }
+
+  function renameRecentConversation(conversationId) {
+    const item = loadRecentWorkItems().find((entry) => entry.id === conversationId);
+    if (!item) return;
+    const next = window.prompt("대화 이름을 입력하세요.", item.title || "새 업무 요청");
+    if (next === null) return;
+    const title = String(next || "").trim();
+    if (!title) return;
+    updateRecentWorkItem(conversationId, { title, updatedAt: Date.now() });
+    const remoteId = getRemoteSessionId(item);
+    if (remoteId) void agentStateRequest({ action: "rename_session", sessionId: remoteId, title }).then(() => scheduleRemoteRecentRefresh()).catch(() => showToast("서버 대화 이름 변경에 실패했습니다."));
+  }
+
+  function toggleFavoriteRecentConversation(conversationId) {
+    const item = loadRecentWorkItems().find((entry) => entry.id === conversationId);
+    if (!item) return;
+    const nextFavorite = !item.isFavorite;
+    updateRecentWorkItem(conversationId, { isFavorite: nextFavorite, updatedAt: Date.now() });
+    const remoteId = getRemoteSessionId(item);
+    if (remoteId) void agentStateRequest({ action: "toggle_favorite", sessionId: remoteId, favorite: nextFavorite }).then(() => scheduleRemoteRecentRefresh()).catch(() => showToast("즐겨찾기 변경에 실패했습니다."));
+  }
+
+  function deleteRecentConversation(conversationId) {
+    const item = loadRecentWorkItems().find((entry) => entry.id === conversationId);
+    if (!item) return;
+    const ok = window.confirm(`'${item.title || "최근 작업"}' 대화를 삭제할까요?`);
+    if (!ok) return;
+    const items = loadRecentWorkItems().filter((entry) => entry.id !== conversationId);
+    saveRecentWorkItems(items);
+    if (activeConversationId === conversationId) {
+      startNewConversation();
       setMode("home");
     }
-    scheduleRecentSessionsRefresh();
-  } catch (err) {
-    window.alert("대화를 삭제하지 못했습니다.\n" + getErrorMessage(err));
-  }
-}
-
-function buildAgentMessage(message, files = []) {
-  const text = String(message || "").trim() || "첨부한 파일을 분석해 주세요.";
-  const list = Array.isArray(files) ? files : [];
-
-  if (!list.length) return text;
-
-  const fileLines = list.map((item, index) => {
-    const name = getAttachmentName(item);
-    const size = formatFileSize(getAttachmentSize(item));
-    return `${index + 1}. ${name} (${size})`;
-  });
-
-  return [text, "", "[첨부 파일]", ...fileLines].join("\n");
-}
-
-function shouldRedirectToKnowledge(message, hasFiles = false) {
-  if (hasFiles) return false;
-
-  const text = normalizeAgentText(message);
-  if (!text) return false;
-
-  // 문서 작성·요약·번역·메일 초안 등 업무 AI Agent가 처리해야 하는 산출물 요청은
-  // 사내 지식 문의로 돌리지 않습니다.
-  const workOutputPatterns = [
-    /메일|이메일|공문|공지|안내문|보고서|기안|품의서|회의록|요약|정리|번역|검토|초안|문장|표현|다듬|작성|써\s*줘|써줘|만들어\s*줘|만들어줘|수정|엑셀|pptx?|피피티|파워포인트|슬라이드|제안서/i,
-  ];
-  if (hasPattern(text, workOutputPatterns)) return false;
-
-  const explicitKnowledgePatterns = [
-    /사내\s*지식\s*문의|지식\s*베이스|사내\s*자료\s*기준/i,
-    /사내\s*(규정|규칙|내규|규정집|기준|정책)/i,
-    /업무\s*(절차|프로세스|매뉴얼|가이드|기준)/i,
-    /(담당\s*부서|담당자|소관\s*부서|문의\s*부서)/i,
-    /(신청|승인|결재|품의|구매|계약|정산|경비|출장|휴가|연차|근태|복리후생|보안|개인정보).{0,12}(절차|규정|기준|방법|어디|누구|담당|문의)/i,
-    /(절차|규정|기준|방법|담당).{0,12}(알려|확인|문의|어디|누구|뭐야|무엇)/i,
-  ];
-
-  return hasPattern(text, explicitKnowledgePatterns);
-}
-
-function addKnowledgeRedirectMessage(originalMessage = "") {
-  const answer = [
-    "사내 규정이나 업무 절차에 대한 질문은 정확한 답변을 위해 사내 지식 문의에서 확인해 주세요.",
-    "아래 버튼을 누르면 질문 내용을 그대로 가져갈 수 있습니다.",
-  ].join("\n");
-
-  const messageDiv = addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-  applyKnowledgeRedirectAction(messageDiv, originalMessage);
-
-  saveAgentMessage("assistant", answer, {
-    route: "knowledge-redirect",
-    originalMessage,
-  });
-}
-
-function shouldUseFileApi(message, hasFiles, history = []) {
-  // 운영 정책: 입력창 위 파일 칩이 남아 있으면 사용자가 명시적으로 X를 누르기 전까지
-  // 현재 분석 파일이 연결된 상태로 봅니다.
-  // 따라서 메일/보고서/문장 작성처럼 보이는 요청이어도 file-api로 보내서
-  // SideTalk 지식베이스가 끼어들 가능성을 차단합니다.
-  return Boolean(hasFiles);
-}
-
-
-function hasInlineSourceContent(message) {
-  const raw = String(message || "").trim();
-  if (!raw) return false;
-
-  const compact = raw.replace(/\s+/g, " ");
-  const hasWorkInstruction = /(요약|정리|번역|다듬|수정|교정|검토|작성|초안|핵심|간결|보고용|회의록|메일|목록|표)/i.test(compact);
-  const explicitSourceMarkers = [
-    /\[\s*(요약할\s*내용|내용|원문|문장|회의\s*내용|자료|본문|텍스트|입력|검토할\s*내용)\s*\]/i,
-    /(?:^|\n)\s*(요약할\s*내용|내용|원문|문장|회의\s*내용|자료|본문|텍스트|입력|검토할\s*내용)\s*[:：]/i,
-    /(?:아래|다음)\s*(?:내용|글|문장|자료|텍스트|본문)\s*(?:을|를)?/i,
-  ];
-
-  if (explicitSourceMarkers.some((pattern) => pattern.test(raw)) && hasWorkInstruction) return true;
-
-  const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const structuredLineCount = lines.filter((line) => /^(?:[※#>*-]|\d+[.)]|[가-힣A-Za-z0-9 _/·\-]{2,40}\s*[:：])/.test(line)).length;
-  if (hasWorkInstruction && lines.length >= 5 && structuredLineCount >= 2) return true;
-
-  return false;
-}
-
-function isMissingFileReferenceQuestion(message) {
-  if (hasInlineSourceContent(message)) return false;
-
-  const text = normalizeAgentText(message);
-  if (!text) return false;
-
-  const strongFileReferencePatterns = [
-    /(?:이|해당|위|앞|방금|현재)\s*(?:파일|자료|문서|엑셀|시트|xlsx|csv|pdf|pptx?|워드|docx?)/i,
-    /(?:첨부(?:한|된)?|업로드(?:한|된)?)\s*(?:파일|자료|문서|엑셀|시트|xlsx|csv|pdf|pptx?|워드|docx?)?/i,
-    /(?:첨부\s*파일|업로드\s*파일|분석\s*파일|연결된\s*파일)/i,
-    /(?:파일|자료|문서|엑셀|시트)\s*(?:분석|요약|정리|검토|확인|기준|내용|안에서|에서|내에서)/i,
-    /(?:분석|요약|정리|검토|확인)\s*(?:해줘|해\s*줘|해주세요|해\s*주세요).{0,10}(?:파일|자료|문서|엑셀|시트)/i,
-  ];
-
-  if (hasPattern(text, strongFileReferencePatterns)) return true;
-
-  // 실제 엑셀 첨부가 없을 때 아래 업무 데이터 표현은 사내 지식베이스로 보내지지 않게 막습니다.
-  // 단, "엑셀 함수 알려줘" 같은 일반 교육성 질문은 차단하지 않습니다.
-  const sheetDataReferencePatterns = [
-    /(?:매출원장|순매출|거래번호|안전재고|누락값|중복값|이상치).{0,30}(?:분석|정리|표|합계|평균|상위|하위|리스크|알려|확인|추출)/i,
-    /(?:부서별|담당자별|거래처별|제품별|지역별|상태별|월별|일자별).{0,20}(?:합계|평균|매출|순매출|집계|표|정리)/i,
-  ];
-
-  return hasPattern(text, sheetDataReferencePatterns);
-}
-
-function buildFileContextRequiredAnswer() {
-  return "현재 연결된 파일이 없습니다.\n분석할 파일을 첨부한 뒤 다시 요청해 주세요.";
-}
-
-
-function getInstructionPart(message) {
-  const raw = String(message || "").trim();
-  if (!raw) return "";
-
-  /**
-   * Export routing must read the user's instruction, not the data payload.
-   * Example:
-   *   "아래 내용을 엑셀 파일로 만들어줘.\n\n컬럼:\n...\n데이터:\nPPT 템플릿 검토 / ..."
-   * The word "PPT" above is only a cell value, so it must not trigger PPT generation.
-   */
-  const blockMarkerPattern = /(^|\n)\s*(?:컬럼|열|데이터|자료|내용|목록|표\s*데이터|원본|입력|행)\s*:/i;
-  const markerMatch = raw.match(blockMarkerPattern);
-
-  if (markerMatch && typeof markerMatch.index === "number" && markerMatch.index > 0) {
-    return raw.slice(0, markerMatch.index).trim();
+    renderRecentWorkList();
+    const remoteId = getRemoteSessionId(item);
+    if (remoteId) void agentStateRequest({ action: "delete_session", sessionId: remoteId }).then(() => scheduleRemoteRecentRefresh()).catch(() => showToast("서버 대화 삭제에 실패했습니다."));
   }
 
-  const lines = raw.split(/\r?\n/);
-  const firstBlankIndex = lines.findIndex((line, index) => index > 0 && !line.trim());
-  if (firstBlankIndex > 0) {
-    const head = lines.slice(0, firstBlankIndex).join("\n").trim();
-    if (head && looksLikeExportInstruction(head)) return head;
+  function updateRecentWorkItem(conversationId, patch) {
+    const items = loadRecentWorkItems();
+    const index = items.findIndex((entry) => entry.id === conversationId);
+    if (index < 0) return null;
+    const next = { ...items[index], ...patch };
+    items[index] = next;
+    saveRecentWorkItems(sortRecentWorkItems(items));
+    renderRecentWorkList();
+    return next;
   }
 
-  return raw;
-}
+  function upsertRecentWorkItem(item) {
+    if (!item?.id) return;
+    const items = loadRecentWorkItems().filter((entry) => entry.id !== item.id && (!item.remoteId || getRemoteSessionId(entry) !== item.remoteId));
+    saveRecentWorkItems(sortRecentWorkItems([item, ...items]));
+    renderRecentWorkList();
+  }
 
-function looksLikeExportInstruction(text) {
-  const normalized = normalizeAgentText(text);
-  if (!normalized) return false;
+  function sortRecentWorkItems(items) {
+    return (Array.isArray(items) ? items : [])
+      .filter((item) => item && item.id)
+      .sort((a, b) => Number(Boolean(b.isFavorite)) - Number(Boolean(a.isFavorite)) || Number(b.updatedAt || 0) - Number(a.updatedAt || 0))
+      .slice(0, MAX_RECENT_WORK);
+  }
 
-  return /엑셀|xlsx?|excel|스프레드시트|pptx?|파워포인트|프레젠테이션|슬라이드|발표자료|보고자료/i.test(normalized) &&
-    /만들|생성|작성|제작|구성|정리|변환|다운로드|내려받|출력|파일로|로\s*줘/i.test(normalized);
-}
+  function getRemoteSessionId(item) {
+    const explicit = String(item?.remoteId || item?.remote_id || "").trim();
+    if (explicit) return explicit;
+    const id = String(item?.id || "").trim();
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) ? id : "";
+  }
 
-function hasExplicitExcelExportRequest(text) {
-  const normalized = normalizeAgentText(text);
-  if (!normalized) return false;
+  function scheduleRemoteRecentRefresh(delay = REMOTE_SESSION_REFRESH_DEBOUNCE_MS) {
+    if (!sessionToken) return;
+    window.clearTimeout(recentRemoteRefreshTimer);
+    recentRemoteRefreshTimer = window.setTimeout(() => refreshRecentWorkFromServer(), delay);
+  }
 
-  const excelPatterns = [
-    /(?:엑셀|xlsx|excel|스프레드시트)\s*(?:파일)?\s*(?:로|으로)\s*(?:만들|생성|작성|정리|변환|다운로드|내려받|출력)/i,
-    /(?:엑셀|xlsx|excel|스프레드시트)\s*파일\s*(?:을|를)?\s*(?:만들|생성|작성|정리|다운로드|내려받|출력)/i,
-    /(?:표|목록|데이터|내용|자료|결과|위\s*내용|아래\s*내용).{0,30}(?:엑셀|xlsx|excel|스프레드시트)\s*(?:파일)?\s*(?:로|으로)/i,
-    /(?:엑셀|xlsx|excel)\s*(?:다운로드|내려받기|다운받기)\s*(?:버튼|링크|파일|가능|하게|할\s*수|만들|생성)/i,
-    /(?:다운로드|내려받|다운받).{0,20}(?:엑셀|xlsx|excel)\s*(?:파일)?/i,
-  ];
-
-  return hasPattern(normalized, excelPatterns);
-}
-
-function hasExplicitPptExportRequest(text) {
-  const normalized = normalizeAgentText(text);
-  if (!normalized) return false;
-
-  const pptPatterns = [
-    /(?:pptx?|피피티|파워포인트|프레젠테이션|슬라이드|발표자료|보고자료|보고용\s*(?:pptx?|피피티|파워포인트|프레젠테이션|자료))\s*(?:파일|자료|초안|덱)?\s*(?:로|으로)\s*(?:만들|생성|작성|제작|구성|정리|변환|다운로드|내려받|출력)/i,
-    /(?:pptx?|피피티|파워포인트|프레젠테이션|슬라이드|발표자료|보고자료|보고용\s*(?:pptx?|피피티|파워포인트|프레젠테이션|자료))\s*(?:파일|자료|초안|덱)?\s*(?:을|를)?\s*(?:만들|생성|작성|제작|구성|정리|변환)(?:어|아|해)?\s*(?:줘|주세요|주십시오|달라|바랍니다|해줘|해주세요)/i,
-    /(?:발표자료|보고자료|보고용\s*자료|제안서)\s*(?:를|을)?\s*(?:만들|생성|작성|제작|구성)/i,
-    /(?:pptx?|피피티|파워포인트|프레젠테이션)\s*초안/i,
-    /(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드).{0,30}(?:pptx?|피피티|파워포인트|프레젠테이션|슬라이드)/i,
-    /(?:pptx?|피피티|파워포인트|프레젠테이션|슬라이드).{0,30}(?:\d+|[0-9]+)\s*(?:장|페이지|슬라이드)/i,
-  ];
-
-  return hasPattern(normalized, pptPatterns);
-}
-
-function hasBothExportFormatsRequest(text) {
-  const normalized = normalizeAgentText(text);
-  if (!normalized) return false;
-
-  const bothFormatPatterns = [
-    /(?:엑셀|xlsx|excel|스프레드시트).{0,12}(?:과|와|및|랑|하고|,|\/|둘\s*다|모두).{0,12}(?:pptx?|파워포인트|프레젠테이션|슬라이드|발표자료)/i,
-    /(?:pptx?|파워포인트|프레젠테이션|슬라이드|발표자료).{0,12}(?:과|와|및|랑|하고|,|\/|둘\s*다|모두).{0,12}(?:엑셀|xlsx|excel|스프레드시트)/i,
-  ];
-
-  const exportActionPatterns = [
-    /만들|생성|작성|제작|정리|변환|다운로드|내려받|출력|파일로|파일\s*생성/i,
-  ];
-
-  return hasPattern(normalized, bothFormatPatterns) && hasPattern(normalized, exportActionPatterns);
-}
-
-function decideExportTask(message) {
-  const instructionText = getInstructionPart(message);
-  const normalizedInstruction = normalizeAgentText(instructionText);
-  const normalizedFullText = normalizeAgentText(message);
-
-  if (hasBothExportFormatsRequest(normalizedInstruction)) return "ambiguous_export";
-
-  const wantsExcelFromInstruction = hasExplicitExcelExportRequest(normalizedInstruction);
-  const wantsPptFromInstruction = hasExplicitPptExportRequest(normalizedInstruction);
-
-  if (wantsExcelFromInstruction && wantsPptFromInstruction) return "ambiguous_export";
-  if (wantsExcelFromInstruction) return EXCEL_DRAFT_TASK;
-  if (wantsPptFromInstruction) return PPT_DRAFT_TASK;
-
-  /**
-   * Fallback is intentionally strict. This catches short requests without
-   * block markers while avoiding values such as "PPT 템플릿 검토" in data rows.
-   */
-  if (hasBothExportFormatsRequest(normalizedFullText)) return "ambiguous_export";
-
-  const wantsExcelFromFullText = hasExplicitExcelExportRequest(normalizedFullText);
-  const wantsPptFromFullText = hasExplicitPptExportRequest(normalizedFullText);
-
-  if (wantsExcelFromFullText && wantsPptFromFullText) return "ambiguous_export";
-  if (wantsExcelFromFullText) return EXCEL_DRAFT_TASK;
-  if (wantsPptFromFullText) return PPT_DRAFT_TASK;
-
-  return "";
-}
-
-function buildAmbiguousExportAnswer() {
-  return [
-    "엑셀과 PPT 요청이 모두 감지되어 자동 생성 형식을 확정하지 않았습니다.",
-    "원하는 결과물을 한 가지로 지정해 주세요.",
-    "",
-    "예시",
-    "- 이 내용을 엑셀 파일로 만들어줘",
-    "- 이 내용을 PPT 파일로 만들어줘",
-  ].join("\n");
-}
-
-function shouldUsePptDraft(message, hasFiles = false) {
-  return decideExportTask(message) === PPT_DRAFT_TASK;
-}
-
-
-function shouldUseWebSearch(message) {
-  const text = normalizeAgentText(message);
-  if (!text) return false;
-
-  /**
-   * 웹 검색은 명시적 요청 또는 최신성이 핵심인 질문에만 사용합니다.
-   * 일반 메일/문서 작성 요청이 외부 업체, AWS, 견적서 같은 단어를 포함하더라도
-   * 최신 정보 조회 의도가 없으면 agent-api 일반 작성 경로로 보냅니다.
-   */
-  const explicitSearchPatterns = [
-    /웹\s*검색|인터넷\s*검색|온라인\s*검색|검색해서|찾아보고|조사해서|최신\s*자료|최신\s*정보/i,
-    /근거\s*자료\s*(?:찾아|검색|조사)|출처\s*(?:포함|찾아|검색)|링크\s*(?:포함|찾아|검색)/i,
-  ];
-
-  const freshnessPatterns = [
-    /(?:오늘|현재|지금|최근|최신|요즘|이번\s*주|이번\s*달|올해|\d{4}년).{0,20}(?:현황|동향|뉴스|이슈|사례|가격|요금|정책|법령|규정|버전|업데이트|일정|환율|주가|날씨)/i,
-    /(?:뉴스|공시|주가|환율|날씨|일정|가격|요금|채용|공고|법령|정책|보안\s*취약점|릴리스\s*노트|업데이트\s*내역).{0,20}(?:알려|정리|요약|확인|찾아|검색)/i,
-  ];
-
-  return hasPattern(text, explicitSearchPatterns) || hasPattern(text, freshnessPatterns);
-}
-
-
-function hasSensitivePptRequestText(message) {
-  // PPTX 생성이 제거되어 프론트에서는 별도 PPT 보안 차단을 수행하지 않습니다.
-  // 실제 개인정보/기밀 차단은 agent-api 서버 정책에서 처리합니다.
-  return false;
-}
-
-function buildPptUploadBlockedAnswer() {
-  return [
-    "PPTX 파일 자동 생성은 지원하지 않습니다.",
-    "대신 슬라이드별 구성안과 본문 초안을 작성해 드리겠습니다.",
-  ].join("\n");
-}
-
-function buildPptSensitiveBlockedAnswer() {
-  return [
-    "요청 내용에 민감정보가 포함되어 있을 수 있습니다.",
-    "개인정보와 기밀 수치를 제거하거나 익명화한 뒤 슬라이드 구성안 작성을 요청해 주세요.",
-  ].join("\n");
-}
-
-
-
-async function sendChatToTarget({
-  targetBody,
-  message,
-  sendButton,
-  input,
-  task = "chat",
-  attachments = [],
-  apiUrl = AI_API_URL,
-  history = [],
-  stream = true,
-  thinkingSteps = null,
-}) {
-  const thinkingBox = createThinkingBox(targetBody, thinkingSteps);
-
-  try {
-    const body = {
-      message,
-      stream,
-    };
-
-    if (task !== "chat") body.task = task;
-    if (history.length) body.history = history;
-    if (attachments.length) {
-      body.attachments = attachments.map((file) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type || "",
-        lastModified: file.lastModified || 0,
-      }));
-      body.systemNote = "첨부 파일의 실제 본문 추출 API가 아직 프론트엔드에 연결되지 않았으면 파일 내용을 분석했다고 말하지 마세요. 파일명과 사용자의 요청만 기준으로 답변하세요.";
+  async function refreshRecentWorkFromServer() {
+    if (!sessionToken || recentRemoteRefreshInProgress) return;
+    recentRemoteRefreshInProgress = true;
+    try {
+      const data = await agentStateRequest({ action: "list_sessions", limit: REMOTE_SESSION_LIST_LIMIT });
+      const remote = Array.isArray(data.sessions) ? data.sessions : [];
+      if (!remote.length) return;
+      const local = loadRecentWorkItems();
+      const next = [...local];
+      remote.forEach((session) => {
+        const remoteId = String(session.id || session.sessionId || "").trim();
+        if (!remoteId) return;
+        const updatedAt = Date.parse(session.last_message_at || session.lastMessageAt || session.updated_at || session.updatedAt || session.created_at || session.createdAt || "") || Date.now();
+        const foundIndex = next.findIndex((item) => getRemoteSessionId(item) === remoteId || item.id === remoteId);
+        const patch = {
+          remoteId,
+          title: String(session.title || "새 업무 요청").trim() || "새 업무 요청",
+          updatedAt,
+          isFavorite: Boolean(session.is_favorite ?? session.isFavorite),
+          task: "general",
+          preview: "저장된 업무 대화",
+        };
+        if (foundIndex >= 0) next[foundIndex] = { ...next[foundIndex], ...patch };
+        else next.push({ id: remoteId, ...patch, messages: [] });
+      });
+      saveRecentWorkItems(sortRecentWorkItems(next));
+      renderRecentWorkList();
+    } catch {
+      // 서버 세션 저장이 아직 배포되지 않은 환경에서는 로컬 최근 작업만 사용합니다.
+    } finally {
+      recentRemoteRefreshInProgress = false;
     }
+  }
 
-    const res = await fetch(apiUrl, {
+  async function ensureRemoteSessionForActiveConversation(titleText = "") {
+    if (!sessionToken || !activeConversationId) return "";
+    const item = getActiveConversation();
+    const existing = getRemoteSessionId(item);
+    if (existing) return existing;
+    try {
+      const title = createConversationTitle(titleText || item?.title || "새 업무 요청");
+      const data = await agentStateRequest({ action: "create_session", title });
+      const remoteId = String(data?.session?.id || "").trim();
+      if (remoteId) updateRecentWorkItem(activeConversationId, { remoteId, title: data.session.title || title });
+      return remoteId;
+    } catch {
+      return "";
+    }
+  }
+
+  async function saveRemoteConversationMessage(role, text, metadata = {}) {
+    const content = String(text || "").trim();
+    if (!content || !sessionToken || !activeConversationId) return null;
+    const sessionId = await ensureRemoteSessionForActiveConversation(content);
+    if (!sessionId) return null;
+    try {
+      const data = await agentStateRequest({ action: "save_message", sessionId, role, content, route: metadata.route || "", metadata });
+      if (data?.session?.id) updateRecentWorkItem(activeConversationId, { remoteId: data.session.id, title: data.session.title || getActiveConversation()?.title || createConversationTitle(content), updatedAt: Date.now() });
+      scheduleRemoteRecentRefresh();
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  async function agentStateRequest(payload) {
+    const res = await fetch(AGENT_API_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + sessionToken,
-      },
-      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionToken}` },
+      body: JSON.stringify(payload || {}),
     });
+    return readApiResponse(res);
+  }
 
-    removeThinkingBox(thinkingBox);
+  function createConversationTitle(text) {
+    const cleaned = stripAttachmentBlock(text)
+      .replace(/[\r\n]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!cleaned) return "새 업무 요청";
+    return cleaned.length > 34 ? `${cleaned.slice(0, 34)}…` : cleaned;
+  }
 
-    if (!res.ok) {
-      const data = await readResponseData(res);
-      const answerText = getApiAnswerText(data, "HTTP " + res.status);
-      addMessage(targetBody, "bot", "AI API 오류가 발생했습니다.\n" + answerText, true);
-      return;
-    }
+  function createConversationPreview(text) {
+    const cleaned = stripAttachmentBlock(text)
+      .replace(/[\r\n]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return cleaned.length > 72 ? `${cleaned.slice(0, 72)}…` : cleaned;
+  }
 
-    const responseContentType = res.headers.get("content-type") || "";
+  function stripAttachmentBlock(text) {
+    return String(text || "").replace(/\n\n?\[첨부 파일\][\s\S]*$/m, "").trim();
+  }
 
-    // stream=true로 요청했더라도 서버가 보안 차단/정책 응답을 JSON으로 반환할 수 있습니다.
-    // 이 경우 JSON 전체를 화면에 노출하지 않고 answer/message만 표시합니다.
-    if (stream && responseContentType.includes("application/json")) {
-      const data = await readResponseData(res);
-      const answerText = getApiAnswerText(data, "답변을 생성하지 못했습니다.");
-      const isArtifact = Boolean(data.excel?.ok || task === EXCEL_DRAFT_TASK);
-      const isKnowledgeRedirect = targetBody === agentBody && isKnowledgeRedirectText(answerText);
-      const messageDiv = addMessage(targetBody, "bot", answerText, false, { hideCopy: isArtifact || isKnowledgeRedirect });
-      appendExcelDownloadButton(targetBody, data.excel);
-      appendEvidenceBox(targetBody, data);
-      if (isKnowledgeRedirect) applyKnowledgeRedirectAction(messageDiv, message);
-      if (targetBody === agentBody) {
-        await saveAgentMessage("assistant", answerText, {
-          route: isKnowledgeRedirect ? "knowledge-redirect" : task || "agent-api",
-          artifact: isArtifact,
-          artifactSavedAt: isArtifact ? new Date().toISOString() : undefined,
-          excel: data.excel || null,
-          originalMessage: isKnowledgeRedirect ? message : undefined,
-        });
+  function formatRelativeTime(timestamp) {
+    const diff = Date.now() - Number(timestamp || 0);
+    if (!Number.isFinite(diff) || diff < 0) return "방금 전";
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+    if (diff < minute) return "방금 전";
+    if (diff < hour) return `${Math.floor(diff / minute)}분 전`;
+    if (diff < day) return `${Math.floor(diff / hour)}시간 전`;
+    if (diff < day * 7) return `${Math.floor(diff / day)}일 전`;
+    return new Date(Number(timestamp)).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
+  }
+
+  function getTaskIconClass(task) {
+    const value = String(task || "");
+    if (value.includes("excel")) return "excel";
+    if (value.includes("translation")) return "translate";
+    if (value.includes("summary")) return "summary";
+    if (value.includes("report")) return "report";
+    if (value.includes("file")) return "file";
+    return "doc";
+  }
+
+  function getTaskIconText(task) {
+    const value = String(task || "");
+    if (value.includes("excel")) return "X";
+    if (value.includes("translation")) return "A";
+    if (value.includes("summary")) return "≡";
+    if (value.includes("report")) return "▥";
+    if (value.includes("file")) return "▰";
+    return "▤";
+  }
+
+  function restoreLocalHistory() {
+    renderRecentWorkList();
+  }
+
+  function restoreAgentConversationFromCache() {
+    return getRecentHistory();
+  }
+
+  function saveAgentConversationCache(key, messages) {
+    try {
+      sessionStorage.setItem(key, JSON.stringify(Array.isArray(messages) ? messages.slice(-MAX_HISTORY) : []));
+    } catch {}
+  }
+
+  function setComposerDisabled(disabled) {
+    if (state.agentMessageInput) state.agentMessageInput.disabled = disabled;
+    if (state.agentSendBtn) state.agentSendBtn.disabled = disabled;
+    if (state.agentAttachBtn) state.agentAttachBtn.disabled = disabled;
+    if (state.homeSendBtn) state.homeSendBtn.disabled = disabled;
+  }
+
+  function isPlainEnterSubmitEvent(event) {
+    if (!event || event.key !== "Enter") return false;
+    if (event.isComposing || event.keyCode === 229) return false;
+    if (event.shiftKey) return false;
+    return true;
+  }
+
+  function resizeTextarea(textarea) {
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    const maxHeight = Math.min(window.innerHeight * 0.28, 180);
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? "auto" : "hidden";
+  }
+
+  function showToast(message) {
+    document.querySelector(".ds-toast")?.remove();
+    const toast = document.createElement("div");
+    toast.className = "ds-toast";
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add("show"));
+    setTimeout(() => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 200); }, 1800);
+  }
+
+  function decodeSessionTokenPayload(token) {
+    if (!token) return null;
+    try {
+      const part = String(token).split(".")[0] || "";
+      const normalized = part.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+      const json = decodeURIComponent(Array.from(atob(padded)).map((ch) => `%${ch.charCodeAt(0).toString(16).padStart(2, "0")}`).join(""));
+      return JSON.parse(json);
+    } catch { return null; }
+  }
+
+  function getDisplayName(profile) {
+    if (!profile) return "";
+    const candidates = [profile.userName, profile.user_name, profile.name, profile.displayName, profile.display_name, profile.empName, profile.empNm, profile.loginId, profile.login_id, profile.empNo, profile.emp_no];
+    return candidates.map((value) => String(value || "").trim()).find((value) => value && value !== "undefined" && value !== "null") || "";
+  }
+
+  function applyHeaderProfile(profile) {
+    const displayName = getDisplayName(profile);
+    if (!displayName) return;
+    if (!state.profileName) state.profileName = document.querySelector(".profile-button strong");
+    if (!state.profileAvatar) state.profileAvatar = document.querySelector(".avatar");
+    if (state.profileName) state.profileName.textContent = displayName;
+    if (state.profileAvatar) state.profileAvatar.textContent = displayName.slice(0, 1);
+    cacheDisplayName(displayName);
+  }
+
+  async function bootstrapProfile() {
+    if (!sessionToken) return;
+    try {
+      const res = await fetch(AGENT_API_URL, { method: "GET", headers: { Authorization: `Bearer ${sessionToken}` } });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.ok) {
+        currentLoginId = data.loginId || data.login_id || currentLoginId;
+        currentEmpNo = data.empNo || data.emp_no || data.rpaAuthEmpNo || currentEmpNo;
+        applyHeaderProfile(data);
+        renderRecentWorkList();
+        scheduleRemoteRecentRefresh(50);
       }
-      return;
-    }
-
-    if (!stream) {
-      const data = await readResponseData(res);
-
-      const answerText = getApiAnswerText(data, "답변을 생성하지 못했습니다.");
-      const isArtifact = Boolean(data.excel?.ok || task === EXCEL_DRAFT_TASK);
-      const isKnowledgeRedirect = targetBody === agentBody && isKnowledgeRedirectText(answerText);
-      const messageDiv = addMessage(targetBody, "bot", answerText, false, { hideCopy: isArtifact || isKnowledgeRedirect });
-      appendExcelDownloadButton(targetBody, data.excel);
-      appendEvidenceBox(targetBody, data);
-      if (isKnowledgeRedirect) applyKnowledgeRedirectAction(messageDiv, message);
-      if (targetBody === agentBody) {
-        await saveAgentMessage("assistant", answerText, {
-          route: isKnowledgeRedirect ? "knowledge-redirect" : task || "agent-api",
-          artifact: isArtifact,
-          artifactSavedAt: new Date().toISOString(),
-          excel: data.excel || null,
-          originalMessage: isKnowledgeRedirect ? message : undefined,
-        });
-      }
-      return;
-    }
-
-    if (!res.body) {
-      addMessage(targetBody, "bot", "스트림 응답 본문이 없습니다.");
-      return;
-    }
-
-    const botDiv = addMessage(targetBody, "bot", "");
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-
-    let fullText = "";
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-
-      buffer += chunk;
-
-      if (buffer.includes("\n\n") || buffer.includes("data: [DONE]") || !buffer.includes("data:")) {
-        const parsed = parseStreamText(buffer);
-
-        if (parsed) {
-          fullText += parsed;
-          setMessageContent(botDiv, fullText);
-          targetBody.scrollTop = targetBody.scrollHeight;
-          if (targetBody === aiBody) saveChatHistory();
-          if (targetBody === agentBody) saveAgentConversationCacheDebounced();
-        }
-
-        buffer = "";
-      }
-    }
-
-    const tail = decoder.decode();
-    if (tail) buffer += tail;
-
-    const finalParsed = parseStreamText(buffer);
-    if (finalParsed) {
-      fullText += finalParsed;
-      setMessageContent(botDiv, fullText);
-      if (targetBody === aiBody) saveChatHistory();
-      if (targetBody === agentBody) saveAgentConversationCacheDebounced();
-    }
-
-    if (!fullText.trim()) {
-      setMessageContent(botDiv, "답변 데이터는 수신했지만 화면에 표시할 텍스트를 찾지 못했습니다.");
-      if (targetBody === aiBody) saveChatHistory();
-      if (targetBody === agentBody) saveAgentConversationCacheDebounced();
-    }
-
-    if (targetBody === agentBody && fullText.trim()) {
-      const isKnowledgeRedirect = isKnowledgeRedirectText(fullText);
-      if (isKnowledgeRedirect) applyKnowledgeRedirectAction(botDiv, message);
-      saveAgentMessage("assistant", fullText, {
-        route: isKnowledgeRedirect ? "knowledge-redirect" : task || "agent-api",
-        originalMessage: isKnowledgeRedirect ? message : undefined,
-      });
-    }
-  } catch (err) {
-    removeThinkingBox(thinkingBox);
-    addMessage(targetBody, "bot", "호출 실패: " + getErrorMessage(err));
-  } finally {
-    if (sendButton) {
-      if (sendButton === agentSendBtn && isAgentPptGenerating) {
-        syncAgentPptGeneratingControls();
-      } else {
-        sendButton.disabled = false;
-      }
-    }
-
-    if (!(input === agentMessageInput && isAgentPptGenerating)) {
-      focusInputWhenPanelReady(input);
-    }
-  }
-}
-
-async function sendChat(message) {
-  return sendChatToTarget({
-    targetBody: aiBody,
-    message,
-    sendButton: sendBtn,
-    input: messageInput,
-  });
-}
-
-async function sendAgentFileAnalysis(message, files = [], history = [], options = {}) {
-  const useStream = options.stream !== false;
-  const task = options.task || "";
-  const thinkingBox = createThinkingBox(agentBody, options.thinkingSteps || null);
-
-  try {
-    const formData = new FormData();
-    formData.append("message", message);
-    formData.append("stream", String(useStream));
-    if (agentSessionId) formData.append("sessionId", agentSessionId);
-    if (task) formData.append("task", task);
-    if (history.length) formData.append("history", JSON.stringify(history));
-
-    const fileIds = getAgentFileIds(files);
-    if (fileIds.length) formData.append("fileIds", JSON.stringify(fileIds));
-
-    files.forEach((item) => {
-      const file = getAttachmentFile(item);
-      if (file && !getAttachmentId(item)) {
-        formData.append("files", file, file.name);
-      }
-    });
-
-    const res = await fetch(FILE_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + sessionToken,
-      },
-      body: formData,
-    });
-
-    removeThinkingBox(thinkingBox);
-
-    if (!res.ok) {
-      const data = await readResponseData(res);
-      const answerText = getApiAnswerText(data, "HTTP " + res.status);
-      const safeMessage = buildUserFriendlyFileErrorMessage(answerText);
-      addMessage(agentBody, "bot", safeMessage, false, { hideCopy: true });
-      await saveAgentMessage("assistant", safeMessage, {
-        route: "file-api-error",
-        fileIds: getAgentFileIds(files),
-      });
-      return;
-    }
-
-    const responseContentType = res.headers.get("content-type") || "";
-
-    if (useStream && responseContentType.includes("application/json")) {
-      const data = await readResponseData(res);
-      const responseFileIds = getFileIdsFromResponses(data.files || []);
-      if (options.keepFilesInComposer === true) mergePersistedAgentFiles(data.files || []);
-      const answerText = getApiAnswerText(data, "파일 분석 답변을 생성하지 못했습니다.");
-      const isArtifact = Boolean(data.excel?.ok || task === EXCEL_DRAFT_TASK);
-      const isKnowledgeRedirect = isKnowledgeRedirectText(answerText);
-      const messageDiv = addMessage(agentBody, "bot", answerText, false, { hideCopy: isArtifact || isKnowledgeRedirect });
-      appendExcelDownloadButton(agentBody, data.excel);
-      appendEvidenceBox(agentBody, data);
-      if (isKnowledgeRedirect) applyKnowledgeRedirectAction(messageDiv, message);
-      await saveAgentMessage("assistant", answerText, {
-        route: isKnowledgeRedirect ? "knowledge-redirect" : task || "file-api",
-        artifact: isArtifact,
-        artifactSavedAt: isArtifact ? new Date().toISOString() : undefined,
-        excel: data.excel || null,
-        fileIds: responseFileIds,
-        originalMessage: isKnowledgeRedirect ? message : undefined,
-      });
-      return;
-    }
-
-    if (!useStream) {
-      const data = await readResponseData(res);
-
-      const responseFileIds = getFileIdsFromResponses(data.files || []);
-      if (options.keepFilesInComposer === true) mergePersistedAgentFiles(data.files || []);
-      const answerText = getApiAnswerText(data, "파일 분석 답변을 생성하지 못했습니다.");
-      const isArtifact = Boolean(data.excel?.ok || task === EXCEL_DRAFT_TASK);
-      const isKnowledgeRedirect = isKnowledgeRedirectText(answerText);
-      const messageDiv = addMessage(agentBody, "bot", answerText, false, { hideCopy: isArtifact || isKnowledgeRedirect });
-      appendExcelDownloadButton(agentBody, data.excel);
-      appendEvidenceBox(agentBody, data);
-      if (isKnowledgeRedirect) applyKnowledgeRedirectAction(messageDiv, message);
-      await saveAgentMessage("assistant", answerText, {
-        route: isKnowledgeRedirect ? "knowledge-redirect" : task || "file-api",
-        artifact: isArtifact,
-        artifactSavedAt: new Date().toISOString(),
-        excel: data.excel || null,
-        fileIds: responseFileIds,
-        originalMessage: isKnowledgeRedirect ? message : undefined,
-      });
-      return;
-    }
-
-    if (!res.body) {
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        const data = await res.json();
-        addMessage(agentBody, "bot", getApiAnswerText(data, "파일 분석 응답 본문이 없습니다."), true);
-      } else {
-        addMessage(agentBody, "bot", "파일 분석 응답 본문이 없습니다.");
-      }
-      return;
-    }
-
-    const botDiv = addMessage(agentBody, "bot", "");
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-
-    let fullText = "";
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      if (buffer.includes("\n\n") || buffer.includes("data: [DONE]") || !buffer.includes("data:")) {
-        const parsed = parseStreamText(buffer);
-
-        if (parsed) {
-          fullText += parsed;
-          setMessageContent(botDiv, fullText);
-          agentBody.scrollTop = agentBody.scrollHeight;
-          saveAgentConversationCacheDebounced();
-        }
-
-        buffer = "";
-      }
-    }
-
-    const tail = decoder.decode();
-    if (tail) buffer += tail;
-
-    const finalParsed = parseStreamText(buffer);
-    if (finalParsed) {
-      fullText += finalParsed;
-      setMessageContent(botDiv, fullText);
-      saveAgentConversationCacheDebounced();
-    }
-
-    if (!fullText.trim()) {
-      setMessageContent(botDiv, "파일 분석 응답은 수신했지만 화면에 표시할 텍스트를 찾지 못했습니다.");
-    } else {
-      const isKnowledgeRedirect = isKnowledgeRedirectText(fullText);
-      if (isKnowledgeRedirect) applyKnowledgeRedirectAction(botDiv, message);
-      saveAgentMessage("assistant", fullText, {
-        route: isKnowledgeRedirect ? "knowledge-redirect" : task || "file-api",
-        originalMessage: isKnowledgeRedirect ? message : undefined,
-        fileIds: getAgentFileIds(),
-      });
-    }
-  } catch (err) {
-    removeThinkingBox(thinkingBox);
-    const safeMessage = buildUserFriendlyFileErrorMessage(getErrorMessage(err));
-    addMessage(agentBody, "bot", safeMessage, false, { hideCopy: true });
-  } finally {
-    if (isAgentPptGenerating) {
-      syncAgentPptGeneratingControls();
-    } else {
-      if (agentSendBtn) agentSendBtn.disabled = false;
-      focusInputWhenPanelReady(agentMessageInput);
-    }
-  }
-}
-
-
-async function sendAgentChat(message, files = [], history = [], options = {}) {
-  const task = options.task || "";
-  const isPptDraft = task === PPT_DRAFT_TASK;
-  const isExcelDraft = task === EXCEL_DRAFT_TASK;
-  const isWebSearch = task === WEB_SEARCH_TASK;
-  const useFileApi = Boolean(options.useFileApi && files.length);
-  const thinkingSteps = isPptDraft
-    ? [
-      "요청 의도와 발표 목적을 정리하는 중",
-      "슬라이드 흐름과 핵심 메시지를 구성하는 중",
-      "장표별 본문 초안을 작성하는 중",
-      "확인 필요 자료와 검토 항목을 정리하는 중",
-    ]
-    : null;
-
-  if (useFileApi) {
-    lastAgentRoute = "file-api";
-    lastAgentFileUseAt = Date.now();
-    return sendAgentFileAnalysis(message, files, history, {
-      task,
-      stream: false,
-      thinkingSteps,
-      keepFilesInComposer: true,
-    });
+    } catch {}
   }
 
-  lastAgentRoute = "agent-api";
-
-  // PPT 요청도 agent-api 일반 문서 작성 경로로 전달합니다. 서버에서 PPTX 생성을 차단하고 슬라이드 구성안만 반환합니다.
-  return sendChatToTarget({
-    targetBody: agentBody,
-    message,
-    sendButton: agentSendBtn,
-    input: agentMessageInput,
-    apiUrl: AGENT_API_URL,
-    history,
-    task,
-    stream: !(isPptDraft || isExcelDraft || isWebSearch),
-    thinkingSteps,
-    // 파일 칩이 남아 있더라도 일반 업무 요청으로 판단된 경우에는
-    // agent-api/SideTalk에 첨부 메타데이터를 넘기지 않습니다.
-    // 파일 기반 후속 질문은 위 file-api 경로에서만 처리합니다.
-    attachments: [],
-  });
-}
-
-document.addEventListener("click", (event) => {
-  if (openRecentMenu && !event.target?.closest?.(".agent-recent-more-wrap")) closeRecentMenu();
-});
-
-if (aiBtn) aiBtn.addEventListener("click", () => setMode("ai"));
-
-if (rpaBtn) rpaBtn.addEventListener("click", () => setMode("rpa"));
-
-if (directQuestionBtn) {
-  directQuestionBtn.addEventListener("click", () => setMode("ai"));
-}
-
-if (docWriteBtn) {
-  // 버튼 클릭만으로는 API를 호출하지 않고, 문서 작성 화면만 엽니다.
-  docWriteBtn.addEventListener("click", () => setMode("doc"));
-}
-
-if (rpaEntryBtn) {
-  rpaEntryBtn.addEventListener("click", () => setMode("rpa"));
-}
-
-if (aiBackBtn) {
-  aiBackBtn.addEventListener("click", () => setMode("home"));
-}
-
-if (rpaBackBtn) {
-  rpaBackBtn.addEventListener("click", () => setMode("home"));
-}
-
-if (docBackBtn) {
-  docBackBtn.addEventListener("click", () => setMode("home"));
-}
-
-if (agentNewChatBtn) {
-  agentNewChatBtn.addEventListener("click", () => {
-    startNewAgentConversation();
-  });
-}
-
-if (reloadRpaBtn) {
-  reloadRpaBtn.addEventListener("click", () => {
-    // 최종 사용자 화면에서는 버튼이 숨겨져 있지만, 테스트용으로 남겨둡니다.
-    rpaLoaded = false;
-    loadRpaList();
-  });
-}
-
-
-function autoResizeTextarea(input) {
-  if (!input) return;
-  input.style.height = "42px";
-  input.style.height = Math.min(input.scrollHeight, 80) + "px";
-}
-
-function isPlainEnterSubmitEvent(e) {
-  if (!e || e.key !== "Enter") return false;
-
-  // 한글/중문/일문 IME 조합 중 Enter는 글자 확정 용도이므로 전송하지 않습니다.
-  // keyCode 229는 일부 브라우저/그룹웨어 WebView에서 조합 중 입력으로 전달됩니다.
-  if (e.isComposing || e.keyCode === 229) return false;
-
-  // Shift + Enter는 줄바꿈으로 유지합니다.
-  if (e.shiftKey) return false;
-
-  return true;
-}
-
-function submitChatForm(form) {
-  if (!form) return;
-
-  // 그룹웨어 iframe/WebView 환경에서는 requestSubmit()이 무시되거나
-  // submit 버튼 클릭 흐름이 안정적으로 전달되지 않는 경우가 있어
-  // 우리 코드가 등록한 submit 핸들러를 직접 실행하는 방식으로 통일합니다.
-  const submitEvent = new Event("submit", { bubbles: true, cancelable: true });
-  form.dispatchEvent(submitEvent);
-}
-
-if (messageInput && chatForm) {
-  messageInput.addEventListener("keydown", (e) => {
-    if (!isPlainEnterSubmitEvent(e)) return;
-
-    e.preventDefault();
-    submitChatForm(chatForm);
-  });
-
-  messageInput.addEventListener("input", () => autoResizeTextarea(messageInput));
-
-  chatForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    if (currentMode !== "ai") return;
-
-    const message = messageInput.value.trim();
-    if (!message) return;
-
-    addMessage(aiBody, "user", message);
-
-    messageInput.value = "";
-    autoResizeTextarea(messageInput);
-    sendBtn.disabled = true;
-
-    await sendChat(message);
-  });
-}
-
-if (agentBody) {
-  agentBody.addEventListener("click", (e) => {
-    const btn = e.target?.closest?.(".agent-suggestion-btn");
-    if (!btn) return;
-    e.preventDefault();
-    applyAgentSuggestionTemplate(btn.getAttribute("data-template") || "");
-  });
-}
-
-if (agentAttachBtn && agentFileInput) {
-  agentAttachBtn.addEventListener("click", () => {
-    if (isAgentPptGenerating) {
-      syncAgentPptGeneratingControls();
-      return;
-    }
-
-    agentFileInput.click();
-  });
-}
-
-if (agentFileInput) {
-  agentFileInput.addEventListener("change", () => {
-    if (isAgentPptGenerating) {
-      agentFileInput.value = "";
-      syncAgentPptGeneratingControls();
-      return;
-    }
-
-    addAgentFiles(agentFileInput.files);
-  });
-}
-
-async function handleAgentFormSubmit() {
-  if (!agentMessageInput || !agentForm) return;
-
-  if (!isDocModeActive()) {
-    return;
+  function cacheDisplayName(displayName) {
+    try { localStorage.setItem(DISPLAY_NAME_CACHE_KEY, JSON.stringify({ displayName, savedAt: Date.now() })); } catch {}
+  }
+  function getCachedDisplayName() {
+    try {
+      const raw = localStorage.getItem(DISPLAY_NAME_CACHE_KEY);
+      if (!raw) return "";
+      const data = JSON.parse(raw);
+      if (Date.now() - Number(data.savedAt || 0) > DISPLAY_NAME_CACHE_TTL_MS) return "";
+      return String(data.displayName || "").trim();
+    } catch { return ""; }
+  }
+  function restoreCachedDisplayName() {
+    const cached = getCachedDisplayName();
+    if (cached) applyHeaderProfile({ displayName: cached });
   }
 
-  if (agentSubmitInProgress) {
-    return;
+  function formatFileSize(size) {
+    const value = Number(size || 0);
+    if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)}MB`;
+    if (value >= 1024) return `${Math.round(value / 1024)}KB`;
+    return `${value}B`;
   }
+  function getErrorMessage(error) { return error instanceof Error ? error.message : String(error || "알 수 없는 오류"); }
+  function escapeHtml(value) { return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
 
-  if (isAgentPptGenerating) {
-    syncAgentPptGeneratingControls();
-    return;
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init, { once: true });
+  } else {
+    init();
   }
-
-  const rawMessage = agentMessageInput.value.trim();
-  if (!rawMessage && !agentSelectedFiles.length) {
-    focusInputWhenPanelReady(agentMessageInput);
-    return;
-  }
-
-  agentSubmitInProgress = true;
-  if (agentSendBtn) agentSendBtn.disabled = true;
-
-  const filesSnapshot = [...agentSelectedFiles];
-  const historySnapshot = getRecentChatMessages(agentBody);
-  const message = rawMessage || "첨부한 파일을 분석해 주세요.";
-  const hasFiles = filesSnapshot.length > 0;
-  const exportTask = decideExportTask(message);
-
-  try {
-    if (!hasFiles && isMissingFileReferenceQuestion(message)) {
-      addMessage(agentBody, "user", message);
-      clearAgentComposerInput();
-
-      const answer = buildFileContextRequiredAnswer();
-      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-
-      saveAgentMessage("user", message, { route: "file-context-required" });
-      saveAgentMessage("assistant", answer, { route: "file-context-required" });
-      return;
-    }
-
-    // 사용자 입력은 네트워크 세션 복원보다 먼저 화면에 표시합니다.
-    // 그래야 agent-api 세션 복원/저장 요청이 느리거나 실패해도 사용자가 전송 여부를 즉시 알 수 있습니다.
-    if (exportTask === "ambiguous_export") {
-      addMessage(agentBody, "user", message);
-      clearAgentComposerInput();
-      // 파일 칩은 사용자가 직접 X를 누르기 전까지 유지합니다.
-      saveAgentMessage("user", message, { route: "agent-api", fileIds: getAgentFileIds(filesSnapshot) });
-
-      const answer = buildAmbiguousExportAnswer();
-      addMessage(agentBody, "bot", answer, false, { hideCopy: true });
-      saveAgentMessage("assistant", answer, { route: "export-clarification" });
-      return;
-    }
-
-    const task = exportTask || (shouldUseWebSearch(message) && !hasFiles ? WEB_SEARCH_TASK : "");
-    const usePptDraft = task === PPT_DRAFT_TASK;
-    const useExcelDraft = task === EXCEL_DRAFT_TASK;
-
-    // PPT 요청은 더 이상 차단하거나 외부 PPT 생성 Worker로 보내지 않습니다.
-    // agent-api에 일반 문서 작성 요청으로 전달하여 슬라이드 구성안 텍스트만 제공합니다.
-    const useFileApi = usePptDraft
-      ? false
-      : (useExcelDraft && hasFiles ? true : shouldUseFileApi(message, hasFiles, historySnapshot));
-
-    const displayMessage = (useFileApi || (usePptDraft && hasFiles))
-      ? buildAgentMessage(message, filesSnapshot)
-      : message;
-
-    addMessage(agentBody, "user", displayMessage);
-    clearAgentComposerInput();
-    // 파일 칩은 사용자가 직접 X를 누르거나 새 대화를 시작하기 전까지 유지합니다.
-    // 후속 질문에서도 같은 fileId를 file-api로 넘겨 지식베이스가 끼어드는 것을 막습니다.
-
-    // 세션/메시지 저장 실패가 실제 AI 호출을 막지 않도록 분리합니다.
-    saveAgentMessage("user", displayMessage, {
-      route: useFileApi ? "file-api" : task || "agent-api",
-      fileIds: getAgentFileIds(filesSnapshot),
-    });
-
-    if (!task && !useFileApi && shouldRedirectToKnowledge(message, hasFiles)) {
-      addKnowledgeRedirectMessage(message);
-      return;
-    }
-
-    await sendAgentChat(message, filesSnapshot, historySnapshot, {
-      useFileApi,
-      task,
-    });
-  } catch (err) {
-    addMessage(agentBody, "bot", "업무 AI Agent 처리 중 오류가 발생했습니다.\n" + getErrorMessage(err), true);
-  } finally {
-    agentSubmitInProgress = false;
-    if (agentSendBtn && !isAgentPptGenerating) agentSendBtn.disabled = false;
-    updateAgentNewChatButtonVisibility();
-    focusInputWhenPanelReady(agentMessageInput);
-  }
-}
-
-if (agentMessageInput && agentForm) {
-  agentMessageInput.addEventListener("keydown", (e) => {
-    if (!isPlainEnterSubmitEvent(e)) return;
-
-    e.preventDefault();
-    handleAgentFormSubmit();
-  });
-
-  agentMessageInput.addEventListener("input", () => autoResizeTextarea(agentMessageInput));
-
-  if (agentSendBtn) {
-    agentSendBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      handleAgentFormSubmit();
-    });
-  }
-
-  agentForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    handleAgentFormSubmit();
-  });
-}
-
+})();
