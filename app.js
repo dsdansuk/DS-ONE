@@ -686,7 +686,7 @@
           startNewConversation({ showToast: true });
           setMode("home");
         });
-      } else if (label.includes("검색") || label.includes("즐겨찾기") || label.includes("휴지통")) {
+      } else if (label.includes("검색") || label.includes("템플릿") || label.includes("AI 도구") || label.includes("즐겨찾기") || label.includes("휴지통")) {
         button.addEventListener("click", () => showToast("해당 기능은 추후 연동 예정입니다."));
       }
     });
@@ -1466,7 +1466,7 @@
     const item = loadRecentWorkItems().find((entry) => entry.id === conversationId);
     if (!item) return;
     const nextFavorite = !item.isFavorite;
-    updateRecentWorkItem(conversationId, { isFavorite: nextFavorite, updatedAt: Date.now() });
+    updateRecentWorkItem(conversationId, { isFavorite: nextFavorite });
     const remoteId = getRemoteSessionId(item);
     if (remoteId) void agentStateRequest({ action: "toggle_favorite", sessionId: remoteId, favorite: nextFavorite }).then(() => scheduleRemoteRecentRefresh()).catch(() => showToast("즐겨찾기 변경에 실패했습니다."));
   }
@@ -1537,7 +1537,7 @@
       remote.forEach((session) => {
         const remoteId = String(session.id || session.sessionId || "").trim();
         if (!remoteId) return;
-        const updatedAt = Date.parse(session.last_message_at || session.lastMessageAt || session.updated_at || session.updatedAt || session.created_at || session.createdAt || "") || Date.now();
+        const updatedAt = Date.parse(session.display_time_at || session.last_activity_at || session.lastActivityAt || session.last_message_at || session.lastMessageAt || session.created_at || session.createdAt || session.updated_at || session.updatedAt || "") || Date.now();
         const foundIndex = next.findIndex((item) => getRemoteSessionId(item) === remoteId || item.id === remoteId);
         const patch = {
           remoteId,
