@@ -1,9 +1,11 @@
 (() => {
   "use strict";
 
-  // DS ONE 업무 AI Agent 기능 레이어
-  // - 메인 index.html 요소와 style.css 디자인은 건드리지 않고 기능만 런타임으로 연결합니다.
-  // - 그룹웨어 iframe에서는 108x108 런처 버튼만 표시합니다.
+  // DS ONE Safe Function Layer
+  // 목적: 기존 메인 HTML/CSS 화면은 건드리지 않고 기능만 연결합니다.
+  // - 초기 화면에서 기존 DOM 배치/스타일을 변경하지 않습니다.
+  // - iframe 안에서만 108x108 런처 버튼으로 body를 대체합니다.
+  // - open=platform 파라미터는 새 탭 진입 신호로만 처리하고, 화면 모드는 바꾸지 않습니다.
 
   const CONFIG = window.DS_ONE_CONFIG || {};
   const ENDPOINTS = CONFIG.endpoints || {};
@@ -15,13 +17,11 @@
   const SESSION_TOKEN_KEY = "sso_session_token";
   const DISPLAY_NAME_CACHE_KEY = STORAGE.displayNameCacheKey || "ds_chatbot_last_display_name_v1";
   const DISPLAY_NAME_CACHE_TTL_MS = Number(STORAGE.displayNameCacheTtlMs || 7 * 24 * 60 * 60 * 1000);
-  const LOCAL_HISTORY_PREFIX = "ds_one_platform_recent_messages_v2_";
-  const MAX_HISTORY = Number(STORAGE.agentHistoryCacheMaxMessages || 20);
 
   const ALLOWED_EXTENSIONS = (FILE_POLICY.allowedExtensions || ["txt", "md", "csv", "json", "docx", "xlsx", "pptx", "pdf"])
     .map((value) => String(value || "").toLowerCase().replace(/^\./, ""))
     .filter(Boolean);
-  const BLOCKED_EXTENSIONS = new Set((FILE_POLICY.blockedExtensions || ["exe", "dll", "msi", "bat", "cmd", "com", "scr", "ps1", "vbs", "js", "mjs", "jar", "sh", "php", "asp", "aspx", "jsp", "html", "htm", "xml", "doc", "xls", "ppt", "docm", "xlsm", "pptm", "hwp", "hwpx", "zip", "7z", "rar", "tar", "gz"])
+  const BLOCKED_EXTENSIONS = new Set((FILE_POLICY.blockedExtensions || ["exe", "dll", "msi", "bat", "cmd", "com", "scr", "ps1", "vbs", "js", "mjs", "jar", "sh", "php", "asp", "aspx", "jsp", "html", "htm", "xml", "doc", "xls", "ppt", "docm", "xlsm", "pptm", "hwp", "hwpx", "zip", "7z", "rar", "tar", "gz", "png", "jpg", "jpeg", "webp"])
     .map((value) => String(value || "").toLowerCase().replace(/^\./, ""))
     .filter(Boolean));
   const MAX_FILE_SIZE_BYTES = Number(FILE_POLICY.maxFileSizeBytes || 50 * 1024 * 1024);
@@ -30,38 +30,10 @@
   let selectedFiles = [];
   let submitInProgress = false;
   let currentTask = "";
-  let currentLoginId = "";
-  let currentEmpNo = "";
-  let currentMode = "home";
-
-  const state = {
-    homePanel: null,
-    docPanel: null,
-    homePromptInput: null,
-    homeSendBtn: null,
-    homeAttachBtn: null,
-    homeFileChips: null,
-    fileInput: null,
-    agentBody: null,
-    agentForm: null,
-    agentMessageInput: null,
-    agentSendBtn: null,
-    agentAttachBtn: null,
-    agentFileChips: null,
-    agentNewChatBtn: null,
-    docBackBtn: null,
-    profileName: null,
-    profileAvatar: null,
-  };
 
   function init() {
     sessionToken = readSsoSessionToken();
     const tokenProfile = decodeSessionTokenPayload(sessionToken);
-    if (tokenProfile) {
-      currentLoginId = tokenProfile.loginId || tokenProfile.login_id || "";
-      currentEmpNo = tokenProfile.empNo || tokenProfile.emp_no || "";
-      applyHeaderProfile(tokenProfile);
-    }
 
     if (isEmbeddedInIframe()) {
       showIframeLauncher(tokenProfile);
@@ -69,27 +41,24 @@
     }
 
     restoreCachedDisplayName();
-    injectRuntimeStyles();
-    attachToExistingHome();
-    createRuntimeAgentWorkspace();
+    if (tokenProfile) applyHeaderProfile(tokenProfile);
     bootstrapProfile();
-    bindUiEvents();
-    restoreLocalHistory();
-    resizeTextarea(state.homePromptInput);
-    resizeTextarea(state.agentMessageInput);
+    bindExistingUiOnly();
   }
 
   function readSsoSessionToken() {
     const url = new URL(window.location.href);
     const tokenFromUrl = String(url.searchParams.get("token") || "").trim();
-    if (tokenFromUrl) {
-      sessionStorage.setItem(SESSION_TOKEN_KEY, tokenFromUrl);
+    if (tokenFromUrl) sessionStorage.setItem(SESSION_TOKEN_KEY, tokenFromUrl);
+
+    // token/open은 진입 후 주소창에서 제거합니다. 화면 모드 전환 용도로 사용하지 않습니다.
+    if (tokenFromUrl || url.searchParams.has("open") || url.searchParams.has("launcher")) {
       url.searchParams.delete("token");
       url.searchParams.delete("open");
+      url.searchParams.delete("launcher");
       window.history.replaceState({}, document.title, url.toString());
-      return tokenFromUrl;
     }
-    return sessionStorage.getItem(SESSION_TOKEN_KEY) || "";
+    return tokenFromUrl || sessionStorage.getItem(SESSION_TOKEN_KEY) || "";
   }
 
   function isEmbeddedInIframe() {
@@ -103,40 +72,30 @@
   function showIframeLauncher(profile) {
     const displayName = getDisplayName(profile) || getCachedDisplayName() || "DS ONE";
     const targetUrl = buildPlatformOpenUrl();
-    document.documentElement.style.width = "108px";
-    document.documentElement.style.height = "108px";
-    document.body.style.width = "108px";
-    document.body.style.height = "108px";
-    document.body.style.minWidth = "0";
-    document.body.style.margin = "0";
-    document.body.style.overflow = "hidden";
-    document.body.style.background = "transparent";
+
+    document.documentElement.style.cssText = "width:108px;height:108px;margin:0;overflow:hidden;background:transparent;";
+    document.body.style.cssText = "width:108px;height:108px;min-width:0;margin:0;overflow:hidden;background:transparent;";
     document.body.innerHTML = `
-      <button id="dsOneOpenButton" type="button" aria-label="DS ONE 업무 AI 새 탭 열기" title="DS ONE 업무 AI 새 탭 열기">
-        <span class="ds-one-btn-icon" aria-hidden="true">
-          <svg viewBox="0 0 48 48" focusable="false">
-            <path d="M24 5 40.5 14.5v19L24 43 7.5 33.5v-19L24 5Z" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"/>
-            <path d="M24 13.5 33.2 18.8v10.4L24 34.5l-9.2-5.3V18.8L24 13.5Z" fill="currentColor" opacity=".92"/>
+      <button id="dsOneOpenButton" type="button" aria-label="DS ONE 업무 AI 새 탭 열기" title="DS ONE 업무 AI 새 탭 열기" style="position:relative;width:108px;height:108px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:10px 8px;border:0;border-radius:22px;color:#fff;background:linear-gradient(145deg,#8ea7ff 0%,#6f87f7 54%,#5f7ff1 100%);box-shadow:0 12px 24px rgba(40,76,190,.24),inset 0 1px 0 rgba(255,255,255,.28);cursor:pointer;overflow:hidden;font-family:Pretendard,'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;">
+        <span aria-hidden="true" style="position:absolute;inset:-38px auto auto -42px;width:110px;height:110px;border-radius:999px;background:rgba(255,255,255,.14);"></span>
+        <span aria-hidden="true" style="position:relative;z-index:1;width:34px;height:34px;display:grid;place-items:center;">
+          <svg viewBox="0 0 48 48" focusable="false" style="width:34px;height:34px;display:block;">
+            <path d="M24 5 40.5 14.5v19L24 43 7.5 33.5v-19L24 5Z" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"></path>
+            <path d="M24 13.5 33.2 18.8v10.4L24 34.5l-9.2-5.3V18.8L24 13.5Z" fill="currentColor" opacity=".92"></path>
           </svg>
         </span>
-        <span class="ds-one-btn-text"><strong>DS ONE</strong><em>업무 AI</em></span>
-        <span class="ds-one-btn-open" aria-hidden="true">↗</span>
+        <span style="position:relative;z-index:1;display:grid;gap:0;text-align:center;line-height:1.04;text-shadow:0 2px 7px rgba(22,43,120,.18);">
+          <strong style="font-size:16px;font-weight:900;letter-spacing:-.02em;">DS ONE</strong>
+          <em style="font-style:normal;font-size:13px;font-weight:850;letter-spacing:-.03em;">업무 AI</em>
+        </span>
+        <span aria-hidden="true" style="position:absolute;right:8px;top:7px;z-index:1;font-size:13px;font-weight:900;opacity:.9;">↗</span>
       </button>
-      <style>
-        #dsOneOpenButton{position:relative;width:108px;height:108px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:10px 8px;border:0;border-radius:22px;color:#fff;background:linear-gradient(145deg,#8ea7ff 0%,#6f87f7 54%,#5f7ff1 100%);box-shadow:0 12px 24px rgba(40,76,190,.24),inset 0 1px 0 rgba(255,255,255,.28);cursor:pointer;overflow:hidden;font-family:Pretendard,'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}#dsOneOpenButton:before{content:"";position:absolute;inset:-38px auto auto -42px;width:110px;height:110px;border-radius:999px;background:rgba(255,255,255,.14)}#dsOneOpenButton:hover{transform:translateY(-1px);filter:saturate(1.05);box-shadow:0 14px 28px rgba(40,76,190,.3),inset 0 1px 0 rgba(255,255,255,.32)}#dsOneOpenButton:active{transform:translateY(0)}.ds-one-btn-icon{position:relative;z-index:1;width:34px;height:34px;display:grid;place-items:center}.ds-one-btn-icon svg{width:34px;height:34px;display:block}.ds-one-btn-text{position:relative;z-index:1;display:grid;gap:0;text-align:center;line-height:1.04;text-shadow:0 2px 7px rgba(22,43,120,.18)}.ds-one-btn-text strong{font-size:16px;font-weight:900;letter-spacing:-.02em}.ds-one-btn-text em{font-style:normal;font-size:13px;font-weight:850;letter-spacing:-.03em}.ds-one-btn-open{position:absolute;right:8px;top:7px;z-index:1;font-size:13px;font-weight:900;opacity:.9}.ds-one-fallback{position:absolute;inset:0;display:grid;place-items:center;padding:10px;text-align:center;color:#fff;font-size:12px;font-weight:800;text-decoration:none;background:linear-gradient(145deg,#2f6fed,#7da8ff);border-radius:22px}
-      </style>
     `;
 
     document.getElementById("dsOneOpenButton")?.addEventListener("click", () => {
       const popup = window.open(targetUrl, "_blank", "noopener,noreferrer");
       if (!popup) {
-        const link = document.createElement("a");
-        link.href = targetUrl;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.className = "ds-one-fallback";
-        link.textContent = `${displayName}님, 여기를 눌러 새 탭으로 열기`;
-        document.body.appendChild(link);
+        document.body.innerHTML = `<a href="${escapeAttribute(targetUrl)}" target="_blank" rel="noopener noreferrer" style="width:108px;height:108px;display:grid;place-items:center;padding:10px;text-align:center;color:#fff;background:#5f7ff1;border-radius:22px;text-decoration:none;font:800 13px/1.35 Pretendard,'Noto Sans KR','Malgun Gothic',sans-serif;">${escapeHtml(displayName)}님<br>새 탭으로 열기</a>`;
       }
     });
   }
@@ -149,170 +108,69 @@
     return url.toString();
   }
 
-  function injectRuntimeStyles() {
-    if (document.getElementById("ds-one-agent-runtime-style")) return;
-    const style = document.createElement("style");
-    style.id = "ds-one-agent-runtime-style";
-    style.textContent = `
-      .ds-agent-workspace[hidden]{display:none!important}.ds-agent-workspace{min-width:0;min-height:0;height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto;padding:clamp(16px,2.2dvh,28px) clamp(18px,2.8vw,42px);overflow:hidden;background:radial-gradient(circle at 78% 8%,rgba(47,111,237,.08),transparent 32%),linear-gradient(145deg,rgba(232,241,255,.72),rgba(255,255,255,.84) 40%,#f8fbff)}.ds-workspace-header{display:flex;align-items:center;gap:14px;min-height:54px;padding:0 0 clamp(12px,1.6dvh,18px)}.ds-workspace-back,.ds-workspace-new-chat{min-width:42px;height:42px;display:grid;place-items:center;color:#2e3c58;background:rgba(255,255,255,.88);border:1px solid var(--line,#e1e7f0);border-radius:8px;box-shadow:0 5px 14px rgba(37,48,77,.05);transition:background .16s ease,color .16s ease,transform .16s ease,border-color .16s ease}.ds-workspace-back{font-size:30px;line-height:1}.ds-workspace-new-chat{margin-left:auto;padding:0 16px;font-weight:800}.ds-workspace-back:hover,.ds-workspace-new-chat:hover{color:var(--blue,#2f6fed);background:#fff;border-color:#c9dbff;transform:translateY(-1px)}.ds-workspace-title{display:grid;gap:4px;min-width:0}.ds-workspace-title strong{font-size:clamp(20px,2.3dvh,26px);font-weight:850;color:var(--ink,#151a24)}.ds-workspace-title span{overflow:hidden;color:#5f6878;font-size:clamp(13px,1.5dvh,15px);font-weight:600;text-overflow:ellipsis;white-space:nowrap}.ds-agent-body{min-height:0;display:flex;flex-direction:column;gap:14px;overflow-y:auto;padding:4px 4px 16px;scrollbar-width:thin}.ds-agent-empty-card{width:min(760px,100%);margin:min(8dvh,72px) auto 0;display:grid;grid-template-columns:54px minmax(0,1fr);gap:16px;padding:clamp(18px,2.2dvh,26px);background:rgba(255,255,255,.86);border:1px solid var(--line,#e1e7f0);border-radius:18px;box-shadow:0 14px 32px rgba(37,48,77,.08)}.ds-empty-badge{width:54px;height:54px;display:grid;place-items:center;color:#fff;font-size:25px;background:linear-gradient(145deg,var(--blue,#2f6fed),#8ab0ff);border-radius:16px;box-shadow:0 10px 20px rgba(47,111,237,.2)}.ds-agent-empty-card strong{display:block;margin:2px 0 8px;font-size:18px;font-weight:850}.ds-agent-empty-card p{margin:0;color:#5f6878;font-size:14px;line-height:1.55}.ds-agent-suggestion-grid{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}.ds-agent-suggestion-btn{min-height:34px;padding:0 12px;color:#2f5fb6;font-weight:800;background:#f2f7ff;border:1px solid #d8e6ff;border-radius:999px}.ds-chat-row,.ds-thinking-row{width:min(980px,100%);display:flex;gap:10px;margin:0 auto}.ds-user-row{justify-content:flex-end}.ds-bot-row{justify-content:flex-start;align-items:flex-start}.ds-chat-avatar{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:900;background:linear-gradient(145deg,var(--blue,#2f6fed),#7da8ff);border-radius:11px;box-shadow:0 8px 18px rgba(47,111,237,.15)}.ds-msg{max-width:min(760px,calc(100% - 44px));padding:13px 15px;font-size:14px;line-height:1.65;word-break:keep-all;overflow-wrap:anywhere;border:1px solid rgba(225,231,240,.9);box-shadow:0 8px 20px rgba(37,48,77,.06)}.ds-msg.user{color:#fff;background:linear-gradient(145deg,var(--blue,#2f6fed),#6e98ff);border-color:transparent;border-radius:18px 18px 4px 18px}.ds-msg.bot{color:#283144;background:rgba(255,255,255,.93);border-radius:4px 18px 18px 18px}.ds-msg-heading{margin:14px 0 6px;font-weight:900;font-size:16px;color:#121827}.ds-msg-heading:first-child{margin-top:0}.ds-msg-bullet{padding-left:2px}.ds-msg-table-wrap{margin:10px 0 14px}.ds-msg-table-toolbar{display:flex;justify-content:flex-end;margin-bottom:6px}.ds-msg-table-toolbar button,.ds-bot-copy-btn{height:28px;padding:0 10px;color:#2f5fb6;font-size:12px;font-weight:800;background:#eef5ff;border:1px solid #d8e6ff;border-radius:999px}.ds-msg-table-scroll{max-width:100%;overflow:auto;border:1px solid #e0e7f3;border-radius:12px;background:#fff}.ds-msg-table{width:max-content;min-width:100%;border-collapse:collapse;font-size:13px}.ds-msg-table th,.ds-msg-table td{padding:8px 10px;border-bottom:1px solid #edf1f7;text-align:left;vertical-align:top;white-space:nowrap}.ds-msg-table th{background:#f5f8fd;font-weight:900;color:#263146}.ds-bot-copy-btn{align-self:flex-end;opacity:.88}.ds-agent-composer{width:min(980px,100%);margin:0 auto;display:grid;gap:8px}.ds-file-chip-row,.ds-home-file-chip-row{display:flex;flex-wrap:wrap;gap:7px}.ds-file-chip{display:inline-flex;align-items:center;gap:7px;max-width:260px;min-height:30px;padding:5px 8px;color:#29456f;background:#eef5ff;border:1px solid #d8e6ff;border-radius:999px;font-size:12px;font-weight:750}.ds-file-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ds-file-chip em{font-style:normal;color:#6a7690;font-weight:700}.ds-file-chip button{width:20px;height:20px;display:grid;place-items:center;color:#6a7690;background:#fff;border:1px solid #d8e6ff;border-radius:999px}.ds-agent-input-row{display:flex;align-items:flex-end;gap:8px;padding:10px;background:rgba(255,255,255,.94);border:1px solid #dfe7f2;border-radius:18px;box-shadow:0 14px 30px rgba(37,48,77,.08)}.ds-attach-btn,.ds-agent-send-btn{width:40px;height:40px;display:grid;place-items:center;flex:0 0 auto;color:#2f5fb6;background:#f2f7ff;border:1px solid #d8e6ff;border-radius:12px}.ds-agent-send-btn{color:#fff;background:linear-gradient(145deg,var(--blue,#2f6fed),#7da8ff);border-color:transparent}.ds-agent-input-row textarea{min-height:40px;max-height:160px;flex:1;resize:none;border:0;outline:0;background:transparent;color:#1b2332;font:inherit;line-height:1.5;padding:8px 4px}.ds-agent-disclaimer{margin:0;color:#778090;font-size:12px;text-align:center}.ds-toast{position:fixed;left:50%;bottom:24px;z-index:9999;min-width:220px;max-width:min(420px,calc(100vw - 32px));padding:12px 14px;color:#fff;font-size:14px;font-weight:800;text-align:center;background:rgba(20,28,44,.92);border-radius:999px;box-shadow:0 14px 36px rgba(0,0,0,.18);transform:translate(-50%,12px);opacity:0;transition:opacity .18s ease,transform .18s ease}.ds-toast.show{opacity:1;transform:translate(-50%,0)}@media(max-width:900px){.ds-agent-workspace{padding:14px}.ds-workspace-title span{display:none}.ds-agent-empty-card{grid-template-columns:1fr}.ds-empty-badge{display:none}}
-    `;
-    document.head.appendChild(style);
-  }
+  function bindExistingUiOnly() {
+    const promptTextarea = document.querySelector(".prompt-card textarea");
+    const sendButton = document.querySelector(".prompt-card .send-btn");
+    const attachButton = document.querySelector(".prompt-card .icon-btn");
+    const fileInput = ensureHiddenFileInput();
 
-  function attachToExistingHome() {
-    state.homePanel = document.querySelector(".home-stage");
-    state.homePromptInput = document.querySelector(".prompt-card textarea");
-    state.homeSendBtn = document.querySelector(".prompt-card .send-btn");
-    state.homeAttachBtn = document.querySelector(".prompt-card .icon-btn");
-    state.profileName = document.querySelector(".profile-button strong");
-    state.profileAvatar = document.querySelector(".avatar");
+    attachButton?.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      addFiles(fileInput.files || []);
+      fileInput.value = "";
+      updateAttachButtonTitle(attachButton);
+    });
 
-    const promptCard = document.querySelector(".prompt-card");
-    if (promptCard && !document.getElementById("dsHomeFileChips")) {
-      const chips = document.createElement("div");
-      chips.id = "dsHomeFileChips";
-      chips.className = "ds-home-file-chip-row";
-      chips.hidden = true;
-      chips.setAttribute("aria-label", "첨부 파일 목록");
-      promptCard.appendChild(chips);
-      state.homeFileChips = chips;
-    } else {
-      state.homeFileChips = document.getElementById("dsHomeFileChips");
-    }
-
-    if (!state.fileInput) {
-      const input = document.createElement("input");
-      input.id = "dsPlatformFileInput";
-      input.type = "file";
-      input.multiple = true;
-      input.hidden = true;
-      input.accept = ".txt,.md,.csv,.json,.docx,.xlsx,.pptx,.pdf";
-      document.body.appendChild(input);
-      state.fileInput = input;
-    }
-  }
-
-  function createRuntimeAgentWorkspace() {
-    if (document.getElementById("dsAgentWorkspace")) return;
-    const panel = document.createElement("section");
-    panel.id = "dsAgentWorkspace";
-    panel.className = "ds-agent-workspace";
-    panel.hidden = true;
-    panel.setAttribute("aria-label", "업무 AI Agent 대화");
-    panel.innerHTML = `
-      <header class="ds-workspace-header">
-        <button id="dsDocBackBtn" class="ds-workspace-back" type="button" aria-label="홈으로 돌아가기">‹</button>
-        <div class="ds-workspace-title">
-          <strong>업무 AI Agent</strong>
-          <span>문서 작성, 요약, 번역, 엑셀 분석, 파일 기반 질문을 도와드립니다.</span>
-        </div>
-        <button id="dsAgentNewChatBtn" class="ds-workspace-new-chat" type="button">새 대화</button>
-      </header>
-      <div id="dsAgentBody" class="ds-agent-body" aria-live="polite">
-        <section class="ds-agent-empty-card" aria-label="업무 AI 안내">
-          <div class="ds-empty-badge" aria-hidden="true">✦</div>
-          <div>
-            <strong>필요한 업무를 자연스럽게 입력해 주세요.</strong>
-            <p>파일을 첨부하면 문서·엑셀·PDF 내용을 기준으로 더 정확하게 답변합니다.</p>
-          </div>
-          <div class="ds-agent-suggestion-grid" aria-label="추천 요청">
-            <button class="ds-agent-suggestion-btn" type="button" data-template="아래 내용을 정중한 업무 메일로 다듬어 주세요.\n\n[내용]\n">메일 초안</button>
-            <button class="ds-agent-suggestion-btn" type="button" data-template="아래 회의 내용을 회의록으로 정리해 주세요.\n\n[회의 내용]\n">회의록</button>
-            <button class="ds-agent-suggestion-btn" type="button" data-template="첨부한 파일의 핵심 내용을 요약하고 주요 이슈를 알려주세요.">파일 요약</button>
-            <button class="ds-agent-suggestion-btn" type="button" data-template="첨부한 엑셀 파일에서 이상값, 누락, 중복, 주요 리스크를 분석해 주세요.">엑셀 분석</button>
-          </div>
-        </section>
-      </div>
-      <form id="dsAgentForm" class="ds-agent-composer" autocomplete="off">
-        <div id="dsAgentFileChips" class="ds-file-chip-row" hidden aria-label="첨부 파일 목록"></div>
-        <div class="ds-agent-input-row">
-          <button id="dsAgentAttachBtn" class="ds-attach-btn" type="button" aria-label="파일 첨부" title="파일 첨부">
-            <svg class="icon" aria-hidden="true"><use href="#i-clip"></use></svg>
-          </button>
-          <textarea id="dsAgentMessageInput" rows="1" placeholder="업무 요청을 입력하세요. Shift+Enter로 줄바꿈"></textarea>
-          <button id="dsAgentSendBtn" class="ds-agent-send-btn" type="submit" aria-label="전송">
-            <svg class="icon" aria-hidden="true"><use href="#i-send"></use></svg>
-          </button>
-        </div>
-        <p class="ds-agent-disclaimer">AI 답변은 참고용입니다. 중요한 업무에는 근거와 원문을 확인해 주세요.</p>
-      </form>
-    `;
-    const mainShell = document.querySelector(".main-shell") || document.body;
-    mainShell.appendChild(panel);
-    state.docPanel = panel;
-    state.agentBody = document.getElementById("dsAgentBody");
-    state.agentForm = document.getElementById("dsAgentForm");
-    state.agentMessageInput = document.getElementById("dsAgentMessageInput");
-    state.agentSendBtn = document.getElementById("dsAgentSendBtn");
-    state.agentAttachBtn = document.getElementById("dsAgentAttachBtn");
-    state.agentFileChips = document.getElementById("dsAgentFileChips");
-    state.agentNewChatBtn = document.getElementById("dsAgentNewChatBtn");
-    state.docBackBtn = document.getElementById("dsDocBackBtn");
-  }
-
-  function bindUiEvents() {
-    document.querySelectorAll(".menu-item").forEach((button) => {
-      const label = button.textContent.trim();
-      if (label.includes("새 대화")) {
-        button.addEventListener("click", () => {
-          startNewConversation();
-          setMode("doc");
-        });
-      } else if (label.includes("검색") || label.includes("즐겨찾기") || label.includes("휴지통")) {
-        button.addEventListener("click", () => showToast("해당 기능은 추후 연동 예정입니다."));
-      }
+    sendButton?.addEventListener("click", () => submitPrompt(promptTextarea));
+    promptTextarea?.addEventListener("keydown", (event) => {
+      if (!isPlainEnterSubmitEvent(event)) return;
+      event.preventDefault();
+      submitPrompt(promptTextarea);
     });
 
     document.querySelectorAll(".action-card").forEach((card) => {
       card.addEventListener("click", () => {
         const meta = getCardTemplate(card);
         currentTask = meta.task;
-        setMode("doc");
-        if (meta.template) setAgentInput(meta.template);
-        if (meta.attach) state.fileInput?.click();
+        if (promptTextarea && meta.template) {
+          promptTextarea.value = meta.template;
+          promptTextarea.dispatchEvent(new Event("input", { bubbles: true }));
+          promptTextarea.focus();
+        }
+        if (meta.attach) fileInput.click();
       });
     });
 
-    state.homeAttachBtn?.addEventListener("click", () => state.fileInput?.click());
-    state.agentAttachBtn?.addEventListener("click", () => state.fileInput?.click());
-    state.fileInput?.addEventListener("change", () => {
-      addFiles(state.fileInput.files || []);
-      state.fileInput.value = "";
+    document.querySelectorAll(".menu-item,.sidebar-guide-button,.header-button,.recent-item,.guide-button,.task-row,.text-button,.more-btn").forEach((el) => {
+      el.addEventListener("click", (event) => {
+        const text = String(el.textContent || "").trim();
+        if (text.includes("새 대화")) {
+          selectedFiles = [];
+          currentTask = "";
+          if (promptTextarea) promptTextarea.value = "";
+          updateAttachButtonTitle(attachButton);
+          showToast("새 대화를 시작했습니다.");
+          return;
+        }
+        if (text.includes("채팅 검색") || text.includes("즐겨찾기") || text.includes("휴지통") || text.includes("사용 가이드") || text.includes("도움말")) {
+          event.preventDefault();
+          showToast("해당 기능은 추후 연동 예정입니다.");
+        }
+      });
     });
+  }
 
-    state.homeSendBtn?.addEventListener("click", submitFromHome);
-    state.homePromptInput?.addEventListener("input", () => resizeTextarea(state.homePromptInput));
-    state.homePromptInput?.addEventListener("keydown", (event) => {
-      if (!isPlainEnterSubmitEvent(event)) return;
-      event.preventDefault();
-      submitFromHome();
-    });
-
-    state.docBackBtn?.addEventListener("click", () => setMode("home"));
-    state.agentNewChatBtn?.addEventListener("click", startNewConversation);
-    state.agentBody?.addEventListener("click", (event) => {
-      const button = event.target.closest(".ds-agent-suggestion-btn");
-      if (!button) return;
-      setAgentInput(button.getAttribute("data-template") || "");
-    });
-    state.agentMessageInput?.addEventListener("input", () => resizeTextarea(state.agentMessageInput));
-    state.agentMessageInput?.addEventListener("keydown", (event) => {
-      if (!isPlainEnterSubmitEvent(event)) return;
-      event.preventDefault();
-      handleAgentSubmit();
-    });
-    state.agentForm?.addEventListener("submit", (event) => {
-      event.preventDefault();
-      handleAgentSubmit();
-    });
-
-    document.querySelectorAll(".sidebar-guide-button,.header-button,.recent-item,.task-row").forEach((button) => {
-      button.addEventListener("click", () => showToast("해당 기능은 추후 연동 예정입니다."));
-    });
-    window.addEventListener("resize", () => {
-      resizeTextarea(state.homePromptInput);
-      resizeTextarea(state.agentMessageInput);
-    });
+  function ensureHiddenFileInput() {
+    let input = document.getElementById("dsOneHiddenFileInput");
+    if (input) return input;
+    input = document.createElement("input");
+    input.id = "dsOneHiddenFileInput";
+    input.type = "file";
+    input.multiple = true;
+    input.hidden = true;
+    input.accept = ".txt,.md,.csv,.json,.docx,.xlsx,.pptx,.pdf";
+    document.body.appendChild(input);
+    return input;
   }
 
   function getCardTemplate(card) {
@@ -324,54 +182,6 @@
     if (title.includes("파일")) return { task: "file_question", attach: true, template: "첨부한 파일을 기준으로 질문에 답변해 주세요.\n\n[질문]\n" };
     if (title.includes("보고서")) return { task: "report_summary", attach: false, template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" };
     return { task: "", attach: false, template: "" };
-  }
-
-  function setMode(mode) {
-    currentMode = mode;
-    if (state.homePanel) state.homePanel.hidden = mode !== "home";
-    if (state.docPanel) state.docPanel.hidden = mode !== "doc";
-    if (mode === "doc") {
-      window.setTimeout(() => state.agentMessageInput?.focus(), 60);
-    } else {
-      window.setTimeout(() => state.homePromptInput?.focus(), 60);
-    }
-  }
-
-  function submitFromHome() {
-    const message = String(state.homePromptInput?.value || "").trim();
-    if (!message && !selectedFiles.length) {
-      state.homePromptInput?.focus();
-      return;
-    }
-    setMode("doc");
-    if (message) setAgentInput(message);
-    if (state.homePromptInput) state.homePromptInput.value = "";
-    resizeTextarea(state.homePromptInput);
-    handleAgentSubmit();
-  }
-
-  function setAgentInput(value) {
-    if (!state.agentMessageInput) return;
-    state.agentMessageInput.value = String(value || "");
-    resizeTextarea(state.agentMessageInput);
-    window.setTimeout(() => state.agentMessageInput?.focus(), 30);
-  }
-
-  function startNewConversation() {
-    selectedFiles = [];
-    renderFileChips();
-    clearMessages();
-    if (state.agentMessageInput) state.agentMessageInput.value = "";
-    resizeTextarea(state.agentMessageInput);
-    sessionStorage.removeItem(getLocalHistoryKey());
-    showToast("새 대화를 시작했습니다.");
-  }
-
-  function clearMessages() {
-    if (!state.agentBody) return;
-    state.agentBody.querySelectorAll(".ds-chat-row,.ds-thinking-row").forEach((node) => node.remove());
-    const emptyCard = state.agentBody.querySelector(".ds-agent-empty-card");
-    if (emptyCard) emptyCard.hidden = false;
   }
 
   function addFiles(fileList) {
@@ -386,8 +196,14 @@
       const duplicated = selectedFiles.some((item) => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified);
       if (!duplicated) selectedFiles.push(file);
     });
-    renderFileChips();
     if (rejected.length) showToast(rejected[0]);
+    else if (selectedFiles.length) showToast(`${selectedFiles.length}개 파일이 첨부되었습니다.`);
+  }
+
+  function updateAttachButtonTitle(button) {
+    if (!button) return;
+    button.title = selectedFiles.length ? selectedFiles.map((file) => file.name).join("\n") : "파일 첨부";
+    button.setAttribute("aria-label", selectedFiles.length ? `첨부 파일 ${selectedFiles.length}개` : "파일 첨부");
   }
 
   function validateFile(file) {
@@ -405,98 +221,86 @@
     return match ? match[1] : "";
   }
 
-  function renderFileChips() {
-    [state.agentFileChips, state.homeFileChips].filter(Boolean).forEach((container) => {
-      container.innerHTML = "";
-      container.hidden = selectedFiles.length === 0;
-      selectedFiles.forEach((file, index) => {
-        const chip = document.createElement("span");
-        chip.className = "ds-file-chip";
-        chip.innerHTML = `<span>${escapeHtml(file.name)}</span><em>${formatFileSize(file.size)}</em><button type="button" aria-label="첨부 파일 제거">×</button>`;
-        chip.querySelector("button")?.addEventListener("click", () => {
-          selectedFiles.splice(index, 1);
-          renderFileChips();
-        });
-        container.appendChild(chip);
-      });
-    });
-  }
-
-  async function handleAgentSubmit() {
+  async function submitPrompt(textarea) {
     if (submitInProgress) return;
-    const message = String(state.agentMessageInput?.value || "").trim();
+    const message = String(textarea?.value || "").trim();
     if (!message && !selectedFiles.length) {
-      state.agentMessageInput?.focus();
+      textarea?.focus();
       return;
     }
+
     if (!sessionToken) {
-      addMessage("bot", "그룹웨어 SSO 인증 정보가 없습니다. 그룹웨어 버튼을 통해 다시 접속해 주세요.");
+      showResultOverlay("업무 AI Agent", "그룹웨어 SSO 인증 정보가 없습니다. 그룹웨어 버튼을 통해 다시 접속해 주세요.");
       return;
     }
 
     submitInProgress = true;
-    setComposerDisabled(true);
-    const userText = message || "첨부한 파일을 분석해 주세요.";
-    addMessage("user", buildDisplayUserMessage(userText));
-    if (state.agentMessageInput) state.agentMessageInput.value = "";
-    resizeTextarea(state.agentMessageInput);
-    const thinking = addThinkingMessage(selectedFiles.length ? "파일을 분석하고 있습니다..." : "답변을 작성하고 있습니다...");
-
+    const overlay = showResultOverlay("업무 AI Agent", "답변을 준비하고 있습니다...");
     try {
-      const history = getRecentHistory();
-      const data = selectedFiles.length ? await requestFileAnalysis(userText, history) : await requestAgentAnswer(userText, history);
-      thinking.remove();
+      const data = selectedFiles.length
+        ? await requestFileAnalysis(message || "첨부한 파일을 분석해 주세요.")
+        : await requestAgentAnswer(message);
       const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
-      addMessage("bot", answer);
-      saveLocalHistory(userText, answer);
+      setOverlayContent(overlay, answer);
+      if (textarea) textarea.value = "";
+      selectedFiles = [];
+      updateAttachButtonTitle(document.querySelector(".prompt-card .icon-btn"));
     } catch (error) {
-      thinking.remove();
-      addMessage("bot", `업무 AI Agent 처리 중 오류가 발생했습니다.\n${getErrorMessage(error)}`);
+      setOverlayContent(overlay, "업무 AI Agent 처리 중 오류가 발생했습니다.\n" + getErrorMessage(error));
     } finally {
       submitInProgress = false;
-      setComposerDisabled(false);
-      state.agentMessageInput?.focus();
     }
   }
 
-  function buildDisplayUserMessage(message) {
-    if (!selectedFiles.length) return message;
-    const lines = selectedFiles.map((file, index) => `${index + 1}. ${file.name} (${formatFileSize(file.size)})`);
-    return `${message}\n\n[첨부 파일]\n${lines.join("\n")}`;
-  }
-
-  async function requestAgentAnswer(message, history) {
+  async function requestAgentAnswer(message) {
     const res = await fetch(AGENT_API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionToken}` },
-      body: JSON.stringify({ message, stream: false, task: normalizeTask(currentTask), history }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({
+        message,
+        stream: false,
+        task: normalizeTask(currentTask),
+        history: [],
+      }),
     });
     return readApiResponse(res);
   }
 
-  async function requestFileAnalysis(message, history) {
+  async function requestFileAnalysis(message) {
     const formData = new FormData();
     formData.append("message", message);
     formData.append("stream", "false");
-    formData.append("history", JSON.stringify(history));
-    const normalizedTask = normalizeTask(currentTask);
-    if (normalizedTask) formData.append("task", normalizedTask);
+    formData.append("history", JSON.stringify([]));
+    if (normalizeTask(currentTask)) formData.append("task", normalizeTask(currentTask));
     selectedFiles.forEach((file) => formData.append("files", file, file.name));
-    const res = await fetch(FILE_API_URL, { method: "POST", headers: { Authorization: `Bearer ${sessionToken}` }, body: formData });
+
+    const res = await fetch(FILE_API_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${sessionToken}` },
+      body: formData,
+    });
     return readApiResponse(res);
   }
 
   async function readApiResponse(res) {
     const text = await res.text();
     let data = {};
-    try { data = text ? JSON.parse(text) : {}; } catch { data = { ok: false, message: text }; }
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { ok: false, message: text };
+    }
     if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`);
     return data;
   }
 
   function normalizeTask(task) {
     const value = String(task || "").trim();
-    if (!value || value === "excel_analysis" || value === "file_question" || value === "document_draft") return "";
+    if (!value) return "";
+    if (value === "excel_analysis" || value === "file_question" || value === "document_draft") return "";
     if (value === "document_summary") return "document_summary";
     if (value === "translation") return "translation";
     if (value === "report_summary") return "report_summary";
@@ -505,179 +309,139 @@
 
   function extractAnswerText(data) {
     if (!data) return "";
-    return String(data.answer || data.text || data.message || data.raw || "").trim();
+    return String(data.answer || data.message || data.result || data.text || data.output || "").trim();
   }
 
-  function addMessage(role, text) {
-    if (!state.agentBody) return null;
-    const emptyCard = state.agentBody.querySelector(".ds-agent-empty-card");
-    if (emptyCard) emptyCard.hidden = true;
-    const row = document.createElement("div");
-    row.className = role === "user" ? "ds-chat-row ds-user-row" : "ds-chat-row ds-bot-row";
-    if (role === "bot") {
-      const avatar = document.createElement("span");
-      avatar.className = "ds-chat-avatar";
-      avatar.textContent = "AI";
-      row.appendChild(avatar);
+  function showResultOverlay(title, content) {
+    let overlay = document.getElementById("dsOneResultOverlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "dsOneResultOverlay";
+      overlay.setAttribute("role", "dialog");
+      overlay.setAttribute("aria-modal", "true");
+      overlay.style.cssText = "position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:24px;background:rgba(15,23,42,.28);backdrop-filter:blur(3px);";
+      overlay.innerHTML = `
+        <section style="width:min(960px,calc(100vw - 48px));height:min(760px,calc(100dvh - 48px));display:grid;grid-template-rows:auto minmax(0,1fr);background:rgba(255,255,255,.98);border:1px solid #dfe7f2;border-radius:22px;box-shadow:0 26px 70px rgba(15,23,42,.24);overflow:hidden;font-family:Pretendard,'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;">
+          <header style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 22px;border-bottom:1px solid #e7edf7;background:#fff;">
+            <strong id="dsOneResultTitle" style="font-size:18px;font-weight:900;color:#151a24;">업무 AI Agent</strong>
+            <button id="dsOneResultClose" type="button" style="width:36px;height:36px;display:grid;place-items:center;border:1px solid #dfe7f2;border-radius:10px;background:#f8fbff;color:#344052;font-size:22px;line-height:1;cursor:pointer;">×</button>
+          </header>
+          <div id="dsOneResultBody" style="min-height:0;padding:22px;overflow:auto;color:#263146;font-size:14px;line-height:1.75;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;"></div>
+        </section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("#dsOneResultClose")?.addEventListener("click", () => overlay.remove());
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) overlay.remove();
+      });
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") document.getElementById("dsOneResultOverlay")?.remove();
+      });
     }
-    const msg = document.createElement("div");
-    msg.className = `ds-msg ${role === "user" ? "user" : "bot"}`;
-    if (role === "bot") renderMessageContent(msg, text); else msg.textContent = text;
-    row.appendChild(msg);
-    if (role === "bot") addCopyButton(row, msg);
-    state.agentBody.appendChild(row);
-    state.agentBody.scrollTop = state.agentBody.scrollHeight;
-    return row;
+    overlay.querySelector("#dsOneResultTitle").textContent = title || "업무 AI Agent";
+    setOverlayContent(overlay, content || "");
+    return overlay;
   }
 
-  function addThinkingMessage(text) {
-    const row = document.createElement("div");
-    row.className = "ds-thinking-row ds-bot-row";
-    row.innerHTML = `<span class="ds-chat-avatar">AI</span><div class="ds-msg bot">${escapeHtml(text)}</div>`;
-    state.agentBody.appendChild(row);
-    state.agentBody.scrollTop = state.agentBody.scrollHeight;
-    return row;
+  function setOverlayContent(overlay, content) {
+    const body = overlay?.querySelector("#dsOneResultBody");
+    if (body) body.textContent = String(content || "");
   }
 
-  function renderMessageContent(container, text) {
-    container.innerHTML = "";
-    const lines = normalizeAnswerText(text).split(/\r?\n/);
-    for (let i = 0; i < lines.length; i += 1) {
-      const line = lines[i];
-      if (!line.trim()) { container.appendChild(document.createElement("br")); continue; }
-      if (isMarkdownTableStart(lines, i)) {
-        const tableLines = [];
-        while (i < lines.length && isMarkdownTableLine(lines[i])) { tableLines.push(lines[i]); i += 1; }
-        i -= 1;
-        appendMarkdownTable(container, tableLines);
-        continue;
+  async function bootstrapProfile() {
+    if (!sessionToken) return;
+    try {
+      const res = await fetch(AGENT_API_URL, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${sessionToken}` },
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.ok) applyHeaderProfile(data);
+    } catch {
+      // 프로필 조회 실패 시 토큰 payload 또는 캐시 이름만 유지합니다.
+    }
+  }
+
+  function decodeSessionTokenPayload(token) {
+    const body = String(token || "").split(".")[0];
+    if (!body) return null;
+    try {
+      let base64 = body.replaceAll("-", "+").replaceAll("_", "/");
+      while (base64.length % 4) base64 += "=";
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      const payload = JSON.parse(new TextDecoder().decode(bytes));
+      if (payload.exp && Number(payload.exp) * 1000 < Date.now()) {
+        sessionStorage.removeItem(SESSION_TOKEN_KEY);
+        return null;
       }
-      const div = document.createElement("div");
-      const heading = line.match(/^\s*(결론|요약|분석 결과|파일 구조 요약|핵심 이슈|우선 조치|기준 및 근거|확인 필요|다음 조치)\s*:?\s*$/);
-      if (heading) { div.className = "ds-msg-heading"; div.textContent = heading[1]; }
-      else if (/^\s*[-•]\s+/.test(line)) { div.className = "ds-msg-bullet"; div.textContent = line.replace(/^\s*[-•]\s+/, "• "); }
-      else { div.className = "ds-msg-line"; appendInlineMarkdown(div, line); }
-      container.appendChild(div);
+      return payload;
+    } catch {
+      return null;
     }
   }
 
-  function normalizeAnswerText(text) {
-    return String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/기준\s*\/\s*근거/g, "기준 및 근거").replace(/\n{3,}/g, "\n\n").trim();
+  function getDisplayName(profile) {
+    if (!profile) return "";
+    const candidates = [
+      profile.userName,
+      profile.user_name,
+      profile.name,
+      profile.displayName,
+      profile.display_name,
+      profile.empName,
+      profile.empNm,
+      profile.loginId,
+      profile.login_id,
+      profile.empNo,
+      profile.emp_no,
+    ];
+    return candidates.map((value) => String(value || "").trim()).find((value) => value && value !== "undefined" && value !== "null") || "";
   }
 
-  function isMarkdownTableLine(line) { return /^\s*\|.+\|\s*$/.test(String(line || "")); }
-  function isMarkdownTableSeparator(line) { return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(String(line || "")); }
-  function isMarkdownTableStart(lines, index) { return isMarkdownTableLine(lines[index]) && isMarkdownTableSeparator(lines[index + 1] || ""); }
-  function parseTableRow(line) { return String(line || "").trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim()); }
-
-  function appendMarkdownTable(container, tableLines) {
-    const wrap = document.createElement("div");
-    wrap.className = "ds-msg-table-wrap";
-    const toolbar = document.createElement("div");
-    toolbar.className = "ds-msg-table-toolbar";
-    const copyBtn = document.createElement("button");
-    copyBtn.type = "button";
-    copyBtn.textContent = "표 복사";
-    copyBtn.addEventListener("click", async () => {
-      const tsv = tableLines.filter((line) => !isMarkdownTableSeparator(line)).map((line) => parseTableRow(line).join("\t")).join("\n");
-      const ok = await copyToClipboard(tsv);
-      copyBtn.textContent = ok ? "복사 완료" : "복사 실패";
-      setTimeout(() => { copyBtn.textContent = "표 복사"; }, 1200);
-    });
-    toolbar.appendChild(copyBtn);
-    wrap.appendChild(toolbar);
-    const scroll = document.createElement("div");
-    scroll.className = "ds-msg-table-scroll";
-    const table = document.createElement("table");
-    table.className = "ds-msg-table";
-    const thead = document.createElement("thead");
-    const hr = document.createElement("tr");
-    parseTableRow(tableLines[0]).forEach((cell) => { const th = document.createElement("th"); appendInlineMarkdown(th, cell); hr.appendChild(th); });
-    thead.appendChild(hr);
-    table.appendChild(thead);
-    const tbody = document.createElement("tbody");
-    tableLines.slice(2).forEach((line) => {
-      if (!isMarkdownTableLine(line) || isMarkdownTableSeparator(line)) return;
-      const tr = document.createElement("tr");
-      parseTableRow(line).forEach((cell) => { const td = document.createElement("td"); appendInlineMarkdown(td, cell); tr.appendChild(td); });
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    scroll.appendChild(table);
-    wrap.appendChild(scroll);
-    container.appendChild(wrap);
+  function applyHeaderProfile(profile) {
+    const displayName = getDisplayName(profile);
+    if (!displayName) return;
+    const profileName = document.querySelector(".profile-button strong");
+    const profileAvatar = document.querySelector(".avatar");
+    if (profileName) profileName.textContent = displayName;
+    if (profileAvatar) profileAvatar.textContent = displayName.slice(0, 1);
+    cacheDisplayName(displayName);
   }
 
-  function appendInlineMarkdown(parent, text) {
-    const value = String(text || "");
-    const regex = /(\*\*(.+?)\*\*|`([^`]+)`)/g;
-    let last = 0;
-    let match;
-    while ((match = regex.exec(value))) {
-      if (match.index > last) parent.appendChild(document.createTextNode(value.slice(last, match.index)));
-      if (match[2]) { const strong = document.createElement("strong"); strong.textContent = match[2]; parent.appendChild(strong); }
-      else if (match[3]) { const code = document.createElement("code"); code.textContent = match[3]; parent.appendChild(code); }
-      last = regex.lastIndex;
+  function cacheDisplayName(displayName) {
+    try {
+      localStorage.setItem(DISPLAY_NAME_CACHE_KEY, JSON.stringify({ displayName, savedAt: Date.now() }));
+    } catch {
     }
-    if (last < value.length) parent.appendChild(document.createTextNode(value.slice(last)));
   }
 
-  function addCopyButton(row, msg) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "ds-bot-copy-btn";
-    button.textContent = "복사";
-    button.addEventListener("click", async () => {
-      const ok = await copyToClipboard(msg.textContent || "");
-      button.textContent = ok ? "복사 완료" : "복사 실패";
-      setTimeout(() => { button.textContent = "복사"; }, 1200);
-    });
-    row.appendChild(button);
-  }
-
-  async function copyToClipboard(text) {
-    try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; } } catch {}
+  function getCachedDisplayName() {
     try {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.style.position = "fixed";
-      textarea.style.left = "-9999px";
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      const ok = document.execCommand("copy");
-      textarea.remove();
-      return ok;
-    } catch { return false; }
+      const raw = localStorage.getItem(DISPLAY_NAME_CACHE_KEY);
+      if (!raw) return "";
+      const data = JSON.parse(raw);
+      if (Date.now() - Number(data.savedAt || 0) > DISPLAY_NAME_CACHE_TTL_MS) return "";
+      return String(data.displayName || "").trim();
+    } catch {
+      return "";
+    }
   }
 
-  function getLocalHistoryKey() {
-    const userKey = currentEmpNo || currentLoginId || "anonymous";
-    return LOCAL_HISTORY_PREFIX + String(userKey).replace(/[^a-zA-Z0-9_.:-]/g, "_");
-  }
-  function getRecentHistory() {
-    try { const raw = sessionStorage.getItem(getLocalHistoryKey()); const data = raw ? JSON.parse(raw) : []; return Array.isArray(data) ? data.slice(-MAX_HISTORY) : []; } catch { return []; }
-  }
-  function saveLocalHistory(userText, assistantText) {
-    try {
-      const history = getRecentHistory();
-      history.push({ role: "user", text: userText });
-      if (assistantText) history.push({ role: "assistant", text: assistantText });
-      sessionStorage.setItem(getLocalHistoryKey(), JSON.stringify(history.slice(-MAX_HISTORY)));
-    } catch {}
-  }
-  function restoreLocalHistory() {
-    const history = getRecentHistory();
-    if (!history.length) return;
-    setMode("doc");
-    history.forEach((message) => addMessage(message.role === "user" ? "user" : "bot", message.text || ""));
+  function restoreCachedDisplayName() {
+    const cached = getCachedDisplayName();
+    if (cached) applyHeaderProfile({ displayName: cached });
   }
 
-  function setComposerDisabled(disabled) {
-    if (state.agentMessageInput) state.agentMessageInput.disabled = disabled;
-    if (state.agentSendBtn) state.agentSendBtn.disabled = disabled;
-    if (state.agentAttachBtn) state.agentAttachBtn.disabled = disabled;
-    if (state.homeSendBtn) state.homeSendBtn.disabled = disabled;
+  function showToast(message) {
+    const previous = document.getElementById("dsOneToast");
+    previous?.remove();
+    const toast = document.createElement("div");
+    toast.id = "dsOneToast";
+    toast.textContent = String(message || "");
+    toast.style.cssText = "position:fixed;left:50%;bottom:24px;z-index:10000;max-width:min(440px,calc(100vw - 32px));padding:12px 16px;color:#fff;background:rgba(21,26,36,.94);border-radius:999px;box-shadow:0 14px 36px rgba(0,0,0,.18);font:800 14px/1.35 Pretendard,'Noto Sans KR','Malgun Gothic',system-ui,sans-serif;transform:translateX(-50%);";
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 1900);
   }
 
   function isPlainEnterSubmitEvent(event) {
@@ -687,93 +451,29 @@
     return true;
   }
 
-  function resizeTextarea(textarea) {
-    if (!textarea) return;
-    textarea.style.height = "auto";
-    const maxHeight = Math.min(window.innerHeight * 0.28, 180);
-    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
-    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? "auto" : "hidden";
-  }
-
-  function showToast(message) {
-    document.querySelector(".ds-toast")?.remove();
-    const toast = document.createElement("div");
-    toast.className = "ds-toast";
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    requestAnimationFrame(() => toast.classList.add("show"));
-    setTimeout(() => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 200); }, 1800);
-  }
-
-  function decodeSessionTokenPayload(token) {
-    if (!token) return null;
-    try {
-      const part = String(token).split(".")[0] || "";
-      const normalized = part.replace(/-/g, "+").replace(/_/g, "/");
-      const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
-      const json = decodeURIComponent(Array.from(atob(padded)).map((ch) => `%${ch.charCodeAt(0).toString(16).padStart(2, "0")}`).join(""));
-      return JSON.parse(json);
-    } catch { return null; }
-  }
-
-  function getDisplayName(profile) {
-    if (!profile) return "";
-    const candidates = [profile.userName, profile.user_name, profile.name, profile.displayName, profile.display_name, profile.empName, profile.empNm, profile.loginId, profile.login_id, profile.empNo, profile.emp_no];
-    return candidates.map((value) => String(value || "").trim()).find((value) => value && value !== "undefined" && value !== "null") || "";
-  }
-
-  function applyHeaderProfile(profile) {
-    const displayName = getDisplayName(profile);
-    if (!displayName) return;
-    if (!state.profileName) state.profileName = document.querySelector(".profile-button strong");
-    if (!state.profileAvatar) state.profileAvatar = document.querySelector(".avatar");
-    if (state.profileName) state.profileName.textContent = displayName;
-    if (state.profileAvatar) state.profileAvatar.textContent = displayName.slice(0, 1);
-    cacheDisplayName(displayName);
-  }
-
-  async function bootstrapProfile() {
-    if (!sessionToken) return;
-    try {
-      const res = await fetch(AGENT_API_URL, { method: "GET", headers: { Authorization: `Bearer ${sessionToken}` } });
-      const data = await res.json().catch(() => null);
-      if (res.ok && data?.ok) {
-        currentLoginId = data.loginId || data.login_id || currentLoginId;
-        currentEmpNo = data.empNo || data.emp_no || data.rpaAuthEmpNo || currentEmpNo;
-        applyHeaderProfile(data);
-      }
-    } catch {}
-  }
-
-  function cacheDisplayName(displayName) {
-    try { localStorage.setItem(DISPLAY_NAME_CACHE_KEY, JSON.stringify({ displayName, savedAt: Date.now() })); } catch {}
-  }
-  function getCachedDisplayName() {
-    try {
-      const raw = localStorage.getItem(DISPLAY_NAME_CACHE_KEY);
-      if (!raw) return "";
-      const data = JSON.parse(raw);
-      if (Date.now() - Number(data.savedAt || 0) > DISPLAY_NAME_CACHE_TTL_MS) return "";
-      return String(data.displayName || "").trim();
-    } catch { return ""; }
-  }
-  function restoreCachedDisplayName() {
-    const cached = getCachedDisplayName();
-    if (cached) applyHeaderProfile({ displayName: cached });
-  }
-
   function formatFileSize(size) {
     const value = Number(size || 0);
     if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)}MB`;
     if (value >= 1024) return `${Math.round(value / 1024)}KB`;
     return `${value}B`;
   }
-  function getErrorMessage(error) { return error instanceof Error ? error.message : String(error || "알 수 없는 오류"); }
-  function escapeHtml(value) { return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init, { once: true });
-  } else {
-    init();
+  function getErrorMessage(error) {
+    return error instanceof Error ? error.message : String(error || "알 수 없는 오류");
   }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function escapeAttribute(value) {
+    return escapeHtml(value).replace(/`/g, "&#96;");
+  }
+
+  init();
 })();
