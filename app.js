@@ -109,18 +109,27 @@ function isEmbeddedInIframe() {
 function showIframeLauncher(profile) {
   body.classList.add("is-iframe-launcher");
   const displayName = getDisplayName(profile) || getCachedDisplayName() || "DS ONE";
+  const safeDisplayName = escapeHtml(displayName);
   const launcher = document.createElement("main");
   launcher.className = "iframe-launcher";
   launcher.innerHTML = `
-    <div class="iframe-launch-card">
-      <div class="iframe-launch-brand">
-        <span class="brand-mark mini" aria-hidden="true"></span>
-        <strong>DS ONE</strong>
-      </div>
-      <p class="iframe-launch-title">업무 AI Agent</p>
-      <p class="iframe-launch-desc">${escapeHtml(displayName)}님, 새 탭에서 넓은 화면으로 이용하세요.</p>
-      <button class="iframe-launch-button" type="button">업무 AI Agent 열기</button>
-    </div>
+    <button
+      class="iframe-launch-button"
+      type="button"
+      title="DS ONE 업무 AI 플랫폼 새 탭 열기"
+      aria-label="${safeDisplayName}님의 DS ONE 업무 AI 플랫폼을 새 탭에서 열기"
+    >
+      <span class="iframe-launch-newtab" aria-hidden="true">↗</span>
+      <span class="iframe-launch-visual" aria-hidden="true">
+        <span class="iframe-launch-orbit"></span>
+        <span class="iframe-launch-people">
+          <span></span><span></span><span></span>
+        </span>
+        <span class="iframe-launch-hand"></span>
+      </span>
+      <span class="iframe-launch-title">DS ONE</span>
+      <span class="iframe-launch-subtitle">업무 AI</span>
+    </button>
   `;
   document.body.appendChild(launcher);
 
@@ -134,8 +143,8 @@ function showIframeLauncher(profile) {
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       link.className = "iframe-launch-fallback";
-      link.textContent = "새 탭이 차단되었습니다. 여기를 눌러 열어 주세요.";
-      launcher.querySelector(".iframe-launch-card")?.appendChild(link);
+      link.textContent = "DS ONE 업무 AI 열기 ↗";
+      launcher.appendChild(link);
     }
   });
 }
