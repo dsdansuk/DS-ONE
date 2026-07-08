@@ -590,10 +590,10 @@
     .action-card {
       min-height: clamp(96px, 11.4dvh, 116px);
       display: grid;
-      align-content: center;
-      justify-content: center;
+      align-content: start;
+      /* justify-content: center; */
       gap: clamp(7px, 0.8dvh, 10px);
-      padding: clamp(12px, 1.45dvh, 16px);
+      padding: clamp(16px, 1.45dvh, 16px);
       color: inherit;
       text-align: left;
       background: rgba(255, 255, 255, 0.86);
