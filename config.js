@@ -23,7 +23,7 @@ window.DS_ONE_CONFIG = Object.freeze({
     agentHistoryCacheTtlMs: 60 * 60 * 1000,
     agentHistoryCacheMaxMessages: 20,
     recentWorkPrefix: "ds_one_platform_recent_work_v1_",
-    recentWorkMaxItems: 8,
+    recentWorkMaxItems: 50,
     recentWorkMaxMessages: 24,
   }),
   ui: Object.freeze({

@@ -1,4 +1,4 @@
-﻿:root {
+:root {
       --blue: #2f6fed;
       --blue-strong: #2159e8;
       --blue-soft: #eef5ff;
@@ -287,7 +287,32 @@
       align-content: start;
       gap: 3px;
       min-height: 0;
-      overflow: hidden;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding-right: 3px;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+    }
+
+    .recent-list::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .recent-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .recent-list::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.34);
+      border: 2px solid transparent;
+      border-radius: 999px;
+      background-clip: padding-box;
+    }
+
+    .recent-list::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 116, 139, 0.5);
+      border: 2px solid transparent;
+      background-clip: padding-box;
     }
 
     .recent-item {

@@ -18,7 +18,7 @@
   const LOCAL_HISTORY_PREFIX = "ds_one_platform_recent_messages_v2_";
   const RECENT_WORK_PREFIX = STORAGE.recentWorkPrefix || "ds_one_platform_recent_work_v1_";
   const MAX_HISTORY = Number(STORAGE.agentHistoryCacheMaxMessages || 20);
-  const MAX_RECENT_WORK = Number(STORAGE.recentWorkMaxItems || 8);
+  const MAX_RECENT_WORK = Number(STORAGE.recentWorkMaxItems || 50);
   const MAX_STORED_CONVERSATION_MESSAGES = Number(STORAGE.recentWorkMaxMessages || 24);
   const REMOTE_SESSION_REFRESH_DEBOUNCE_MS = 700;
   const REMOTE_SESSION_LIST_LIMIT = Math.max(MAX_RECENT_WORK, 20);
@@ -541,10 +541,8 @@
         transform: translateY(-50%) scale(1.03);
       }
       .recent-context-menu {
-        position: absolute;
-        z-index: 80;
-        right: 8px;
-        top: calc(100% - 3px);
+        position: fixed;
+        z-index: 9998;
         width: 132px;
         padding: 6px;
         border: 1px solid rgba(148, 163, 184, 0.24);
@@ -1364,13 +1362,14 @@
 
   function toggleRecentContextMenu(container, item) {
     if (!container || !item) return;
-    if (recentContextMenu && container.contains(recentContextMenu)) {
+    if (recentContextMenu?.dataset?.conversationId === String(item.id)) {
       closeRecentContextMenu();
       return;
     }
     closeRecentContextMenu();
     const menu = document.createElement("div");
     menu.className = "recent-context-menu";
+    menu.dataset.conversationId = String(item.id);
     menu.innerHTML = `
       <button type="button" data-action="rename">이름 바꾸기</button>
       <button type="button" data-action="favorite">${item.isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}</button>
@@ -1387,7 +1386,17 @@
       if (action === "favorite") return toggleFavoriteRecentConversation(item.id);
       if (action === "delete") return deleteRecentConversation(item.id);
     });
-    container.appendChild(menu);
+    document.body.appendChild(menu);
+    const trigger = container.querySelector(".recent-more-btn") || container;
+    const rect = trigger.getBoundingClientRect();
+    const menuWidth = 132;
+    const menuHeight = Math.max(112, menu.offsetHeight || 112);
+    const gap = 6;
+    const left = Math.min(window.innerWidth - menuWidth - 8, Math.max(8, rect.right - menuWidth));
+    let top = rect.bottom + gap;
+    if (top + menuHeight > window.innerHeight - 8) top = Math.max(8, rect.top - menuHeight - gap);
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
     recentContextMenu = menu;
   }
 
