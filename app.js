@@ -47,6 +47,7 @@
   let chatSearchDialog = null;
   let chatSearchDebounceTimer = 0;
   let chatSearchRequestSeq = 0;
+  let activeConversationHighlightQuery = "";
   const CHAT_SEARCH_DEBOUNCE_MS = 420;
 
   const state = {
@@ -688,10 +689,12 @@
       .ds-search-close > * { pointer-events: none; }
       .ds-dialog-close:hover,
       .ds-search-close:hover { color: #1d4ed8; background: #f1f6ff; }
+      .ds-dialog-close,
       .ds-search-close {
         font-size: 0;
         line-height: 0;
       }
+      .ds-dialog-close svg,
       .ds-search-close svg {
         width: 15px;
         height: 15px;
@@ -877,11 +880,22 @@
         0%, 80%, 100% { transform: translateY(0); opacity: .32; }
         40% { transform: translateY(-4px); opacity: .85; }
       }
-      .ds-search-highlight {
+      .ds-search-highlight,
+      .ds-chat-highlight {
         border-radius: 5px;
         background: #fff3bf;
         color: inherit;
         font-weight: 950;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+      }
+      .ds-chat-row.is-search-hit .ds-msg {
+        animation: ds-chat-hit-pulse 1.2s ease;
+      }
+      @keyframes ds-chat-hit-pulse {
+        0% { filter: drop-shadow(0 0 0 rgba(47,111,237,0)); }
+        25% { filter: drop-shadow(0 0 10px rgba(47,111,237,.18)); }
+        100% { filter: drop-shadow(0 0 0 rgba(47,111,237,0)); }
       }
       @media (max-width: 720px) {
         .ds-dialog-backdrop, .ds-search-backdrop { padding: 14px; }
@@ -1103,6 +1117,7 @@
     const { showToast: shouldShowToast = false } = options || {};
     closeRecentContextMenu();
     activeConversationId = "";
+    activeConversationHighlightQuery = "";
     remoteSessionCreatePromise = null;
     remoteSessionCreateConversationId = "";
     currentTask = "";
@@ -1188,6 +1203,7 @@
     submitInProgress = true;
     setComposerDisabled(true);
     const userText = message || "첨부한 파일을 분석해 주세요.";
+    activeConversationHighlightQuery = "";
     const history = getRecentHistory();
     const displayUserMessage = buildDisplayUserMessage(userText);
     ensureActiveConversation(userText, displayUserMessage);
@@ -1283,7 +1299,11 @@
     }
     const msg = document.createElement("div");
     msg.className = `ds-msg ${role === "user" ? "user" : "bot"}`;
-    if (role === "bot") renderMessageContent(msg, text); else msg.textContent = text;
+    if (role === "bot") renderMessageContent(msg, text, activeConversationHighlightQuery);
+    else appendTextWithHighlight(msg, text, activeConversationHighlightQuery, "ds-chat-highlight");
+    if (activeConversationHighlightQuery && String(text || "").toLowerCase().includes(activeConversationHighlightQuery.toLowerCase())) {
+      row.classList.add("is-search-hit");
+    }
     row.appendChild(msg);
     if (role === "bot") addCopyButton(row, msg);
     state.agentBody.appendChild(row);
@@ -1304,7 +1324,7 @@
     return row;
   }
 
-  function renderMessageContent(container, text) {
+  function renderMessageContent(container, text, highlightQuery = "") {
     container.innerHTML = "";
     const rawLines = normalizeAnswerText(text).split(/\r?\n/);
     let inCode = false;
@@ -1341,7 +1361,7 @@
           i += 1;
         }
         i -= 1;
-        appendMarkdownTable(container, tableLines);
+        appendMarkdownTable(container, tableLines, highlightQuery);
         continue;
       }
       if (/^---+$/.test(trimmed)) {
@@ -1361,7 +1381,7 @@
       if (/^>\s+/.test(trimmed)) {
         const div = document.createElement("div");
         div.className = "ds-msg-quote";
-        appendInlineMarkdown(div, trimmed.replace(/^>\s+/, ""));
+        appendInlineMarkdown(div, trimmed.replace(/^>\s+/, ""), highlightQuery);
         container.appendChild(div);
         continue;
       }
@@ -1374,7 +1394,7 @@
         num.className = "ds-num";
         num.textContent = `${numbered[1]}.`;
         div.appendChild(num);
-        appendInlineMarkdown(div, numbered[2]);
+        appendInlineMarkdown(div, numbered[2], highlightQuery);
         container.appendChild(div);
         continue;
       }
@@ -1382,14 +1402,14 @@
       if (/^[-•]\s+/.test(trimmed)) {
         const div = document.createElement("div");
         div.className = "ds-msg-bullet";
-        appendInlineMarkdown(div, trimmed.replace(/^[-•]\s+/, ""));
+        appendInlineMarkdown(div, trimmed.replace(/^[-•]\s+/, ""), highlightQuery);
         container.appendChild(div);
         continue;
       }
 
       const div = document.createElement("div");
       div.className = "ds-msg-paragraph";
-      appendInlineMarkdown(div, line);
+      appendInlineMarkdown(div, line, highlightQuery);
       container.appendChild(div);
     }
 
@@ -1433,7 +1453,7 @@
   function isMarkdownTableStart(lines, index) { return isMarkdownTableLine(lines[index]) && isMarkdownTableSeparator(lines[index + 1] || ""); }
   function parseTableRow(line) { return String(line || "").trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim()); }
 
-  function appendMarkdownTable(container, tableLines) {
+  function appendMarkdownTable(container, tableLines, highlightQuery = "") {
     const wrap = document.createElement("div");
     wrap.className = "ds-msg-table-wrap";
     const toolbar = document.createElement("div");
@@ -1455,14 +1475,14 @@
     table.className = "ds-msg-table";
     const thead = document.createElement("thead");
     const hr = document.createElement("tr");
-    parseTableRow(tableLines[0]).forEach((cell) => { const th = document.createElement("th"); appendInlineMarkdown(th, cell); hr.appendChild(th); });
+    parseTableRow(tableLines[0]).forEach((cell) => { const th = document.createElement("th"); appendInlineMarkdown(th, cell, highlightQuery); hr.appendChild(th); });
     thead.appendChild(hr);
     table.appendChild(thead);
     const tbody = document.createElement("tbody");
     tableLines.slice(2).forEach((line) => {
       if (!isMarkdownTableLine(line) || isMarkdownTableSeparator(line)) return;
       const tr = document.createElement("tr");
-      parseTableRow(line).forEach((cell) => { const td = document.createElement("td"); appendInlineMarkdown(td, cell); tr.appendChild(td); });
+      parseTableRow(line).forEach((cell) => { const td = document.createElement("td"); appendInlineMarkdown(td, cell, highlightQuery); tr.appendChild(td); });
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -1471,18 +1491,47 @@
     container.appendChild(wrap);
   }
 
-  function appendInlineMarkdown(parent, text) {
+  function appendInlineMarkdown(parent, text, highlightQuery = "") {
     const value = String(text || "");
     const regex = /(\*\*(.+?)\*\*|`([^`]+)`)/g;
     let last = 0;
     let match;
     while ((match = regex.exec(value))) {
-      if (match.index > last) parent.appendChild(document.createTextNode(value.slice(last, match.index)));
-      if (match[2]) { const strong = document.createElement("strong"); strong.textContent = match[2]; parent.appendChild(strong); }
-      else if (match[3]) { const code = document.createElement("code"); code.textContent = match[3]; parent.appendChild(code); }
+      if (match.index > last) appendTextWithHighlight(parent, value.slice(last, match.index), highlightQuery, "ds-chat-highlight");
+      if (match[2]) {
+        const strong = document.createElement("strong");
+        appendTextWithHighlight(strong, match[2], highlightQuery, "ds-chat-highlight");
+        parent.appendChild(strong);
+      } else if (match[3]) {
+        const code = document.createElement("code");
+        code.textContent = match[3];
+        parent.appendChild(code);
+      }
       last = regex.lastIndex;
     }
-    if (last < value.length) parent.appendChild(document.createTextNode(value.slice(last)));
+    if (last < value.length) appendTextWithHighlight(parent, value.slice(last), highlightQuery, "ds-chat-highlight");
+  }
+
+  function appendTextWithHighlight(parent, text, query, className = "ds-chat-highlight") {
+    const value = String(text || "");
+    const normalizedQuery = normalizeSearchQuery(query || "");
+    if (!normalizedQuery) {
+      parent.appendChild(document.createTextNode(value));
+      return;
+    }
+    const lowerValue = value.toLowerCase();
+    const lowerQuery = normalizedQuery.toLowerCase();
+    let index = 0;
+    let found;
+    while ((found = lowerValue.indexOf(lowerQuery, index)) !== -1) {
+      if (found > index) parent.appendChild(document.createTextNode(value.slice(index, found)));
+      const mark = document.createElement("mark");
+      mark.className = className;
+      mark.textContent = value.slice(found, found + normalizedQuery.length);
+      parent.appendChild(mark);
+      index = found + normalizedQuery.length;
+    }
+    if (index < value.length) parent.appendChild(document.createTextNode(value.slice(index)));
   }
 
   function addCopyButton(row, msg) {
@@ -1656,7 +1705,7 @@
     closeButton.type = "button";
     closeButton.className = "ds-dialog-close";
     closeButton.setAttribute("aria-label", "닫기");
-    closeButton.textContent = "×";
+    closeButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7l10 10" /><path d="M17 7 7 17" /></svg>`;
     head.appendChild(copy);
     head.appendChild(closeButton);
     card.appendChild(head);
@@ -1720,7 +1769,7 @@
         renderChatSearchResults("");
         return;
       }
-      setChatSearchPending("입력이 끝나면 검색합니다");
+      setChatSearchPending("검색 중입니다");
       chatSearchDebounceTimer = window.setTimeout(searchNow, CHAT_SEARCH_DEBOUNCE_MS);
     });
     closeButton.addEventListener("click", close);
@@ -1849,7 +1898,7 @@
       button.addEventListener("click", () => {
         upsertRecentWorkItem(item);
         closeChatSearchDialog();
-        openRecentConversation(item.id);
+        openRecentConversation(item.id, query);
       });
       results.appendChild(button);
     });
@@ -2021,10 +2070,11 @@
     });
   }
 
-  async function openRecentConversation(conversationId) {
+  async function openRecentConversation(conversationId, highlightQuery = "") {
     const item = loadRecentWorkItems().find((entry) => entry.id === conversationId);
     if (!item) return;
     activeConversationId = item.id;
+    activeConversationHighlightQuery = normalizeSearchQuery(highlightQuery);
     currentTask = item.task || "";
     selectedFiles = [];
     renderFileChips();
@@ -2053,7 +2103,17 @@
       const apiHistory = (active?.messages || []).map((message) => ({ role: message.role === "assistant" ? "assistant" : "user", text: message.text || "" })).slice(-MAX_HISTORY);
       sessionStorage.setItem(getLocalHistoryKey(), JSON.stringify(apiHistory));
     } catch {}
+    if (activeConversationHighlightQuery) scrollToFirstChatHighlight();
     renderRecentWorkList();
+  }
+
+  function scrollToFirstChatHighlight() {
+    const first = state.agentBody?.querySelector(".ds-chat-highlight");
+    if (!first) return;
+    window.setTimeout(() => {
+      try { first.scrollIntoView({ block: "center", behavior: "smooth" }); }
+      catch { first.scrollIntoView(); }
+    }, 80);
   }
 
   function renderLocalConversationMessages(item) {
