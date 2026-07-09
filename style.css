@@ -500,8 +500,8 @@
 
     .prompt-card textarea {
       width: 100%;
-      height: 28px;
-      min-height: 28px;
+      height: 46px;
+      min-height: 46px;
       max-height: min(24dvh, 168px);
       resize: none;
       overflow-y: hidden;
