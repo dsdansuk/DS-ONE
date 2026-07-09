@@ -13,10 +13,11 @@
   const AGENT_API_URL = ENDPOINTS.agentApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/agent-api";
   const FILE_API_URL = ENDPOINTS.fileApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api";
   const SESSION_TOKEN_KEY = "sso_session_token";
-  const AUTH_TOKEN_CACHE_KEY = STORAGE.authTokenCacheKey || "ds_one_platform_sso_token_cache_v1";
-  const AUTH_IDENTITY_CACHE_KEY = STORAGE.authIdentityCacheKey || "ds_one_platform_auth_identity_v1";
-  const AUTH_IDENTITY_CACHE_TTL_MS = Number(STORAGE.authIdentityCacheTtlMs || 30 * 24 * 60 * 60 * 1000);
-  const AUTH_TOKEN_REFRESH_SKEW_MS = Number(STORAGE.authTokenRefreshSkewMs || 30 * 1000);
+  const PERSISTED_SESSION_TOKEN_KEY = STORAGE.persistedSessionTokenKey || "ds_one_sso_token_cache_v1";
+  const LAST_IDENTITY_KEY = STORAGE.lastIdentityKey || "ds_one_last_identity_v1";
+  const SESSION_TOKEN_CACHE_TTL_MS = Number(STORAGE.sessionTokenCacheTtlMs || 12 * 60 * 60 * 1000);
+  const LAST_IDENTITY_CACHE_TTL_MS = Number(STORAGE.lastIdentityCacheTtlMs || 30 * 24 * 60 * 60 * 1000);
+  const SESSION_REFRESH_LEEWAY_MS = Number(STORAGE.sessionRefreshLeewayMs || 10 * 60 * 1000);
   const DISPLAY_NAME_CACHE_KEY = STORAGE.displayNameCacheKey || "ds_chatbot_last_display_name_v1";
   const DISPLAY_NAME_CACHE_TTL_MS = Number(STORAGE.displayNameCacheTtlMs || 7 * 24 * 60 * 60 * 1000);
   const LOCAL_HISTORY_PREFIX = "ds_one_platform_recent_messages_v2_";
@@ -52,6 +53,8 @@
   let chatSearchDebounceTimer = 0;
   let chatSearchRequestSeq = 0;
   let activeConversationHighlightQuery = "";
+  let authBootstrapPromise = null;
+  let sessionRefreshPromise = null;
   const CHAT_SEARCH_DEBOUNCE_MS = 420;
 
   const state = {
@@ -80,18 +83,17 @@
 
   function init() {
     sessionToken = readSsoSessionToken();
-    const cachedIdentity = restoreCachedAuthIdentity();
     const tokenProfile = decodeSessionTokenPayload(sessionToken);
     if (tokenProfile) {
-      currentLoginId = tokenProfile.loginId || tokenProfile.login_id || currentLoginId || "";
-      currentEmpNo = tokenProfile.empNo || tokenProfile.emp_no || currentEmpNo || "";
-      applyHeaderProfile({ ...cachedIdentity, ...tokenProfile });
-      cacheAuthIdentity({ ...cachedIdentity, ...tokenProfile });
-      migrateAnonymousRecentWorkIfNeeded();
+      applyIdentityFromPayload(tokenProfile);
+      applyHeaderProfile(tokenProfile);
+      persistLastIdentity(tokenProfile);
+    } else {
+      restoreCachedIdentity();
     }
 
     if (isEmbeddedInIframe()) {
-      showIframeLauncher(tokenProfile);
+      showIframeLauncher(tokenProfile || getCachedIdentity());
       return;
     }
 
@@ -100,11 +102,12 @@
     injectSearchAndDialogStyles();
     attachToExistingHome();
     createRuntimeAgentWorkspace();
-    bootstrapProfile();
     bindUiEvents();
+    migrateAnonymousRecentWorkToCurrentUser();
     renderRecentWorkList();
-    scheduleRemoteRecentRefresh(120);
-    resizeTextarea(state.homePromptInput);
+    authBootstrapPromise = bootstrapProfile();
+    authBootstrapPromise.finally(() => scheduleRemoteRecentRefresh(120));
+    normalizeHomeComposerLayout();
     resizeTextarea(state.agentMessageInput);
   }
 
@@ -112,124 +115,51 @@
     const url = new URL(window.location.href);
     const tokenFromUrl = String(url.searchParams.get("token") || "").trim();
     if (tokenFromUrl) {
-      storeSessionToken(tokenFromUrl);
+      storeSessionToken(tokenFromUrl, { persistent: true });
       url.searchParams.delete("token");
       url.searchParams.delete("open");
       window.history.replaceState({}, document.title, url.toString());
-      return isUsableSessionToken(tokenFromUrl) ? tokenFromUrl : "";
+      return tokenFromUrl;
     }
 
-    const sessionValue = String(sessionStorage.getItem(SESSION_TOKEN_KEY) || "").trim();
-    if (sessionValue) {
-      cacheIdentityFromToken(sessionValue);
-      if (isUsableSessionToken(sessionValue)) return sessionValue;
-      sessionStorage.removeItem(SESSION_TOKEN_KEY);
-    }
+    const fromSession = String(sessionStorage.getItem(SESSION_TOKEN_KEY) || "").trim();
+    if (fromSession) return fromSession;
 
-    const cachedToken = readCachedSessionToken();
-    if (cachedToken) {
-      sessionStorage.setItem(SESSION_TOKEN_KEY, cachedToken);
-      return cachedToken;
+    const fromLocal = readPersistedSessionToken();
+    if (fromLocal) {
+      sessionStorage.setItem(SESSION_TOKEN_KEY, fromLocal);
+      return fromLocal;
     }
-
     return "";
   }
 
-  function storeSessionToken(token) {
+  function storeSessionToken(token, options = {}) {
     const value = String(token || "").trim();
     if (!value) return;
-    sessionStorage.setItem(SESSION_TOKEN_KEY, value);
-    cacheIdentityFromToken(value);
-    try {
-      const expMs = getSessionTokenExpiryMs(value);
-      if (!expMs || expMs <= Date.now()) return;
-      localStorage.setItem(AUTH_TOKEN_CACHE_KEY, JSON.stringify({ token: value, expMs, savedAt: Date.now() }));
-    } catch {}
-  }
-
-  function readCachedSessionToken() {
-    try {
-      const raw = localStorage.getItem(AUTH_TOKEN_CACHE_KEY);
-      if (!raw) return "";
-      const data = JSON.parse(raw);
-      const token = String(data.token || "").trim();
-      const expMs = Number(data.expMs || getSessionTokenExpiryMs(token) || 0);
-      if (!token || !expMs || expMs <= Date.now() + AUTH_TOKEN_REFRESH_SKEW_MS) {
-        localStorage.removeItem(AUTH_TOKEN_CACHE_KEY);
-        return "";
-      }
-      cacheIdentityFromToken(token);
-      return token;
-    } catch {
-      try { localStorage.removeItem(AUTH_TOKEN_CACHE_KEY); } catch {}
-      return "";
+    sessionToken = value;
+    try { sessionStorage.setItem(SESSION_TOKEN_KEY, value); } catch {}
+    const payload = decodeSessionTokenPayload(value);
+    if (payload) {
+      applyIdentityFromPayload(payload);
+      persistLastIdentity(payload);
+    }
+    if (options.persistent !== false) {
+      try {
+        localStorage.setItem(PERSISTED_SESSION_TOKEN_KEY, JSON.stringify({ token: value, savedAt: Date.now(), exp: Number(payload?.exp || 0) }));
+      } catch {}
     }
   }
 
-  function isUsableSessionToken(token) {
-    const value = String(token || "").trim();
-    if (!value) return false;
-    const expMs = getSessionTokenExpiryMs(value);
-    return !expMs || expMs > Date.now() + AUTH_TOKEN_REFRESH_SKEW_MS;
-  }
-
-  function getSessionTokenExpiryMs(token) {
-    const payload = decodeSessionTokenPayload(token);
-    const exp = Number(payload?.exp || 0);
-    return Number.isFinite(exp) && exp > 0 ? exp * 1000 : 0;
-  }
-
-  function cacheIdentityFromToken(token) {
-    const payload = decodeSessionTokenPayload(token);
-    if (payload) cacheAuthIdentity(payload);
-  }
-
-  function cacheAuthIdentity(profile) {
-    const loginId = String(profile?.loginId || profile?.login_id || currentLoginId || "").trim();
-    const empNo = String(profile?.empNo || profile?.emp_no || currentEmpNo || "").trim();
-    const displayName = getDisplayName(profile) || getCachedDisplayName() || "";
-    if (!loginId && !empNo) return;
+  function readPersistedSessionToken() {
     try {
-      localStorage.setItem(AUTH_IDENTITY_CACHE_KEY, JSON.stringify({ loginId, empNo, displayName, savedAt: Date.now() }));
-    } catch {}
-  }
-
-  function restoreCachedAuthIdentity() {
-    try {
-      const raw = localStorage.getItem(AUTH_IDENTITY_CACHE_KEY);
-      if (!raw) return null;
+      const raw = localStorage.getItem(PERSISTED_SESSION_TOKEN_KEY);
+      if (!raw) return "";
       const data = JSON.parse(raw);
-      if (Date.now() - Number(data.savedAt || 0) > AUTH_IDENTITY_CACHE_TTL_MS) return null;
-      currentLoginId = String(data.loginId || currentLoginId || "").trim();
-      currentEmpNo = String(data.empNo || currentEmpNo || "").trim();
-      if (data.displayName) applyHeaderProfile({ displayName: data.displayName });
-      return data;
-    } catch { return null; }
-  }
-
-  function migrateAnonymousRecentWorkIfNeeded() {
-    const targetKey = getRecentWorkKey();
-    const anonymousKey = RECENT_WORK_PREFIX + "anonymous";
-    if (!targetKey || targetKey === anonymousKey) return;
-    mergeRecentWorkStorageKeys(anonymousKey, targetKey, { removeSource: true });
-  }
-
-  function mergeRecentWorkStorageKeys(sourceKey, targetKey, options = {}) {
-    if (!sourceKey || !targetKey || sourceKey === targetKey) return;
-    try {
-      const source = JSON.parse(localStorage.getItem(sourceKey) || "[]");
-      const target = JSON.parse(localStorage.getItem(targetKey) || "[]");
-      if (!Array.isArray(source) || !source.length) return;
-      const merged = new Map();
-      [...target, ...source].forEach((item) => {
-        if (!item?.id) return;
-        const key = getRemoteSessionId(item) || item.id;
-        const prev = merged.get(key);
-        if (!prev || Number(item.updatedAt || 0) >= Number(prev.updatedAt || 0)) merged.set(key, item);
-      });
-      localStorage.setItem(targetKey, JSON.stringify(sortRecentWorkItems(Array.from(merged.values()))));
-      if (options.removeSource) localStorage.removeItem(sourceKey);
-    } catch {}
+      const token = String(data.token || "").trim();
+      if (!token) return "";
+      if (Date.now() - Number(data.savedAt || 0) > SESSION_TOKEN_CACHE_TTL_MS) return "";
+      return token;
+    } catch { return ""; }
   }
 
   function isEmbeddedInIframe() {
@@ -294,6 +224,14 @@
     const style = document.createElement("style");
     style.id = "ds-one-agent-runtime-style";
     style.textContent = `
+      .prompt-card.ds-home-empty textarea {
+        height: 24px !important;
+        min-height: 24px !important;
+        overflow-y: hidden !important;
+      }
+      .prompt-card.ds-home-empty {
+        grid-template-rows: auto auto;
+      }
       .home-stage.ds-agent-mode {
         justify-content: stretch;
         align-items: stretch;
@@ -1134,7 +1072,10 @@
     });
 
     state.homeSendBtn?.addEventListener("click", submitFromHome);
-    state.homePromptInput?.addEventListener("input", () => resizeTextarea(state.homePromptInput));
+    state.homePromptInput?.addEventListener("input", () => {
+      syncHomePromptEmptyClass();
+      resizeTextarea(state.homePromptInput);
+    });
     state.homePromptInput?.addEventListener("keydown", (event) => {
       if (!isPlainEnterSubmitEvent(event)) return;
       event.preventDefault();
@@ -1201,12 +1142,13 @@
       window.setTimeout(() => state.agentMessageInput?.focus(), 60);
     } else {
       // 대화 화면에서 홈으로 돌아올 때 숨겨진 textarea를 측정해 생긴 inline height를 제거합니다.
-      // 이 처리가 없으면 새 대화 버튼을 한 번 더 누를 때 홈 input 높이가 달라질 수 있습니다.
-      resetHomePromptVisualState();
+      // 빈 홈 input은 첫 접속 화면과 동일한 CSS 기본 높이를 항상 유지합니다.
+      normalizeHomeComposerLayout();
       window.requestAnimationFrame(() => {
-        resetHomePromptVisualState();
+        normalizeHomeComposerLayout();
         state.homePromptInput?.focus();
       });
+      window.setTimeout(() => normalizeHomeComposerLayout(), 80);
     }
   }
 
@@ -1221,6 +1163,7 @@
     if (state.homePromptInput) {
       state.homePromptInput.value = "";
       resetTextareaVisualState(state.homePromptInput);
+      syncHomePromptEmptyClass();
     }
     handleAgentSubmit();
   }
@@ -1235,6 +1178,7 @@
   function setHomeInput(value) {
     if (!state.homePromptInput) return;
     state.homePromptInput.value = String(value || "");
+    syncHomePromptEmptyClass();
     resizeTextarea(state.homePromptInput);
     window.setTimeout(() => state.homePromptInput?.focus(), 30);
   }
@@ -1257,10 +1201,13 @@
     if (state.homePromptInput) {
       state.homePromptInput.value = "";
       resetTextareaVisualState(state.homePromptInput);
+      syncHomePromptEmptyClass();
     }
     sessionStorage.removeItem(getLocalHistoryKey());
     renderRecentWorkList();
-    if (currentMode === "home") resetHomePromptVisualState();
+    normalizeHomeComposerLayout();
+    window.requestAnimationFrame(() => normalizeHomeComposerLayout());
+    window.setTimeout(() => normalizeHomeComposerLayout(), 80);
     if (shouldShowToast) showToast("새 대화를 시작했습니다.");
   }
 
@@ -1326,8 +1273,9 @@
       state.agentMessageInput?.focus();
       return;
     }
-    if (!sessionToken) {
-      addMessage("bot", "그룹웨어 SSO 인증 정보가 없습니다. 그룹웨어 버튼을 통해 다시 접속해 주세요.");
+    const activeToken = await ensureValidSession({ silent: false });
+    if (!activeToken) {
+      addMessage("bot", "세션 갱신이 필요합니다. 기존 채팅 기록은 유지됩니다. 그룹웨어의 DS ONE 버튼으로 다시 접속한 뒤 이어서 사용해 주세요.");
       return;
     }
 
@@ -1373,16 +1321,72 @@
     return `${message}\n\n[첨부 파일]\n${lines.join("\n")}`;
   }
 
+  async function ensureValidSession(options = {}) {
+    if (!sessionToken) sessionToken = readSsoSessionToken();
+    const payload = decodeSessionTokenPayload(sessionToken);
+    if (payload) {
+      applyIdentityFromPayload(payload);
+      persistLastIdentity(payload);
+    }
+    if (!sessionToken) return "";
+
+    const expMs = Number(payload?.exp || 0) * 1000;
+    const now = Date.now();
+    const shouldRefresh = !expMs || expMs - now <= SESSION_REFRESH_LEEWAY_MS;
+    if (!shouldRefresh) return sessionToken;
+
+    const refreshed = await refreshSessionToken(options);
+    if (refreshed) return refreshed;
+    if (expMs && expMs > now) return sessionToken;
+    return "";
+  }
+
+  async function refreshSessionToken(options = {}) {
+    if (!sessionToken) return "";
+    if (sessionRefreshPromise) return await sessionRefreshPromise;
+    const tokenForRefresh = sessionToken;
+    sessionRefreshPromise = (async () => {
+      try {
+        const res = await fetch(AGENT_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenForRefresh}` },
+          body: JSON.stringify({ action: "refresh_session" }),
+        });
+        const data = await readApiResponse(res);
+        const nextToken = String(data.token || data.sessionToken || "").trim();
+        if (!nextToken) return "";
+        storeSessionToken(nextToken, { persistent: true });
+        const profile = decodeSessionTokenPayload(nextToken) || data;
+        applyHeaderProfile(profile);
+        migrateAnonymousRecentWorkToCurrentUser();
+        renderRecentWorkList();
+        scheduleRemoteRecentRefresh(80);
+        return nextToken;
+      } catch (error) {
+        // 기록은 그대로 유지하고 새 요청이 필요할 때만 재인증을 안내합니다.
+        void error;
+        return "";
+      } finally {
+        sessionRefreshPromise = null;
+      }
+    })();
+    return await sessionRefreshPromise;
+  }
+
   async function requestAgentAnswer(message, history) {
+    const activeToken = await ensureValidSession({ silent: false });
+    if (!activeToken) throw new Error("세션 갱신이 필요합니다. 그룹웨어 DS ONE 버튼으로 다시 접속해 주세요.");
     const res = await fetch(AGENT_API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionToken}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
       body: JSON.stringify({ message, stream: false, task: normalizeTask(currentTask), history }),
     });
     return readApiResponse(res);
   }
 
   async function requestFileAnalysis(message, history) {
+    const activeToken = await ensureValidSession({ silent: false });
+    if (!activeToken) throw new Error("세션 갱신이 필요합니다. 그룹웨어 DS ONE 버튼으로 다시 접속해 주세요.");
     const formData = new FormData();
     formData.append("message", message);
     formData.append("stream", "false");
@@ -1390,7 +1394,7 @@
     const normalizedTask = normalizeTask(currentTask);
     if (normalizedTask) formData.append("task", normalizedTask);
     selectedFiles.forEach((file) => formData.append("files", file, file.name));
-    const res = await fetch(FILE_API_URL, { method: "POST", headers: { Authorization: `Bearer ${sessionToken}` }, body: formData });
+    const res = await fetch(FILE_API_URL, { method: "POST", headers: { Authorization: `Bearer ${activeToken}` }, body: formData });
     return readApiResponse(res);
   }
 
@@ -1398,14 +1402,7 @@
     const text = await res.text();
     let data = {};
     try { data = text ? JSON.parse(text) : {}; } catch { data = { ok: false, message: text }; }
-    if (!res.ok) {
-      const message = data.message || data.error || `HTTP ${res.status}`;
-      if (/인증 토큰 만료|인증 토큰 없음|token expired|jwt expired/i.test(String(message || ""))) {
-        clearExpiredSessionTokenOnly();
-        throw new Error("그룹웨어 인증 시간이 만료되었습니다. 저장된 채팅 기록은 유지되며, 새 요청은 그룹웨어에서 다시 접속한 뒤 이용해 주세요.");
-      }
-      throw new Error(message);
-    }
+    if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`);
     return data;
   }
 
@@ -1702,7 +1699,7 @@
   }
 
   function getStorageUserKey() {
-    if (!currentEmpNo && !currentLoginId) restoreCachedAuthIdentity();
+    if (!currentEmpNo && !currentLoginId) restoreCachedIdentity();
     return String(currentEmpNo || currentLoginId || "anonymous").replace(/[^a-zA-Z0-9_.:-]/g, "_");
   }
 
@@ -2329,13 +2326,15 @@
   }
 
   function scheduleRemoteRecentRefresh(delay = REMOTE_SESSION_REFRESH_DEBOUNCE_MS) {
-    if (!sessionToken) return;
+    if (!sessionToken && !readPersistedSessionToken()) return;
     window.clearTimeout(recentRemoteRefreshTimer);
     recentRemoteRefreshTimer = window.setTimeout(() => refreshRecentWorkFromServer(), delay);
   }
 
   async function refreshRecentWorkFromServer() {
-    if (!sessionToken || recentRemoteRefreshInProgress) return;
+    if (recentRemoteRefreshInProgress) return;
+    const activeToken = await ensureValidSession({ silent: true });
+    if (!activeToken) return;
     recentRemoteRefreshInProgress = true;
     try {
       const data = await agentStateRequest({ action: "list_sessions", limit: REMOTE_SESSION_LIST_LIMIT });
@@ -2415,9 +2414,12 @@
   }
 
   async function agentStateRequest(payload) {
+    const action = String(payload?.action || "");
+    const activeToken = action === "refresh_session" ? sessionToken : await ensureValidSession({ silent: true });
+    if (!activeToken) throw new Error("세션 갱신이 필요합니다.");
     const res = await fetch(AGENT_API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionToken}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
       body: JSON.stringify(payload || {}),
     });
     return readApiResponse(res);
@@ -2533,9 +2535,24 @@
     textarea.closest(".prompt-card")?.classList.remove("is-scrollable");
   }
 
+  function syncHomePromptEmptyClass() {
+    const card = state.homePromptInput?.closest(".prompt-card");
+    if (!card || !state.homePromptInput) return;
+    const empty = !String(state.homePromptInput.value || "").trim();
+    card.classList.toggle("ds-home-empty", empty);
+    if (empty) card.classList.remove("is-scrollable");
+  }
+
+  function normalizeHomeComposerLayout() {
+    if (!state.homePromptInput) return;
+    if (!String(state.homePromptInput.value || "").trim()) {
+      resetTextareaVisualState(state.homePromptInput);
+    }
+    syncHomePromptEmptyClass();
+  }
+
   function resetHomePromptVisualState() {
-    if (!state.homePromptInput || String(state.homePromptInput.value || "").trim()) return;
-    resetTextareaVisualState(state.homePromptInput);
+    normalizeHomeComposerLayout();
   }
 
   function isElementMeasurable(element) {
@@ -2581,36 +2598,79 @@
   }
 
   async function bootstrapProfile() {
-    if (!sessionToken) {
-      restoreCachedAuthIdentity();
+    const activeToken = await ensureValidSession({ silent: true });
+    if (!activeToken) {
+      restoreCachedIdentity();
+      migrateAnonymousRecentWorkToCurrentUser();
       renderRecentWorkList();
       return;
     }
     try {
-      const res = await fetch(AGENT_API_URL, { method: "GET", headers: { Authorization: `Bearer ${sessionToken}` } });
+      const res = await fetch(AGENT_API_URL, { method: "GET", headers: { Authorization: `Bearer ${activeToken}` } });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.ok) {
         currentLoginId = data.loginId || data.login_id || currentLoginId;
         currentEmpNo = data.empNo || data.emp_no || data.rpaAuthEmpNo || currentEmpNo;
+        persistLastIdentity(data);
+        migrateAnonymousRecentWorkToCurrentUser();
         applyHeaderProfile(data);
-        cacheAuthIdentity(data);
-        migrateAnonymousRecentWorkIfNeeded();
         renderRecentWorkList();
         scheduleRemoteRecentRefresh(50);
-        return;
-      }
-      if (/인증 토큰 만료|token expired|jwt expired/i.test(String(data?.message || data?.error || ""))) {
-        clearExpiredSessionTokenOnly();
       }
     } catch {}
-    restoreCachedAuthIdentity();
-    renderRecentWorkList();
   }
 
-  function clearExpiredSessionTokenOnly() {
-    try { sessionStorage.removeItem(SESSION_TOKEN_KEY); } catch {}
-    try { localStorage.removeItem(AUTH_TOKEN_CACHE_KEY); } catch {}
-    sessionToken = "";
+  function applyIdentityFromPayload(profile) {
+    if (!profile) return;
+    currentLoginId = String(profile.loginId || profile.login_id || currentLoginId || "").trim();
+    currentEmpNo = String(profile.empNo || profile.emp_no || profile.rpaAuthEmpNo || currentEmpNo || "").trim();
+  }
+
+  function persistLastIdentity(profile) {
+    if (!profile) return;
+    const identity = {
+      empNo: String(profile.empNo || profile.emp_no || profile.rpaAuthEmpNo || currentEmpNo || "").trim(),
+      loginId: String(profile.loginId || profile.login_id || currentLoginId || "").trim(),
+      displayName: getDisplayName(profile),
+      savedAt: Date.now(),
+    };
+    if (!identity.empNo && !identity.loginId) return;
+    try { localStorage.setItem(LAST_IDENTITY_KEY, JSON.stringify(identity)); } catch {}
+  }
+
+  function getCachedIdentity() {
+    try {
+      const raw = localStorage.getItem(LAST_IDENTITY_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (Date.now() - Number(data.savedAt || 0) > LAST_IDENTITY_CACHE_TTL_MS) return null;
+      return data;
+    } catch { return null; }
+  }
+
+  function restoreCachedIdentity() {
+    const cached = getCachedIdentity();
+    if (!cached) return;
+    currentEmpNo = String(cached.empNo || currentEmpNo || "").trim();
+    currentLoginId = String(cached.loginId || currentLoginId || "").trim();
+    if (cached.displayName) applyHeaderProfile({ displayName: cached.displayName });
+  }
+
+  function migrateAnonymousRecentWorkToCurrentUser() {
+    const userKey = getStorageUserKey();
+    if (!userKey || userKey === "anonymous") return;
+    const anonymousKey = RECENT_WORK_PREFIX + "anonymous";
+    const targetKey = getRecentWorkKey();
+    if (anonymousKey === targetKey) return;
+    try {
+      const raw = localStorage.getItem(anonymousKey);
+      if (!raw) return;
+      const anonymousItems = JSON.parse(raw);
+      if (!Array.isArray(anonymousItems) || !anonymousItems.length) return;
+      const merged = sortRecentWorkItems([...(loadRecentWorkItems() || []), ...anonymousItems]);
+      localStorage.setItem(targetKey, JSON.stringify(merged));
+      localStorage.removeItem(anonymousKey);
+    } catch {}
   }
 
   function cacheDisplayName(displayName) {
