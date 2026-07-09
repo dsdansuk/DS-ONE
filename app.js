@@ -225,8 +225,8 @@
     style.id = "ds-one-agent-runtime-style";
     style.textContent = `
       .prompt-card.ds-home-empty textarea {
-        height: 28px !important;
-        min-height: 28px !important;
+        height: 46px !important;
+        min-height: 46px !important;
         overflow-y: hidden !important;
       }
       .prompt-card.ds-home-empty {
