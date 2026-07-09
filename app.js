@@ -13,6 +13,10 @@
   const AGENT_API_URL = ENDPOINTS.agentApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/agent-api";
   const FILE_API_URL = ENDPOINTS.fileApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api";
   const SESSION_TOKEN_KEY = "sso_session_token";
+  const AUTH_TOKEN_CACHE_KEY = STORAGE.authTokenCacheKey || "ds_one_platform_sso_token_cache_v1";
+  const AUTH_IDENTITY_CACHE_KEY = STORAGE.authIdentityCacheKey || "ds_one_platform_auth_identity_v1";
+  const AUTH_IDENTITY_CACHE_TTL_MS = Number(STORAGE.authIdentityCacheTtlMs || 30 * 24 * 60 * 60 * 1000);
+  const AUTH_TOKEN_REFRESH_SKEW_MS = Number(STORAGE.authTokenRefreshSkewMs || 30 * 1000);
   const DISPLAY_NAME_CACHE_KEY = STORAGE.displayNameCacheKey || "ds_chatbot_last_display_name_v1";
   const DISPLAY_NAME_CACHE_TTL_MS = Number(STORAGE.displayNameCacheTtlMs || 7 * 24 * 60 * 60 * 1000);
   const LOCAL_HISTORY_PREFIX = "ds_one_platform_recent_messages_v2_";
@@ -76,11 +80,14 @@
 
   function init() {
     sessionToken = readSsoSessionToken();
+    const cachedIdentity = restoreCachedAuthIdentity();
     const tokenProfile = decodeSessionTokenPayload(sessionToken);
     if (tokenProfile) {
-      currentLoginId = tokenProfile.loginId || tokenProfile.login_id || "";
-      currentEmpNo = tokenProfile.empNo || tokenProfile.emp_no || "";
-      applyHeaderProfile(tokenProfile);
+      currentLoginId = tokenProfile.loginId || tokenProfile.login_id || currentLoginId || "";
+      currentEmpNo = tokenProfile.empNo || tokenProfile.emp_no || currentEmpNo || "";
+      applyHeaderProfile({ ...cachedIdentity, ...tokenProfile });
+      cacheAuthIdentity({ ...cachedIdentity, ...tokenProfile });
+      migrateAnonymousRecentWorkIfNeeded();
     }
 
     if (isEmbeddedInIframe()) {
@@ -105,13 +112,124 @@
     const url = new URL(window.location.href);
     const tokenFromUrl = String(url.searchParams.get("token") || "").trim();
     if (tokenFromUrl) {
-      sessionStorage.setItem(SESSION_TOKEN_KEY, tokenFromUrl);
+      storeSessionToken(tokenFromUrl);
       url.searchParams.delete("token");
       url.searchParams.delete("open");
       window.history.replaceState({}, document.title, url.toString());
-      return tokenFromUrl;
+      return isUsableSessionToken(tokenFromUrl) ? tokenFromUrl : "";
     }
-    return sessionStorage.getItem(SESSION_TOKEN_KEY) || "";
+
+    const sessionValue = String(sessionStorage.getItem(SESSION_TOKEN_KEY) || "").trim();
+    if (sessionValue) {
+      cacheIdentityFromToken(sessionValue);
+      if (isUsableSessionToken(sessionValue)) return sessionValue;
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    }
+
+    const cachedToken = readCachedSessionToken();
+    if (cachedToken) {
+      sessionStorage.setItem(SESSION_TOKEN_KEY, cachedToken);
+      return cachedToken;
+    }
+
+    return "";
+  }
+
+  function storeSessionToken(token) {
+    const value = String(token || "").trim();
+    if (!value) return;
+    sessionStorage.setItem(SESSION_TOKEN_KEY, value);
+    cacheIdentityFromToken(value);
+    try {
+      const expMs = getSessionTokenExpiryMs(value);
+      if (!expMs || expMs <= Date.now()) return;
+      localStorage.setItem(AUTH_TOKEN_CACHE_KEY, JSON.stringify({ token: value, expMs, savedAt: Date.now() }));
+    } catch {}
+  }
+
+  function readCachedSessionToken() {
+    try {
+      const raw = localStorage.getItem(AUTH_TOKEN_CACHE_KEY);
+      if (!raw) return "";
+      const data = JSON.parse(raw);
+      const token = String(data.token || "").trim();
+      const expMs = Number(data.expMs || getSessionTokenExpiryMs(token) || 0);
+      if (!token || !expMs || expMs <= Date.now() + AUTH_TOKEN_REFRESH_SKEW_MS) {
+        localStorage.removeItem(AUTH_TOKEN_CACHE_KEY);
+        return "";
+      }
+      cacheIdentityFromToken(token);
+      return token;
+    } catch {
+      try { localStorage.removeItem(AUTH_TOKEN_CACHE_KEY); } catch {}
+      return "";
+    }
+  }
+
+  function isUsableSessionToken(token) {
+    const value = String(token || "").trim();
+    if (!value) return false;
+    const expMs = getSessionTokenExpiryMs(value);
+    return !expMs || expMs > Date.now() + AUTH_TOKEN_REFRESH_SKEW_MS;
+  }
+
+  function getSessionTokenExpiryMs(token) {
+    const payload = decodeSessionTokenPayload(token);
+    const exp = Number(payload?.exp || 0);
+    return Number.isFinite(exp) && exp > 0 ? exp * 1000 : 0;
+  }
+
+  function cacheIdentityFromToken(token) {
+    const payload = decodeSessionTokenPayload(token);
+    if (payload) cacheAuthIdentity(payload);
+  }
+
+  function cacheAuthIdentity(profile) {
+    const loginId = String(profile?.loginId || profile?.login_id || currentLoginId || "").trim();
+    const empNo = String(profile?.empNo || profile?.emp_no || currentEmpNo || "").trim();
+    const displayName = getDisplayName(profile) || getCachedDisplayName() || "";
+    if (!loginId && !empNo) return;
+    try {
+      localStorage.setItem(AUTH_IDENTITY_CACHE_KEY, JSON.stringify({ loginId, empNo, displayName, savedAt: Date.now() }));
+    } catch {}
+  }
+
+  function restoreCachedAuthIdentity() {
+    try {
+      const raw = localStorage.getItem(AUTH_IDENTITY_CACHE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (Date.now() - Number(data.savedAt || 0) > AUTH_IDENTITY_CACHE_TTL_MS) return null;
+      currentLoginId = String(data.loginId || currentLoginId || "").trim();
+      currentEmpNo = String(data.empNo || currentEmpNo || "").trim();
+      if (data.displayName) applyHeaderProfile({ displayName: data.displayName });
+      return data;
+    } catch { return null; }
+  }
+
+  function migrateAnonymousRecentWorkIfNeeded() {
+    const targetKey = getRecentWorkKey();
+    const anonymousKey = RECENT_WORK_PREFIX + "anonymous";
+    if (!targetKey || targetKey === anonymousKey) return;
+    mergeRecentWorkStorageKeys(anonymousKey, targetKey, { removeSource: true });
+  }
+
+  function mergeRecentWorkStorageKeys(sourceKey, targetKey, options = {}) {
+    if (!sourceKey || !targetKey || sourceKey === targetKey) return;
+    try {
+      const source = JSON.parse(localStorage.getItem(sourceKey) || "[]");
+      const target = JSON.parse(localStorage.getItem(targetKey) || "[]");
+      if (!Array.isArray(source) || !source.length) return;
+      const merged = new Map();
+      [...target, ...source].forEach((item) => {
+        if (!item?.id) return;
+        const key = getRemoteSessionId(item) || item.id;
+        const prev = merged.get(key);
+        if (!prev || Number(item.updatedAt || 0) >= Number(prev.updatedAt || 0)) merged.set(key, item);
+      });
+      localStorage.setItem(targetKey, JSON.stringify(sortRecentWorkItems(Array.from(merged.values()))));
+      if (options.removeSource) localStorage.removeItem(sourceKey);
+    } catch {}
   }
 
   function isEmbeddedInIframe() {
@@ -1280,7 +1398,14 @@
     const text = await res.text();
     let data = {};
     try { data = text ? JSON.parse(text) : {}; } catch { data = { ok: false, message: text }; }
-    if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`);
+    if (!res.ok) {
+      const message = data.message || data.error || `HTTP ${res.status}`;
+      if (/인증 토큰 만료|인증 토큰 없음|token expired|jwt expired/i.test(String(message || ""))) {
+        clearExpiredSessionTokenOnly();
+        throw new Error("그룹웨어 인증 시간이 만료되었습니다. 저장된 채팅 기록은 유지되며, 새 요청은 그룹웨어에서 다시 접속한 뒤 이용해 주세요.");
+      }
+      throw new Error(message);
+    }
     return data;
   }
 
@@ -1577,6 +1702,7 @@
   }
 
   function getStorageUserKey() {
+    if (!currentEmpNo && !currentLoginId) restoreCachedAuthIdentity();
     return String(currentEmpNo || currentLoginId || "anonymous").replace(/[^a-zA-Z0-9_.:-]/g, "_");
   }
 
@@ -2455,7 +2581,11 @@
   }
 
   async function bootstrapProfile() {
-    if (!sessionToken) return;
+    if (!sessionToken) {
+      restoreCachedAuthIdentity();
+      renderRecentWorkList();
+      return;
+    }
     try {
       const res = await fetch(AGENT_API_URL, { method: "GET", headers: { Authorization: `Bearer ${sessionToken}` } });
       const data = await res.json().catch(() => null);
@@ -2463,10 +2593,24 @@
         currentLoginId = data.loginId || data.login_id || currentLoginId;
         currentEmpNo = data.empNo || data.emp_no || data.rpaAuthEmpNo || currentEmpNo;
         applyHeaderProfile(data);
+        cacheAuthIdentity(data);
+        migrateAnonymousRecentWorkIfNeeded();
         renderRecentWorkList();
         scheduleRemoteRecentRefresh(50);
+        return;
+      }
+      if (/인증 토큰 만료|token expired|jwt expired/i.test(String(data?.message || data?.error || ""))) {
+        clearExpiredSessionTokenOnly();
       }
     } catch {}
+    restoreCachedAuthIdentity();
+    renderRecentWorkList();
+  }
+
+  function clearExpiredSessionTokenOnly() {
+    try { sessionStorage.removeItem(SESSION_TOKEN_KEY); } catch {}
+    try { localStorage.removeItem(AUTH_TOKEN_CACHE_KEY); } catch {}
+    sessionToken = "";
   }
 
   function cacheDisplayName(displayName) {
