@@ -46,6 +46,8 @@
   let remoteSessionCreateConversationId = "";
   let chatSearchDialog = null;
   let chatSearchDebounceTimer = 0;
+  let chatSearchRequestSeq = 0;
+  const CHAT_SEARCH_DEBOUNCE_MS = 420;
 
   const state = {
     homePanel: null,
@@ -686,6 +688,21 @@
       .ds-search-close > * { pointer-events: none; }
       .ds-dialog-close:hover,
       .ds-search-close:hover { color: #1d4ed8; background: #f1f6ff; }
+      .ds-search-close {
+        font-size: 0;
+        line-height: 0;
+      }
+      .ds-search-close svg {
+        width: 15px;
+        height: 15px;
+        display: block;
+        flex: 0 0 auto;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
       .ds-dialog-field { margin-top: 20px; }
       .ds-dialog-field label {
         display: block;
@@ -1675,7 +1692,12 @@
             <h2 class="ds-search-title">채팅 검색</h2>
             <p class="ds-search-desc">제목과 대화 내용을 검색해 이전 업무 대화를 다시 열 수 있습니다.</p>
           </div>
-          <button class="ds-search-close" type="button" aria-label="닫기">×</button>
+          <button class="ds-search-close" type="button" aria-label="닫기">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M7 7l10 10" />
+              <path d="M17 7 7 17" />
+            </svg>
+          </button>
         </div>
         <div class="ds-search-input-wrap">
           <input class="ds-search-input" type="search" placeholder="채팅 제목 또는 내용을 검색하세요" autocomplete="off">
@@ -1691,8 +1713,15 @@
     const searchNow = () => renderChatSearchResults(input.value || "");
     input.addEventListener("input", () => {
       window.clearTimeout(chatSearchDebounceTimer);
-      renderChatSearchResults(input.value || "", { localOnly: true });
-      chatSearchDebounceTimer = window.setTimeout(searchNow, 220);
+      chatSearchRequestSeq += 1;
+      const nextQuery = input.value || "";
+      const normalized = normalizeSearchQuery(nextQuery);
+      if (!normalized) {
+        renderChatSearchResults("");
+        return;
+      }
+      setChatSearchPending("입력이 끝나면 검색합니다");
+      chatSearchDebounceTimer = window.setTimeout(searchNow, CHAT_SEARCH_DEBOUNCE_MS);
     });
     closeButton.addEventListener("click", close);
     root.addEventListener("mousedown", (event) => { if (event.target === root) close(); });
@@ -1718,16 +1747,26 @@
   async function renderChatSearchResults(query, options = {}) {
     if (!chatSearchDialog?.results) return;
     const q = normalizeSearchQuery(query);
+    const requestSeq = ++chatSearchRequestSeq;
     const localResults = searchLocalConversations(q);
-    setChatSearchResultNodes(localResults, q, { loading: Boolean(q && sessionToken && !options.localOnly) });
+
+    if (q && sessionToken && !options.localOnly) {
+      setChatSearchPending("검색 중입니다");
+    } else {
+      setChatSearchResultNodes(localResults, q);
+    }
+
     if (!sessionToken || options.localOnly) return;
+
     try {
       const data = await agentStateRequest({ action: "search_sessions", query: q, limit: REMOTE_SESSION_LIST_LIMIT });
+      if (requestSeq !== chatSearchRequestSeq) return;
       const remoteResults = Array.isArray(data.sessions) ? data.sessions.map(remoteSessionToRecentItem) : [];
       const merged = mergeConversationResults(localResults, remoteResults);
       setChatSearchResultNodes(merged, q);
     } catch {
-      if (q) setChatSearchResultNodes(localResults, q);
+      if (requestSeq !== chatSearchRequestSeq) return;
+      setChatSearchResultNodes(localResults, q);
     }
   }
 
@@ -1768,6 +1807,18 @@
     return sortRecentWorkItems(Array.from(map.values()));
   }
 
+  function setChatSearchPending(label = "검색 중입니다") {
+    const results = chatSearchDialog?.results;
+    if (!results) return;
+    results.innerHTML = `
+      <div class="ds-search-loading">
+        <span>${escapeHtml(label)}</span>
+        <span class="ds-search-dot"></span>
+        <span class="ds-search-dot"></span>
+        <span class="ds-search-dot"></span>
+      </div>`;
+  }
+
   function setChatSearchResultNodes(items, query, options = {}) {
     const results = chatSearchDialog?.results;
     if (!results) return;
@@ -1802,12 +1853,6 @@
       });
       results.appendChild(button);
     });
-    if (isLoading) {
-      const loading = document.createElement("div");
-      loading.className = "ds-search-loading-inline";
-      loading.innerHTML = `<span>서버 기록 확인 중</span><span class="ds-search-dot"></span><span class="ds-search-dot"></span><span class="ds-search-dot"></span>`;
-      results.appendChild(loading);
-    }
   }
 
   function normalizeSearchQuery(value) {
