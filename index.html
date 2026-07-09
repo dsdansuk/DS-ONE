@@ -321,6 +321,13 @@
       if (!promptTextarea) return;
 
       const promptCard = promptTextarea.closest(".prompt-card");
+      if (!String(promptTextarea.value || "").trim()) {
+        promptTextarea.style.height = "";
+        promptTextarea.style.overflowY = "hidden";
+        promptCard?.classList.remove("is-scrollable");
+        return;
+      }
+
       const styles = getComputedStyle(promptTextarea);
       const lineHeight = Number.parseFloat(styles.lineHeight) || 24;
       const maxHeight = Math.max(lineHeight * 3, Math.min(window.innerHeight * 0.24, 168));
@@ -387,7 +394,7 @@
     resizePromptTextarea();
     fitHomeToViewport();
   </script>
-  <script src="app.js?v=20260708_v50"></script>
+  <script src="app.js?v=20260709_v53"></script>
 </body>
 </html>
 

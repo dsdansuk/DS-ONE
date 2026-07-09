@@ -225,11 +225,12 @@
     style.id = "ds-one-agent-runtime-style";
     style.textContent = `
       .prompt-card.ds-home-empty textarea {
-        height: 24px !important;
-        min-height: 24px !important;
+        height: 28px !important;
+        min-height: 28px !important;
         overflow-y: hidden !important;
       }
       .prompt-card.ds-home-empty {
+        min-height: clamp(132px, 14.8dvh, 158px);
         grid-template-rows: auto auto;
       }
       .home-stage.ds-agent-mode {

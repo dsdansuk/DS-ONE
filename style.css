@@ -485,7 +485,7 @@
 
     .prompt-card {
       width: min(760px, 100%);
-      min-height: clamp(104px, 12.2dvh, 132px);
+      min-height: clamp(132px, 14.8dvh, 158px);
       display: grid;
       grid-template-rows: auto auto;
       gap: 10px;
@@ -500,8 +500,8 @@
 
     .prompt-card textarea {
       width: 100%;
-      height: 24px;
-      min-height: 24px;
+      height: 28px;
+      min-height: 28px;
       max-height: min(24dvh, 168px);
       resize: none;
       overflow-y: hidden;
