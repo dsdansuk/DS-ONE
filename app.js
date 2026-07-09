@@ -667,16 +667,23 @@
       .ds-search-close {
         width: 34px;
         height: 34px;
-        display: grid;
-        place-items: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 34px;
+        padding: 0;
         border: 1px solid #dce7f7;
         border-radius: 12px;
         background: rgba(255,255,255,.84);
         color: #64748b;
         font-size: 20px;
+        line-height: 1;
         font-weight: 800;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         cursor: pointer;
       }
+      .ds-dialog-close > *,
+      .ds-search-close > * { pointer-events: none; }
       .ds-dialog-close:hover,
       .ds-search-close:hover { color: #1d4ed8; background: #f1f6ff; }
       .ds-dialog-field { margin-top: 20px; }
@@ -737,15 +744,32 @@
         background: linear-gradient(135deg, #ef4444, #fb7185);
         box-shadow: 0 10px 20px rgba(239, 68, 68, .18);
       }
-      .ds-search-card { width: min(720px, calc(100vw - 36px)); padding: 0; }
-      .ds-search-head { padding: 22px 22px 14px; }
-      .ds-search-input-wrap { padding: 0 22px 16px; }
+      .ds-search-card {
+        width: min(720px, calc(100vw - 36px));
+        height: min(680px, calc(100dvh - 48px));
+        min-height: min(560px, calc(100dvh - 48px));
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .ds-search-head {
+        flex: 0 0 auto;
+        padding: 22px 22px 14px;
+      }
+      .ds-search-input-wrap {
+        flex: 0 0 auto;
+        padding: 0 22px 16px;
+      }
       .ds-search-results {
-        max-height: min(58vh, 560px);
+        flex: 1 1 auto;
+        min-height: 0;
         overflow-y: auto;
         padding: 8px 12px 14px;
         scrollbar-width: thin;
       }
+      .ds-search-results::-webkit-scrollbar { width: 8px; }
+      .ds-search-results::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, .45); border-radius: 999px; }
+      .ds-search-results::-webkit-scrollbar-track { background: transparent; }
       .ds-search-result {
         width: 100%;
         display: grid;
@@ -792,12 +816,49 @@
       }
       .ds-search-result-time { color: #7c8aa5; font-size: 12px; font-weight: 800; }
       .ds-search-empty {
+        min-height: 220px;
         padding: 28px 18px 34px;
         color: #7c8aa5;
         text-align: center;
         font-size: 14px;
         font-weight: 750;
         line-height: 1.6;
+        display: grid;
+        place-items: center;
+      }
+      .ds-search-loading,
+      .ds-search-loading-inline {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        color: #64748b;
+        font-size: 13px;
+        font-weight: 800;
+      }
+      .ds-search-loading {
+        min-height: 220px;
+        padding: 26px 18px;
+      }
+      .ds-search-loading-inline {
+        min-height: 42px;
+        margin: 6px 10px 2px;
+        border-radius: 14px;
+        background: rgba(241, 246, 255, .72);
+      }
+      .ds-search-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: currentColor;
+        opacity: .38;
+        animation: ds-search-dot-bounce 1s ease-in-out infinite;
+      }
+      .ds-search-dot:nth-child(2) { animation-delay: .14s; }
+      .ds-search-dot:nth-child(3) { animation-delay: .28s; }
+      @keyframes ds-search-dot-bounce {
+        0%, 80%, 100% { transform: translateY(0); opacity: .32; }
+        40% { transform: translateY(-4px); opacity: .85; }
       }
       .ds-search-highlight {
         border-radius: 5px;
@@ -807,6 +868,11 @@
       }
       @media (max-width: 720px) {
         .ds-dialog-backdrop, .ds-search-backdrop { padding: 14px; }
+        .ds-search-card {
+          width: min(720px, calc(100vw - 28px));
+          height: min(620px, calc(100dvh - 28px));
+          min-height: min(500px, calc(100dvh - 28px));
+        }
         .ds-search-result { grid-template-columns: 30px minmax(0, 1fr); }
         .ds-search-result-time { display: none; }
       }
@@ -1706,10 +1772,15 @@
     const results = chatSearchDialog?.results;
     if (!results) return;
     results.innerHTML = "";
+    const isLoading = Boolean(options.loading);
     if (!items.length) {
       const empty = document.createElement("div");
-      empty.className = "ds-search-empty";
-      empty.textContent = query ? "검색 결과가 없습니다." : "아직 표시할 채팅 기록이 없습니다.";
+      empty.className = isLoading ? "ds-search-loading" : "ds-search-empty";
+      if (isLoading) {
+        empty.innerHTML = `<span>서버 채팅 기록을 검색하는 중입니다</span><span class="ds-search-dot"></span><span class="ds-search-dot"></span><span class="ds-search-dot"></span>`;
+      } else {
+        empty.textContent = query ? "검색 결과가 없습니다." : "아직 표시할 채팅 기록이 없습니다.";
+      }
       results.appendChild(empty);
       return;
     }
@@ -1731,10 +1802,10 @@
       });
       results.appendChild(button);
     });
-    if (options.loading) {
+    if (isLoading) {
       const loading = document.createElement("div");
-      loading.className = "ds-search-empty";
-      loading.textContent = "서버 채팅 기록을 함께 검색하는 중입니다.";
+      loading.className = "ds-search-loading-inline";
+      loading.innerHTML = `<span>서버 기록 확인 중</span><span class="ds-search-dot"></span><span class="ds-search-dot"></span><span class="ds-search-dot"></span>`;
       results.appendChild(loading);
     }
   }
