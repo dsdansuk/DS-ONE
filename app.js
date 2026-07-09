@@ -42,6 +42,10 @@
   let recentContextMenu = null;
   let recentRemoteRefreshTimer = 0;
   let recentRemoteRefreshInProgress = false;
+  let remoteSessionCreatePromise = null;
+  let remoteSessionCreateConversationId = "";
+  let chatSearchDialog = null;
+  let chatSearchDebounceTimer = 0;
 
   const state = {
     homePanel: null,
@@ -64,6 +68,7 @@
     profileAvatar: null,
     recentList: null,
     lowerRecentList: null,
+    searchMenuButton: null,
   };
 
   function init() {
@@ -82,6 +87,7 @@
 
     restoreCachedDisplayName();
     injectRuntimeStyles();
+    injectSearchAndDialogStyles();
     attachToExistingHome();
     createRuntimeAgentWorkspace();
     bootstrapProfile();
@@ -604,6 +610,210 @@
     document.head.appendChild(style);
   }
 
+
+  function injectSearchAndDialogStyles() {
+    if (document.getElementById("ds-one-search-dialog-style")) return;
+    const style = document.createElement("style");
+    style.id = "ds-one-search-dialog-style";
+    style.textContent = `
+      .ds-dialog-backdrop,
+      .ds-search-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 10020;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: rgba(15, 23, 42, .18);
+        backdrop-filter: blur(8px);
+      }
+      .ds-dialog-card,
+      .ds-search-card {
+        width: min(560px, calc(100vw - 36px));
+        color: #101827;
+        border: 1px solid rgba(206, 219, 238, .92);
+        border-radius: 24px;
+        background:
+          radial-gradient(circle at 96% 0%, rgba(82, 128, 255, .12), transparent 34%),
+          linear-gradient(180deg, rgba(255,255,255,.98), rgba(249,251,255,.98));
+        box-shadow: 0 26px 70px rgba(15, 23, 42, .22), inset 0 1px 0 rgba(255,255,255,.86);
+        overflow: hidden;
+      }
+      .ds-dialog-card { padding: 22px; }
+      .ds-dialog-head,
+      .ds-search-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .ds-dialog-title,
+      .ds-search-title {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1.25;
+        letter-spacing: -.04em;
+        font-weight: 900;
+      }
+      .ds-dialog-desc,
+      .ds-search-desc {
+        margin: 7px 0 0;
+        color: #64748b;
+        font-size: 14px;
+        line-height: 1.55;
+        font-weight: 650;
+      }
+      .ds-dialog-close,
+      .ds-search-close {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border: 1px solid #dce7f7;
+        border-radius: 12px;
+        background: rgba(255,255,255,.84);
+        color: #64748b;
+        font-size: 20px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .ds-dialog-close:hover,
+      .ds-search-close:hover { color: #1d4ed8; background: #f1f6ff; }
+      .ds-dialog-field { margin-top: 20px; }
+      .ds-dialog-field label {
+        display: block;
+        margin-bottom: 8px;
+        color: #475569;
+        font-size: 13px;
+        font-weight: 850;
+      }
+      .ds-dialog-input,
+      .ds-search-input {
+        width: 100%;
+        height: 50px;
+        padding: 0 15px;
+        border: 1px solid #dbe7fb;
+        border-radius: 16px;
+        background: #fff;
+        color: #0f172a;
+        font-size: 15px;
+        font-weight: 700;
+        outline: none;
+        box-shadow: 0 8px 24px rgba(30, 64, 175, .06);
+      }
+      .ds-dialog-input:focus,
+      .ds-search-input:focus {
+        border-color: #8bb6ff;
+        box-shadow: 0 0 0 4px rgba(47, 111, 237, .12), 0 10px 26px rgba(30, 64, 175, .08);
+      }
+      .ds-dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 9px;
+        margin-top: 22px;
+      }
+      .ds-dialog-btn {
+        min-width: 88px;
+        height: 42px;
+        padding: 0 16px;
+        border-radius: 14px;
+        border: 1px solid #dce7f7;
+        background: #fff;
+        color: #334155;
+        font-size: 14px;
+        font-weight: 850;
+        cursor: pointer;
+      }
+      .ds-dialog-btn:hover { background: #f8fbff; }
+      .ds-dialog-btn.primary {
+        border-color: transparent;
+        color: #fff;
+        background: linear-gradient(135deg, #2f6fed, #7da8ff);
+        box-shadow: 0 10px 20px rgba(47, 111, 237, .2);
+      }
+      .ds-dialog-btn.danger {
+        border-color: transparent;
+        color: #fff;
+        background: linear-gradient(135deg, #ef4444, #fb7185);
+        box-shadow: 0 10px 20px rgba(239, 68, 68, .18);
+      }
+      .ds-search-card { width: min(720px, calc(100vw - 36px)); padding: 0; }
+      .ds-search-head { padding: 22px 22px 14px; }
+      .ds-search-input-wrap { padding: 0 22px 16px; }
+      .ds-search-results {
+        max-height: min(58vh, 560px);
+        overflow-y: auto;
+        padding: 8px 12px 14px;
+        scrollbar-width: thin;
+      }
+      .ds-search-result {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 10px;
+        border: 0;
+        border-radius: 16px;
+        background: transparent;
+        color: #182235;
+        text-align: left;
+        cursor: pointer;
+      }
+      .ds-search-result:hover,
+      .ds-search-result:focus-visible { background: #f1f6ff; outline: none; }
+      .ds-search-result-icon {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        color: #2f6fed;
+        background: #eaf2ff;
+        font-size: 13px;
+        font-weight: 950;
+      }
+      .ds-search-result-title {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        font-size: 14px;
+        font-weight: 900;
+        letter-spacing: -.02em;
+      }
+      .ds-search-result-snippet {
+        margin-top: 3px;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 650;
+      }
+      .ds-search-result-time { color: #7c8aa5; font-size: 12px; font-weight: 800; }
+      .ds-search-empty {
+        padding: 28px 18px 34px;
+        color: #7c8aa5;
+        text-align: center;
+        font-size: 14px;
+        font-weight: 750;
+        line-height: 1.6;
+      }
+      .ds-search-highlight {
+        border-radius: 5px;
+        background: #fff3bf;
+        color: inherit;
+        font-weight: 950;
+      }
+      @media (max-width: 720px) {
+        .ds-dialog-backdrop, .ds-search-backdrop { padding: 14px; }
+        .ds-search-result { grid-template-columns: 30px minmax(0, 1fr); }
+        .ds-search-result-time { display: none; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function attachToExistingHome() {
     state.homePanel = document.querySelector(".home-stage");
     state.homeContent = document.querySelector(".home-fit");
@@ -684,7 +894,10 @@
           startNewConversation({ showToast: true });
           setMode("home");
         });
-      } else if (label.includes("검색") || label.includes("템플릿") || label.includes("AI 도구") || label.includes("즐겨찾기") || label.includes("휴지통")) {
+      } else if (label.includes("채팅 검색")) {
+        state.searchMenuButton = button;
+        button.addEventListener("click", () => openChatSearchDialog());
+      } else if (label.includes("템플릿") || label.includes("AI 도구") || label.includes("즐겨찾기") || label.includes("휴지통")) {
         button.addEventListener("click", () => showToast("해당 기능은 추후 연동 예정입니다."));
       }
     });
@@ -746,12 +959,12 @@
 
   function getCardTemplate(card) {
     const title = card.querySelector(".card-title")?.textContent.trim() || card.textContent.trim();
-    if (title.includes("문서 작성")) return { task: "document_draft", attach: false, template: "아래 내용을 바탕으로 업무용 문서 초안을 작성해 주세요.\n\n[작성할 내용]\n" };
-    if (title.includes("문서 요약")) return { task: "document_summary", attach: false, template: "아래 내용을 핵심만 간결하게 요약해 주세요.\n\n[요약할 내용]\n" };
-    if (title.includes("문서 번역")) return { task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" };
-    if (title.includes("엑셀 분석")) return { task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요." };
-    if (title.includes("PDF 분석")) return { task: "file_question", attach: true, template: "첨부한 파일을 기준으로 질문에 답변해 주세요.\n\n[질문]\n" };
-    if (title.includes("PPT생성")) return { task: "report_summary", attach: false, template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" };
+    if (title.includes("문서")) return { task: "document_draft", attach: false, template: "아래 내용을 바탕으로 업무용 문서 초안을 작성해 주세요.\n\n[작성할 내용]\n" };
+    if (title.includes("요약")) return { task: "document_summary", attach: false, template: "아래 내용을 핵심만 간결하게 요약해 주세요.\n\n[요약할 내용]\n" };
+    if (title.includes("번역")) return { task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" };
+    if (title.includes("엑셀")) return { task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요." };
+    if (title.includes("파일")) return { task: "file_question", attach: true, template: "첨부한 파일을 기준으로 질문에 답변해 주세요.\n\n[질문]\n" };
+    if (title.includes("보고서")) return { task: "report_summary", attach: false, template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" };
     return { task: "", attach: false, template: "" };
   }
 
@@ -807,6 +1020,8 @@
     const { showToast: shouldShowToast = false } = options || {};
     closeRecentContextMenu();
     activeConversationId = "";
+    remoteSessionCreatePromise = null;
+    remoteSessionCreateConversationId = "";
     currentTask = "";
     selectedFiles = [];
     renderFileChips();
@@ -1265,6 +1480,277 @@
     } catch {}
   }
 
+
+  function showRenameDialog(currentTitle) {
+    return new Promise((resolve) => {
+      const backdrop = createDialogShell({
+        title: "대화 이름 바꾸기",
+        desc: "최근 작업에 표시될 이름입니다. 업무 내용을 알아보기 쉽게 작성해 주세요.",
+      });
+      const field = document.createElement("div");
+      field.className = "ds-dialog-field";
+      field.innerHTML = `<label for="dsRenameInput">대화 이름</label><input id="dsRenameInput" class="ds-dialog-input" type="text" maxlength="80" autocomplete="off">`;
+      const input = field.querySelector("input");
+      input.value = String(currentTitle || "새 업무 요청");
+      backdrop.card.appendChild(field);
+
+      const actions = createDialogActions([
+        { label: "취소", value: null },
+        { label: "저장", value: "save", primary: true },
+      ]);
+      backdrop.card.appendChild(actions.wrap);
+
+      const close = (value) => {
+        backdrop.root.remove();
+        document.removeEventListener("keydown", onKeydown);
+        resolve(value);
+      };
+      const onKeydown = (event) => {
+        if (event.key === "Escape") close(null);
+        if (event.key === "Enter") {
+          event.preventDefault();
+          const title = String(input.value || "").trim();
+          if (title) close(title);
+        }
+      };
+      backdrop.closeButton.addEventListener("click", () => close(null));
+      actions.buttons[0].addEventListener("click", () => close(null));
+      actions.buttons[1].addEventListener("click", () => {
+        const title = String(input.value || "").trim();
+        if (!title) { input.focus(); return; }
+        close(title);
+      });
+      backdrop.root.addEventListener("mousedown", (event) => { if (event.target === backdrop.root) close(null); });
+      document.addEventListener("keydown", onKeydown);
+      document.body.appendChild(backdrop.root);
+      window.setTimeout(() => { input.focus(); input.select(); }, 30);
+    });
+  }
+
+  function showDeleteDialog(item) {
+    return new Promise((resolve) => {
+      const backdrop = createDialogShell({
+        title: "대화를 삭제할까요?",
+        desc: `삭제하면 최근 작업에서 사라집니다. ${String(item?.title || "이 대화")} 대화를 삭제하시겠습니까?`,
+      });
+      const actions = createDialogActions([
+        { label: "취소", value: false },
+        { label: "삭제", value: true, danger: true },
+      ]);
+      backdrop.card.appendChild(actions.wrap);
+      const close = (value) => {
+        backdrop.root.remove();
+        document.removeEventListener("keydown", onKeydown);
+        resolve(Boolean(value));
+      };
+      const onKeydown = (event) => {
+        if (event.key === "Escape") close(false);
+        if (event.key === "Enter") close(true);
+      };
+      backdrop.closeButton.addEventListener("click", () => close(false));
+      actions.buttons[0].addEventListener("click", () => close(false));
+      actions.buttons[1].addEventListener("click", () => close(true));
+      backdrop.root.addEventListener("mousedown", (event) => { if (event.target === backdrop.root) close(false); });
+      document.addEventListener("keydown", onKeydown);
+      document.body.appendChild(backdrop.root);
+      window.setTimeout(() => actions.buttons[0]?.focus(), 30);
+    });
+  }
+
+  function createDialogShell({ title, desc }) {
+    const root = document.createElement("div");
+    root.className = "ds-dialog-backdrop";
+    root.setAttribute("role", "presentation");
+    const card = document.createElement("section");
+    card.className = "ds-dialog-card";
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-modal", "true");
+    const head = document.createElement("div");
+    head.className = "ds-dialog-head";
+    const copy = document.createElement("div");
+    copy.innerHTML = `<h2 class="ds-dialog-title">${escapeHtml(title)}</h2><p class="ds-dialog-desc">${escapeHtml(desc)}</p>`;
+    const closeButton = document.createElement("button");
+    closeButton.type = "button";
+    closeButton.className = "ds-dialog-close";
+    closeButton.setAttribute("aria-label", "닫기");
+    closeButton.textContent = "×";
+    head.appendChild(copy);
+    head.appendChild(closeButton);
+    card.appendChild(head);
+    root.appendChild(card);
+    return { root, card, closeButton };
+  }
+
+  function createDialogActions(actions) {
+    const wrap = document.createElement("div");
+    wrap.className = "ds-dialog-actions";
+    const buttons = actions.map((action) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `ds-dialog-btn${action.primary ? " primary" : ""}${action.danger ? " danger" : ""}`;
+      button.textContent = action.label;
+      wrap.appendChild(button);
+      return button;
+    });
+    return { wrap, buttons };
+  }
+
+  function openChatSearchDialog() {
+    if (chatSearchDialog) {
+      chatSearchDialog.input?.focus();
+      return;
+    }
+    const root = document.createElement("div");
+    root.className = "ds-search-backdrop";
+    root.innerHTML = `
+      <section class="ds-search-card" role="dialog" aria-modal="true" aria-label="채팅 검색">
+        <div class="ds-search-head">
+          <div>
+            <h2 class="ds-search-title">채팅 검색</h2>
+            <p class="ds-search-desc">제목과 대화 내용을 검색해 이전 업무 대화를 다시 열 수 있습니다.</p>
+          </div>
+          <button class="ds-search-close" type="button" aria-label="닫기">×</button>
+        </div>
+        <div class="ds-search-input-wrap">
+          <input class="ds-search-input" type="search" placeholder="채팅 제목 또는 내용을 검색하세요" autocomplete="off">
+        </div>
+        <div class="ds-search-results" role="listbox" aria-label="채팅 검색 결과"></div>
+      </section>`;
+    const input = root.querySelector(".ds-search-input");
+    const results = root.querySelector(".ds-search-results");
+    const closeButton = root.querySelector(".ds-search-close");
+    chatSearchDialog = { root, input, results };
+
+    const close = () => closeChatSearchDialog();
+    const searchNow = () => renderChatSearchResults(input.value || "");
+    input.addEventListener("input", () => {
+      window.clearTimeout(chatSearchDebounceTimer);
+      renderChatSearchResults(input.value || "", { localOnly: true });
+      chatSearchDebounceTimer = window.setTimeout(searchNow, 220);
+    });
+    closeButton.addEventListener("click", close);
+    root.addEventListener("mousedown", (event) => { if (event.target === root) close(); });
+    root.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") close();
+      if (event.key === "Enter") {
+        const first = results.querySelector(".ds-search-result");
+        if (first) { event.preventDefault(); first.click(); }
+      }
+    });
+    document.body.appendChild(root);
+    renderChatSearchResults("");
+    window.setTimeout(() => input.focus(), 40);
+  }
+
+  function closeChatSearchDialog() {
+    if (!chatSearchDialog) return;
+    chatSearchDialog.root.remove();
+    chatSearchDialog = null;
+    window.clearTimeout(chatSearchDebounceTimer);
+  }
+
+  async function renderChatSearchResults(query, options = {}) {
+    if (!chatSearchDialog?.results) return;
+    const q = normalizeSearchQuery(query);
+    const localResults = searchLocalConversations(q);
+    setChatSearchResultNodes(localResults, q, { loading: Boolean(q && sessionToken && !options.localOnly) });
+    if (!sessionToken || options.localOnly) return;
+    try {
+      const data = await agentStateRequest({ action: "search_sessions", query: q, limit: REMOTE_SESSION_LIST_LIMIT });
+      const remoteResults = Array.isArray(data.sessions) ? data.sessions.map(remoteSessionToRecentItem) : [];
+      const merged = mergeConversationResults(localResults, remoteResults);
+      setChatSearchResultNodes(merged, q);
+    } catch {
+      if (q) setChatSearchResultNodes(localResults, q);
+    }
+  }
+
+  function searchLocalConversations(query) {
+    const items = loadRecentWorkItems();
+    if (!query) return items.slice(0, MAX_RECENT_WORK);
+    const q = query.toLowerCase();
+    return items.filter((item) => {
+      const haystack = [item.title, item.preview, ...(Array.isArray(item.messages) ? item.messages.map((m) => m.text || "") : [])]
+        .join("\n")
+        .toLowerCase();
+      return haystack.includes(q);
+    }).slice(0, MAX_RECENT_WORK);
+  }
+
+  function remoteSessionToRecentItem(session) {
+    const remoteId = String(session.id || session.sessionId || "").trim();
+    const updatedAt = Date.parse(session.display_time_at || session.last_activity_at || session.lastActivityAt || session.last_message_at || session.lastMessageAt || session.created_at || session.createdAt || session.updated_at || session.updatedAt || "") || Date.now();
+    return {
+      id: remoteId,
+      remoteId,
+      title: String(session.title || "새 업무 요청").trim() || "새 업무 요청",
+      preview: String(session.snippet || session.preview || "저장된 업무 대화").trim() || "저장된 업무 대화",
+      updatedAt,
+      isFavorite: Boolean(session.is_favorite ?? session.isFavorite),
+      task: "general",
+      messages: [],
+    };
+  }
+
+  function mergeConversationResults(localResults, remoteResults) {
+    const map = new Map();
+    [...remoteResults, ...localResults].forEach((item) => {
+      if (!item?.id) return;
+      const key = getRemoteSessionId(item) || item.id;
+      map.set(key, { ...(map.get(key) || {}), ...item });
+    });
+    return sortRecentWorkItems(Array.from(map.values()));
+  }
+
+  function setChatSearchResultNodes(items, query, options = {}) {
+    const results = chatSearchDialog?.results;
+    if (!results) return;
+    results.innerHTML = "";
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "ds-search-empty";
+      empty.textContent = query ? "검색 결과가 없습니다." : "아직 표시할 채팅 기록이 없습니다.";
+      results.appendChild(empty);
+      return;
+    }
+    items.slice(0, MAX_RECENT_WORK).forEach((item) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "ds-search-result";
+      button.innerHTML = `
+        <span class="ds-search-result-icon">${escapeHtml(getTaskIconText(item.task))}</span>
+        <span>
+          <span class="ds-search-result-title">${highlightSearchText(item.title || "새 업무 요청", query)}</span>
+          <span class="ds-search-result-snippet">${highlightSearchText(item.preview || "저장된 업무 대화", query)}</span>
+        </span>
+        <span class="ds-search-result-time">${escapeHtml(formatRelativeTime(item.updatedAt))}</span>`;
+      button.addEventListener("click", () => {
+        upsertRecentWorkItem(item);
+        closeChatSearchDialog();
+        openRecentConversation(item.id);
+      });
+      results.appendChild(button);
+    });
+    if (options.loading) {
+      const loading = document.createElement("div");
+      loading.className = "ds-search-empty";
+      loading.textContent = "서버 채팅 기록을 함께 검색하는 중입니다.";
+      results.appendChild(loading);
+    }
+  }
+
+  function normalizeSearchQuery(value) {
+    return String(value || "").replace(/\s+/g, " ").trim().slice(0, 80);
+  }
+
+  function highlightSearchText(text, query) {
+    const value = escapeHtml(String(text || ""));
+    if (!query) return value;
+    const safeQuery = escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    try { return value.replace(new RegExp(safeQuery, "ig"), (m) => `<mark class="ds-search-highlight">${m}</mark>`); }
+    catch { return value; }
+  }
+
   function ensureActiveConversation(userText, displayUserMessage) {
     if (activeConversationId) return activeConversationId;
     activeConversationId = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -1459,14 +1945,13 @@
     messages.forEach((message) => addMessage(message.role === "assistant" ? "bot" : "user", message.text || ""));
   }
 
-  function renameRecentConversation(conversationId) {
+  async function renameRecentConversation(conversationId) {
     const item = loadRecentWorkItems().find((entry) => entry.id === conversationId);
     if (!item) return;
-    const next = window.prompt("대화 이름을 입력하세요.", item.title || "새 업무 요청");
-    if (next === null) return;
-    const title = String(next || "").trim();
+    const title = await showRenameDialog(item.title || "새 업무 요청");
     if (!title) return;
-    updateRecentWorkItem(conversationId, { title, updatedAt: Date.now() });
+    // 이름 변경은 대화 활동 시간이 아니므로 최근 작업 시간을 갱신하지 않습니다.
+    updateRecentWorkItem(conversationId, { title });
     const remoteId = getRemoteSessionId(item);
     if (remoteId) void agentStateRequest({ action: "rename_session", sessionId: remoteId, title }).then(() => scheduleRemoteRecentRefresh()).catch(() => showToast("서버 대화 이름 변경에 실패했습니다."));
   }
@@ -1480,10 +1965,10 @@
     if (remoteId) void agentStateRequest({ action: "toggle_favorite", sessionId: remoteId, favorite: nextFavorite }).then(() => scheduleRemoteRecentRefresh()).catch(() => showToast("즐겨찾기 변경에 실패했습니다."));
   }
 
-  function deleteRecentConversation(conversationId) {
+  async function deleteRecentConversation(conversationId) {
     const item = loadRecentWorkItems().find((entry) => entry.id === conversationId);
     if (!item) return;
-    const ok = window.confirm(`'${item.title || "최근 작업"}' 대화를 삭제할까요?`);
+    const ok = await showDeleteDialog(item);
     if (!ok) return;
     const items = loadRecentWorkItems().filter((entry) => entry.id !== conversationId);
     saveRecentWorkItems(items);
@@ -1570,18 +2055,33 @@
 
   async function ensureRemoteSessionForActiveConversation(titleText = "") {
     if (!sessionToken || !activeConversationId) return "";
+    const conversationId = activeConversationId;
     const item = getActiveConversation();
     const existing = getRemoteSessionId(item);
     if (existing) return existing;
-    try {
-      const title = createConversationTitle(titleText || item?.title || "새 업무 요청");
-      const data = await agentStateRequest({ action: "create_session", title });
-      const remoteId = String(data?.session?.id || "").trim();
-      if (remoteId) updateRecentWorkItem(activeConversationId, { remoteId, title: data.session.title || title });
-      return remoteId;
-    } catch {
-      return "";
+    if (remoteSessionCreatePromise && remoteSessionCreateConversationId === conversationId) {
+      return await remoteSessionCreatePromise;
     }
+    remoteSessionCreateConversationId = conversationId;
+    remoteSessionCreatePromise = (async () => {
+      try {
+        const title = createConversationTitle(titleText || item?.title || "새 업무 요청");
+        const data = await agentStateRequest({ action: "create_session", title });
+        const remoteId = String(data?.session?.id || "").trim();
+        if (remoteId && activeConversationId === conversationId) {
+          updateRecentWorkItem(conversationId, { remoteId, title: data.session.title || title });
+        }
+        return remoteId;
+      } catch {
+        return "";
+      } finally {
+        if (remoteSessionCreateConversationId === conversationId) {
+          remoteSessionCreatePromise = null;
+          remoteSessionCreateConversationId = "";
+        }
+      }
+    })();
+    return await remoteSessionCreatePromise;
   }
 
   async function saveRemoteConversationMessage(role, text, metadata = {}) {
