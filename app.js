@@ -1082,7 +1082,13 @@
     if (isDocMode) {
       window.setTimeout(() => state.agentMessageInput?.focus(), 60);
     } else {
-      window.setTimeout(() => state.homePromptInput?.focus(), 60);
+      // 대화 화면에서 홈으로 돌아올 때 숨겨진 textarea를 측정해 생긴 inline height를 제거합니다.
+      // 이 처리가 없으면 새 대화 버튼을 한 번 더 누를 때 홈 input 높이가 달라질 수 있습니다.
+      resetHomePromptVisualState();
+      window.requestAnimationFrame(() => {
+        resetHomePromptVisualState();
+        state.homePromptInput?.focus();
+      });
     }
   }
 
@@ -1094,8 +1100,10 @@
     }
     setMode("doc");
     if (message) setAgentInput(message);
-    if (state.homePromptInput) state.homePromptInput.value = "";
-    resizeTextarea(state.homePromptInput);
+    if (state.homePromptInput) {
+      state.homePromptInput.value = "";
+      resetTextareaVisualState(state.homePromptInput);
+    }
     handleAgentSubmit();
   }
 
@@ -1124,12 +1132,17 @@
     selectedFiles = [];
     renderFileChips();
     clearMessages();
-    if (state.agentMessageInput) state.agentMessageInput.value = "";
-    if (state.homePromptInput) state.homePromptInput.value = "";
-    resizeTextarea(state.agentMessageInput);
-    resizeTextarea(state.homePromptInput);
+    if (state.agentMessageInput) {
+      state.agentMessageInput.value = "";
+      resetTextareaVisualState(state.agentMessageInput);
+    }
+    if (state.homePromptInput) {
+      state.homePromptInput.value = "";
+      resetTextareaVisualState(state.homePromptInput);
+    }
     sessionStorage.removeItem(getLocalHistoryKey());
     renderRecentWorkList();
+    if (currentMode === "home") resetHomePromptVisualState();
     if (shouldShowToast) showToast("새 대화를 시작했습니다.");
   }
 
@@ -2368,10 +2381,40 @@
 
   function resizeTextarea(textarea) {
     if (!textarea) return;
+    const value = String(textarea.value || "");
+    const visible = isElementMeasurable(textarea);
+
+    // 빈 입력창은 CSS 기본 높이를 사용합니다.
+    // 숨겨진 홈 화면 textarea를 측정하면 브라우저마다 scrollHeight가 달라져,
+    // 새 대화 버튼을 반복 클릭할 때 input 카드 높이가 들쭉날쭉해질 수 있습니다.
+    if (!value.trim() || !visible) {
+      resetTextareaVisualState(textarea);
+      return;
+    }
+
     textarea.style.height = "auto";
     const maxHeight = Math.min(window.innerHeight * 0.28, 180);
-    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+    const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
+    textarea.style.height = `${nextHeight}px`;
     textarea.style.overflowY = textarea.scrollHeight > maxHeight ? "auto" : "hidden";
+    textarea.closest(".prompt-card")?.classList.toggle("is-scrollable", textarea.scrollHeight > maxHeight);
+  }
+
+  function resetTextareaVisualState(textarea) {
+    if (!textarea) return;
+    textarea.style.height = "";
+    textarea.style.overflowY = "hidden";
+    textarea.closest(".prompt-card")?.classList.remove("is-scrollable");
+  }
+
+  function resetHomePromptVisualState() {
+    if (!state.homePromptInput || String(state.homePromptInput.value || "").trim()) return;
+    resetTextareaVisualState(state.homePromptInput);
+  }
+
+  function isElementMeasurable(element) {
+    if (!element) return false;
+    return Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
   }
 
   function showToast(message) {
