@@ -2012,24 +2012,116 @@
     } catch {}
   }
 
-  function loadRecentWorkItems() {
+  function loadRecentWorkItems(mode = currentFeature, options = {}) {
+    const targetMode = normalizeFeatureMode(mode);
+    const key = getRecentWorkKey(targetMode);
     try {
-      const raw = localStorage.getItem(getRecentWorkKey());
+      const raw = localStorage.getItem(key);
       const data = raw ? JSON.parse(raw) : [];
-      return Array.isArray(data) ? data.filter((item) => item && item.id).slice(0, MAX_RECENT_WORK) : [];
+      if (!Array.isArray(data)) return [];
+      const kept = [];
+      const moved = [];
+      let changed = false;
+      data.forEach((item) => {
+        if (!item?.id) return;
+        const feature = getConversationFeature(item);
+        const normalized = { ...item, feature };
+        if (feature !== item.feature) changed = true;
+        if (feature === targetMode) kept.push(normalized);
+        else {
+          changed = true;
+          moved.push(normalized);
+        }
+      });
+      if (options.repair !== false && changed) {
+        try { localStorage.setItem(key, JSON.stringify(sortRecentWorkItems(kept))); } catch {}
+        moved.forEach((item) => mergeRecentWorkItemIntoMode(item, item.feature));
+      }
+      return sortRecentWorkItems(kept).slice(0, MAX_RECENT_WORK);
     } catch { return []; }
   }
 
-  function saveRecentWorkItems(items) {
+  function saveRecentWorkItems(items, mode = currentFeature) {
     try {
-      localStorage.setItem(getRecentWorkKey(), JSON.stringify((items || []).slice(0, MAX_RECENT_WORK)));
+      localStorage.setItem(getRecentWorkKey(mode), JSON.stringify((items || []).slice(0, MAX_RECENT_WORK)));
     } catch {}
   }
 
+  function getExplicitFeatureMode(value) {
+    const text = normalizeText(String(value || "")).toLowerCase();
+    if (!text) return "";
+    if (text.includes("knowledge") || text.includes("sidetalk") || text.includes("kb") || text.includes("사내 지식") || text.includes("사내지식")) return "knowledge";
+    if (text.includes("agent") || text.includes("업무 ai") || text.includes("file") || text.includes("excel") || text.includes("agent-api") || text.includes("file-api")) return "agent";
+    return "";
+  }
+
+  function getConversationTextForFeature(item) {
+    const parts = [item?.title, item?.preview, item?.task, item?.route, item?.metadata?.task, item?.metadata?.feature];
+    if (Array.isArray(item?.messages)) {
+      item.messages.slice(0, 4).forEach((message) => parts.push(message?.text || message?.content || ""));
+    }
+    return normalizeText(parts.filter(Boolean).join(" ")).toLowerCase();
+  }
+
+  function looksLikeAgentFileOrExcelConversation(item) {
+    const text = getConversationTextForFeature(item);
+    if (!text) return false;
+    return /\.(xlsx|xls|csv|pptx|docx|pdf)\b/i.test(text)
+      || text.includes("첨부 파일")
+      || text.includes("파일 분석")
+      || text.includes("엑셀")
+      || text.includes("시트에서")
+      || text.includes("원장")
+      || text.includes("승인한도")
+      || text.includes("발주번호")
+      || text.includes("검수")
+      || text.includes("비용정산")
+      || text.includes("매출채권")
+      || text.includes("법인카드")
+      || text.includes("설비점검")
+      || text.includes("품질 lot")
+      || text.includes("불량률")
+      || text.includes("온도 기준")
+      || text.includes("진동 기준");
+  }
+
+  function looksLikeKnowledgeConversation(item) {
+    if (isKnowledgeTask(item?.task || item?.route || item?.metadata?.task || item?.metadata?.feature || "")) return true;
+    const text = getConversationTextForFeature(item);
+    if (!text) return false;
+    return text.includes("사내 지식")
+      || text.includes("사내지식")
+      || text.includes("사내 규정")
+      || text.includes("규정 확인")
+      || text.includes("업무 절차")
+      || text.includes("담당 부서")
+      || text.includes("신청 방법")
+      || text.includes("보안 기준")
+      || text.includes("복리후생")
+      || text.includes("출장비 정산 기준")
+      || text.includes("휴가 기준")
+      || text.includes("근태 규정")
+      || text.includes("결재 절차");
+  }
+
   function getConversationFeature(item) {
-    const explicit = normalizeFeatureMode(item?.feature || item?.featureMode || item?.mode || "");
-    if (explicit === "knowledge") return "knowledge";
-    return isKnowledgeTask(item?.task || item?.route || item?.metadata?.task || item?.metadata?.feature || "") ? "knowledge" : "agent";
+    if (looksLikeAgentFileOrExcelConversation(item)) return "agent";
+    const explicit = getExplicitFeatureMode(item?.feature || item?.featureMode || item?.mode || item?.metadata?.feature || "");
+    if (explicit) return explicit;
+    return looksLikeKnowledgeConversation(item) ? "knowledge" : "agent";
+  }
+
+  function mergeRecentWorkItemIntoMode(item, mode) {
+    if (!item?.id) return;
+    const targetMode = normalizeFeatureMode(mode);
+    try {
+      const key = getRecentWorkKey(targetMode);
+      const raw = localStorage.getItem(key);
+      const data = raw ? JSON.parse(raw) : [];
+      const items = Array.isArray(data) ? data : [];
+      const next = sortRecentWorkItems([{ ...item, feature: targetMode }, ...items.filter((entry) => entry?.id !== item.id && (!item.remoteId || getRemoteSessionId(entry) !== item.remoteId))]);
+      localStorage.setItem(key, JSON.stringify(next));
+    } catch {}
   }
 
   function migrateLegacyRecentWorkByFeature() {
@@ -2291,16 +2383,26 @@
 
   function remoteSessionToRecentItem(session) {
     const remoteId = String(session.id || session.sessionId || "").trim();
+    const title = String(session.title || "새 업무 요청").trim() || "새 업무 요청";
+    const preview = String(session.snippet || session.preview || "저장된 업무 대화").trim() || "저장된 업무 대화";
+    const feature = getConversationFeature({
+      id: remoteId,
+      title,
+      preview,
+      feature: session.feature_mode || session.featureMode || "",
+      task: session.task || session.route || "",
+      metadata: session.metadata || {},
+    });
     const updatedAt = Date.parse(session.display_time_at || session.last_activity_at || session.lastActivityAt || session.last_message_at || session.lastMessageAt || session.created_at || session.createdAt || session.updated_at || session.updatedAt || "") || Date.now();
     return {
       id: remoteId,
       remoteId,
-      title: String(session.title || "새 업무 요청").trim() || "새 업무 요청",
-      preview: String(session.snippet || session.preview || "저장된 업무 대화").trim() || "저장된 업무 대화",
+      title,
+      preview,
       updatedAt,
       isFavorite: Boolean(session.is_favorite ?? session.isFavorite),
-      feature: normalizeFeatureMode(session.feature_mode || session.featureMode || (isKnowledgeTask(session.task || "") ? "knowledge" : "agent")),
-      task: normalizeFeatureMode(session.feature_mode || session.featureMode || "agent") === "knowledge" ? "knowledge_inquiry" : "general",
+      feature,
+      task: feature === "knowledge" ? "knowledge_inquiry" : "general",
       messages: [],
     };
   }
@@ -2309,8 +2411,10 @@
     const map = new Map();
     [...remoteResults, ...localResults].forEach((item) => {
       if (!item?.id) return;
+      const feature = getConversationFeature(item);
+      if (feature !== currentFeature) return;
       const key = getRemoteSessionId(item) || item.id;
-      map.set(key, { ...(map.get(key) || {}), ...item });
+      map.set(key, { ...(map.get(key) || {}), ...item, feature });
     });
     return sortRecentWorkItems(Array.from(map.values()));
   }
@@ -2675,16 +2779,27 @@
       remote.forEach((session) => {
         const remoteId = String(session.id || session.sessionId || "").trim();
         if (!remoteId) return;
+        const title = String(session.title || "새 업무 요청").trim() || "새 업무 요청";
+        const remoteFeature = getConversationFeature({
+          id: remoteId,
+          title,
+          preview: session.snippet || session.preview || "",
+          feature: session.feature_mode || session.featureMode || "",
+          task: session.task || session.route || "",
+          metadata: session.metadata || {},
+        });
+        // 서버가 feature_mode 없는 구버전 세션을 함께 반환하더라도 현재 모드 최근 작업에 섞지 않습니다.
+        if (remoteFeature !== currentFeature) return;
         const updatedAt = Date.parse(session.display_time_at || session.last_activity_at || session.lastActivityAt || session.last_message_at || session.lastMessageAt || session.created_at || session.createdAt || session.updated_at || session.updatedAt || "") || Date.now();
         const foundIndex = next.findIndex((item) => getRemoteSessionId(item) === remoteId || item.id === remoteId);
         const patch = {
           remoteId,
-          title: String(session.title || "새 업무 요청").trim() || "새 업무 요청",
+          title,
           updatedAt,
           isFavorite: Boolean(session.is_favorite ?? session.isFavorite),
-          feature: normalizeFeatureMode(session.feature_mode || session.featureMode || currentFeature),
-          task: normalizeFeatureMode(session.feature_mode || session.featureMode || currentFeature) === "knowledge" ? "knowledge_inquiry" : "general",
-          preview: normalizeFeatureMode(session.feature_mode || session.featureMode || currentFeature) === "knowledge" ? "저장된 사내 지식 문의" : "저장된 업무 대화",
+          feature: remoteFeature,
+          task: remoteFeature === "knowledge" ? "knowledge_inquiry" : "general",
+          preview: remoteFeature === "knowledge" ? "저장된 사내 지식 문의" : "저장된 업무 대화",
         };
         if (foundIndex >= 0) next[foundIndex] = { ...next[foundIndex], ...patch };
         else next.push({ id: remoteId, ...patch, messages: [] });
