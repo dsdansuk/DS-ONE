@@ -2494,8 +2494,16 @@
     });
   }
 
+  function normalizeText(value) {
+    return String(value || "")
+      .normalize("NFKC")
+      .replace(/\u00a0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   function normalizeSearchQuery(value) {
-    return String(value || "").replace(/\s+/g, " ").trim().slice(0, 80);
+    return normalizeText(value).slice(0, 80);
   }
 
   function highlightSearchText(text, query) {
