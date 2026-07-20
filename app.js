@@ -2012,33 +2012,56 @@
     } catch {}
   }
 
-  function loadRecentWorkItems(mode = currentFeature, options = {}) {
-    const targetMode = normalizeFeatureMode(mode);
-    const key = getRecentWorkKey(targetMode);
+  function readRecentWorkItemsFromKey(key) {
     try {
       const raw = localStorage.getItem(key);
       const data = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(data)) return [];
-      const kept = [];
-      const moved = [];
-      let changed = false;
-      data.forEach((item) => {
-        if (!item?.id) return;
+      return Array.isArray(data) ? data.filter((item) => item?.id) : [];
+    } catch { return []; }
+  }
+
+  function loadRecentWorkItems(mode = currentFeature, options = {}) {
+    const targetMode = normalizeFeatureMode(mode);
+    const key = getRecentWorkKey(targetMode);
+    const userKey = getStorageUserKey();
+    const sourceKeys = new Set([key]);
+
+    // v56 이전 또는 캐시 꼬임 상황에서는 feature suffix가 없는 키에 기록이 남아 있을 수 있습니다.
+    // agent 모드는 기존 업무 대화의 기본값이므로 legacy/무분류 세션을 함께 복구합니다.
+    const legacyKey = getLegacyRecentWorkKey(userKey);
+    if (legacyKey !== key) sourceKeys.add(legacyKey);
+    if (userKey !== "anonymous") {
+      sourceKeys.add(`${RECENT_WORK_PREFIX}anonymous`);
+      sourceKeys.add(`${RECENT_WORK_PREFIX}anonymous_${targetMode}`);
+    }
+    // v57 이전/이후 전환 과정에서 userKey가 loginId, empNo, anonymous 등으로 바뀐 캐시도 복구합니다.
+    // 현재 브라우저 안의 캐시만 대상으로 하며, feature 판정 후 현재 모드에 맞는 항목만 표시합니다.
+    try {
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const storageKey = localStorage.key(i) || "";
+        if (storageKey.startsWith(RECENT_WORK_PREFIX)) sourceKeys.add(storageKey);
+      }
+    } catch {}
+
+    const kept = [];
+    const moved = [];
+    let changed = false;
+    sourceKeys.forEach((sourceKey) => {
+      readRecentWorkItemsFromKey(sourceKey).forEach((item) => {
         const feature = getConversationFeature(item);
         const normalized = { ...item, feature };
-        if (feature !== item.feature) changed = true;
+        if (feature !== item.feature || sourceKey !== key) changed = true;
         if (feature === targetMode) kept.push(normalized);
-        else {
-          changed = true;
-          moved.push(normalized);
-        }
+        else moved.push(normalized);
       });
-      if (options.repair !== false && changed) {
-        try { localStorage.setItem(key, JSON.stringify(sortRecentWorkItems(kept))); } catch {}
-        moved.forEach((item) => mergeRecentWorkItemIntoMode(item, item.feature));
-      }
-      return sortRecentWorkItems(kept).slice(0, MAX_RECENT_WORK);
-    } catch { return []; }
+    });
+
+    const deduped = sortRecentWorkItems(dedupeRecentItems(kept)).slice(0, MAX_RECENT_WORK);
+    if (options.repair !== false && changed) {
+      try { localStorage.setItem(key, JSON.stringify(deduped)); } catch {}
+      moved.forEach((item) => mergeRecentWorkItemIntoMode(item, item.feature));
+    }
+    return deduped;
   }
 
   function saveRecentWorkItems(items, mode = currentFeature) {
