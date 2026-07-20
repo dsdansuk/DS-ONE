@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DS ONE 업무 AI Agent 홈</title>
-  <link rel="stylesheet" href="style.css?v=20260709_02">
+  <link rel="stylesheet" href="style.css?v=20260720_v54_knowledge">
 </head>
 <body>
   <svg class="sr-only" aria-hidden="true">
@@ -33,7 +33,22 @@
         <div class="brand-mark"></div>
         <div class="brand-name">DS ONE</div>
         <div class="brand-divider"></div>
-        <div class="product-name">업무 AI Agent</div>
+        <div class="product-switch" id="productSwitch">
+          <button class="product-switch-button" id="productModeButton" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="productModeMenu">
+            <span class="product-name" id="productModeLabel">업무 AI Agent</span>
+            <svg class="icon product-switch-chevron" aria-hidden="true"><use href="#i-chevron"></use></svg>
+          </button>
+          <div class="product-mode-menu" id="productModeMenu" role="menu" hidden>
+            <button type="button" role="menuitemradio" aria-checked="true" data-feature-mode="agent">
+              <strong>업무 AI Agent</strong>
+              <span>문서 작성, 요약, 번역, 파일 분석</span>
+            </button>
+            <button type="button" role="menuitemradio" aria-checked="false" data-feature-mode="knowledge">
+              <strong>사내 지식 문의</strong>
+              <span>규정, 절차, 기준을 사내 지식베이스로 확인</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="top-actions">
@@ -394,7 +409,7 @@
     resizePromptTextarea();
     fitHomeToViewport();
   </script>
-  <script src="app.js?v=20260709_v53_02"></script>
+  <script src="app.js?v=20260720_v54_knowledge"></script>
 </body>
 </html>
 

@@ -593,7 +593,7 @@
       align-content: center;
       justify-content: start;
       gap: clamp(7px, 0.8dvh, 10px);
-      padding: clamp(16px, 1.45dvh, 16px);
+      padding: 16px;
       color: inherit;
       text-align: left;
       background: rgba(255, 255, 255, 0.86);
@@ -1098,3 +1098,136 @@
       }
     }
 
+
+/* v54 feature switcher: 업무 AI Agent / 사내 지식 문의 */
+.product-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.product-switch-button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px 0 0;
+  color: #2b303b;
+  background: transparent;
+  border-radius: 12px;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.product-switch-button:hover,
+.product-switch-button[aria-expanded="true"] {
+  color: var(--blue);
+  background: rgba(47, 111, 237, 0.06);
+}
+
+.product-switch-chevron {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  fill: none;
+  transition: transform 160ms ease;
+}
+
+.product-switch-button[aria-expanded="true"] .product-switch-chevron {
+  transform: rotate(180deg);
+}
+
+.product-mode-menu {
+  position: absolute;
+  left: -8px;
+  top: calc(100% + 10px);
+  z-index: 80;
+  width: 286px;
+  padding: 8px;
+  border: 1px solid rgba(209, 219, 234, 0.96);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 20px 44px rgba(28, 42, 72, 0.16);
+  backdrop-filter: blur(18px);
+}
+
+.product-mode-menu[hidden] {
+  display: none;
+}
+
+.product-mode-menu::before {
+  content: "";
+  position: absolute;
+  left: 28px;
+  top: -7px;
+  width: 12px;
+  height: 12px;
+  transform: rotate(45deg);
+  border-left: 1px solid rgba(209, 219, 234, 0.96);
+  border-top: 1px solid rgba(209, 219, 234, 0.96);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.product-mode-menu button {
+  position: relative;
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 12px 36px 12px 13px;
+  border-radius: 13px;
+  color: #182133;
+  background: transparent;
+  text-align: left;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.product-mode-menu button:hover,
+.product-mode-menu button[aria-checked="true"] {
+  background: linear-gradient(135deg, rgba(47, 111, 237, 0.10), rgba(125, 168, 255, 0.12));
+}
+
+.product-mode-menu button[aria-checked="true"]::after {
+  content: "✓";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--blue);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.product-mode-menu strong {
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.product-mode-menu span {
+  color: #657186;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.app-icon.knowledge,
+.knowledge {
+  background: linear-gradient(145deg, #2f6fed, #7da8ff);
+}
+
+.prompt-card.is-knowledge-mode .icon-btn,
+.ds-agent-composer.is-knowledge-mode .ds-attach-btn {
+  opacity: 0.42;
+}
+
+@media (max-width: 1100px) {
+  .product-mode-menu {
+    left: -72px;
+  }
+}

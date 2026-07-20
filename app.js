@@ -10,6 +10,7 @@
   const STORAGE = CONFIG.storage || {};
   const FILE_POLICY = CONFIG.filePolicy || {};
 
+  const AI_API_URL = ENDPOINTS.aiApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/ai-api";
   const AGENT_API_URL = ENDPOINTS.agentApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/agent-api";
   const FILE_API_URL = ENDPOINTS.fileApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api";
   const SESSION_TOKEN_KEY = "sso_session_token";
@@ -18,6 +19,7 @@
   const SESSION_TOKEN_CACHE_TTL_MS = Number(STORAGE.sessionTokenCacheTtlMs || 12 * 60 * 60 * 1000);
   const LAST_IDENTITY_CACHE_TTL_MS = Number(STORAGE.lastIdentityCacheTtlMs || 30 * 24 * 60 * 60 * 1000);
   const SESSION_REFRESH_LEEWAY_MS = Number(STORAGE.sessionRefreshLeewayMs || 10 * 60 * 1000);
+  const FEATURE_MODE_KEY = STORAGE.featureModeKey || "ds_one_active_feature_mode_v1";
   const DISPLAY_NAME_CACHE_KEY = STORAGE.displayNameCacheKey || "ds_chatbot_last_display_name_v1";
   const DISPLAY_NAME_CACHE_TTL_MS = Number(STORAGE.displayNameCacheTtlMs || 7 * 24 * 60 * 60 * 1000);
   const LOCAL_HISTORY_PREFIX = "ds_one_platform_recent_messages_v2_";
@@ -43,6 +45,7 @@
   let currentLoginId = "";
   let currentEmpNo = "";
   let currentMode = "home";
+  let currentFeature = "agent";
   let activeConversationId = "";
   let recentContextMenu = null;
   let recentRemoteRefreshTimer = 0;
@@ -79,6 +82,52 @@
     recentList: null,
     lowerRecentList: null,
     searchMenuButton: null,
+    productSwitch: null,
+    productModeButton: null,
+    productModeLabel: null,
+    productModeMenu: null,
+    heroTitle: null,
+    heroSubtitle: null,
+    promptCard: null,
+    actionCards: [],
+    agentDisclaimer: null,
+  };
+
+  const FEATURE_PROFILES = {
+    agent: {
+      label: "업무 AI Agent",
+      shortLabel: "업무 AI",
+      title: "무엇을 도와드릴까요?",
+      subtitle: "업무에 필요한 다양한 작업을 AI가 빠르고 정확하게 도와드립니다.",
+      placeholder: "메시지를 입력하세요.   (예: 회의록 요약해줘)",
+      disclaimer: "AI 답변은 참고용입니다. 중요한 업무에는 근거와 원문을 확인해 주세요.",
+      attachEnabled: true,
+      cards: [
+        { iconClass: "doc", iconText: "▤", title: "문서 작성", desc: "기획서, 보고서, 메일<br>초안 작성 등", task: "document_draft", attach: false, template: "아래 내용을 바탕으로 업무용 문서 초안을 작성해 주세요.\n\n[작성할 내용]\n" },
+        { iconClass: "summary", iconText: "≡", title: "문서 요약", desc: "긴 문서나 회의 내용을<br>핵심만 요약", task: "document_summary", attach: false, template: "아래 내용을 핵심만 간결하게 요약해 주세요.\n\n[요약할 내용]\n" },
+        { iconClass: "translate", iconText: "A", title: "문서 번역", desc: "다국어 문서를<br>자연스럽게 번역", task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" },
+        { iconClass: "excel", iconText: "X", title: "엑셀 분석", desc: "데이터 분석 및<br>시각화, 인사이트 도출", task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요." },
+        { iconClass: "file", iconText: "▰", title: "PDF 분석", desc: "파일을 업로드하고<br>질문하기", task: "file_question", attach: true, template: "첨부한 파일을 기준으로 질문에 답변해 주세요.\n\n[질문]\n" },
+        { iconClass: "report", iconText: "▥", title: "PPT 생성", desc: "보고서 구조화 및<br>핵심 내용 정리", task: "report_summary", attach: false, template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" },
+      ],
+    },
+    knowledge: {
+      label: "사내 지식 문의",
+      shortLabel: "사내 지식",
+      title: "사내 기준을 확인해드릴까요?",
+      subtitle: "규정, 절차, 담당 부서 등은 SideTalk 지식베이스 기준으로 답변합니다.",
+      placeholder: "사내 규정, 업무 절차, 담당 부서를 질문하세요.   (예: 출장비 정산 기준 알려줘)",
+      disclaimer: "사내 지식 답변은 SideTalk 지식베이스 기준입니다. 중요한 업무에는 담당 부서와 원문을 확인해 주세요.",
+      attachEnabled: false,
+      cards: [
+        { iconClass: "knowledge", iconText: "규", title: "규정 확인", desc: "사내 규정과 기준<br>빠르게 확인", task: "knowledge_policy", attach: false, template: "사내 규정 기준으로 아래 내용을 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "절", title: "업무 절차", desc: "신청·승인·처리<br>절차 확인", task: "knowledge_process", attach: false, template: "사내 업무 절차 기준으로 아래 내용을 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "담", title: "담당 부서", desc: "문의 부서와<br>담당 기준 확인", task: "knowledge_owner", attach: false, template: "아래 업무의 담당 부서 또는 문의처를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "신", title: "신청 방법", desc: "양식, 결재, 요청<br>방법 확인", task: "knowledge_request", attach: false, template: "아래 신청/요청 방법을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "보", title: "보안 기준", desc: "보안·개인정보<br>처리 기준 확인", task: "knowledge_security", attach: false, template: "사내 보안/개인정보 기준으로 아래 내용을 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "복", title: "복리후생", desc: "휴가, 복지, 근태<br>기준 확인", task: "knowledge_welfare", attach: false, template: "사내 복리후생 또는 근태 기준으로 아래 내용을 확인해 주세요.\n\n[질문]\n" },
+      ],
+    },
   };
 
   function init() {
@@ -102,6 +151,7 @@
     injectSearchAndDialogStyles();
     attachToExistingHome();
     createRuntimeAgentWorkspace();
+    initializeFeatureSwitcher();
     bindUiEvents();
     migrateAnonymousRecentWorkToCurrentUser();
     renderRecentWorkList();
@@ -1038,9 +1088,148 @@
     state.agentFileChips = document.getElementById("dsAgentFileChips");
     state.agentNewChatBtn = null;
     state.docBackBtn = null;
+    state.agentDisclaimer = panel.querySelector(".ds-agent-disclaimer");
+  }
+
+  function normalizeFeatureMode(mode) {
+    return mode === "knowledge" ? "knowledge" : "agent";
+  }
+
+  function getCurrentFeatureProfile() {
+    return FEATURE_PROFILES[normalizeFeatureMode(currentFeature)] || FEATURE_PROFILES.agent;
+  }
+
+  function initializeFeatureSwitcher() {
+    currentFeature = normalizeFeatureMode(localStorage.getItem(FEATURE_MODE_KEY) || "agent");
+    applyFeatureMode(currentFeature, { persist: false, silent: true });
+  }
+
+  function bindFeatureSwitcherEvents() {
+    const button = state.productModeButton;
+    const menu = state.productModeMenu;
+    if (!button || !menu || button.dataset.bound === "true") return;
+    button.dataset.bound = "true";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const open = menu.hidden;
+      menu.hidden = !open;
+      button.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    menu.querySelectorAll("button[data-feature-mode]").forEach((item) => {
+      item.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        applyFeatureMode(item.getAttribute("data-feature-mode") || "agent", { persist: true });
+        menu.hidden = true;
+        button.setAttribute("aria-expanded", "false");
+      });
+    });
+  }
+
+  function closeFeatureMenu() {
+    if (!state.productModeMenu || !state.productModeButton) return;
+    state.productModeMenu.hidden = true;
+    state.productModeButton.setAttribute("aria-expanded", "false");
+  }
+
+  function applyFeatureMode(mode, options = {}) {
+    const nextMode = normalizeFeatureMode(mode);
+    const prevMode = currentFeature;
+    currentFeature = nextMode;
+    if (prevMode !== nextMode) currentTask = "";
+    if (options.persist !== false) {
+      try { localStorage.setItem(FEATURE_MODE_KEY, nextMode); } catch {}
+    }
+    const profile = getCurrentFeatureProfile();
+    if (state.productModeLabel) state.productModeLabel.textContent = profile.label;
+    if (state.productModeButton) state.productModeButton.setAttribute("aria-label", `${profile.label} 선택됨. 기능 변경`);
+    state.productModeMenu?.querySelectorAll("button[data-feature-mode]").forEach((item) => {
+      item.setAttribute("aria-checked", item.getAttribute("data-feature-mode") === nextMode ? "true" : "false");
+    });
+    document.body.classList.toggle("is-knowledge-feature", nextMode === "knowledge");
+    updateHomeFeatureCopy();
+    updateActionCardsForFeature();
+    updateAttachmentAvailability();
+    if (nextMode === "knowledge" && selectedFiles.length) {
+      selectedFiles = [];
+      renderFileChips();
+      if (!options.silent) showToast("사내 지식 문의는 첨부 파일 없이 지식베이스 기준으로 답변합니다.");
+    }
+    if (!options.silent && prevMode !== nextMode) {
+      showToast(`${profile.label} 모드로 전환했습니다.`);
+    }
+  }
+
+  function updateHomeFeatureCopy() {
+    const profile = getCurrentFeatureProfile();
+    if (state.heroTitle) {
+      const sparkle = state.heroTitle.querySelector(".sparkle")?.outerHTML || '<span class="sparkle">✦</span>';
+      state.heroTitle.innerHTML = `${escapeHtml(profile.title)}${sparkle}`;
+    }
+    if (state.heroSubtitle) state.heroSubtitle.textContent = profile.subtitle;
+    if (state.homePromptInput) state.homePromptInput.placeholder = profile.placeholder;
+    if (state.agentMessageInput) state.agentMessageInput.placeholder = currentFeature === "knowledge"
+      ? "사내 규정, 절차, 기준을 질문하세요. Shift+Enter로 줄바꿈"
+      : "메시지를 입력하세요. Shift+Enter로 줄바꿈";
+    if (state.agentDisclaimer) state.agentDisclaimer.textContent = profile.disclaimer;
+    state.promptCard?.classList.toggle("is-knowledge-mode", currentFeature === "knowledge");
+    state.agentForm?.classList.toggle("is-knowledge-mode", currentFeature === "knowledge");
+  }
+
+  function updateActionCardsForFeature() {
+    const cards = state.actionCards && state.actionCards.length ? state.actionCards : Array.from(document.querySelectorAll(".action-card"));
+    state.actionCards = cards;
+    const profile = getCurrentFeatureProfile();
+    cards.forEach((card, index) => {
+      const item = profile.cards[index];
+      if (!item) {
+        card.hidden = true;
+        return;
+      }
+      card.hidden = false;
+      card.dataset.featureTask = item.task || "";
+      card.dataset.featureTemplate = item.template || "";
+      card.dataset.featureAttach = item.attach ? "true" : "false";
+      card.dataset.featureMode = currentFeature;
+      const icon = card.querySelector(".app-icon");
+      const title = card.querySelector(".card-title");
+      const desc = card.querySelector(".card-desc");
+      if (icon) {
+        icon.className = `app-icon ${item.iconClass || "doc"}`;
+        icon.textContent = item.iconText || "▤";
+      }
+      if (title) title.textContent = item.title || "업무 요청";
+      if (desc) desc.innerHTML = item.desc || "";
+    });
+  }
+
+  function updateAttachmentAvailability() {
+    const disabled = currentFeature === "knowledge";
+    [state.homeAttachBtn, state.agentAttachBtn].filter(Boolean).forEach((button) => {
+      button.disabled = disabled || submitInProgress;
+      button.setAttribute("aria-disabled", disabled ? "true" : "false");
+      button.title = disabled ? "사내 지식 문의는 첨부 파일 없이 지식베이스 기준으로 답변합니다." : "파일 첨부";
+    });
+  }
+
+  function getCurrentConversationTask() {
+    if (currentFeature === "knowledge") return "knowledge_inquiry";
+    return normalizeTask(currentTask) || currentTask || "general";
+  }
+
+  function getCurrentApiRoute() {
+    if (currentFeature === "knowledge") return "ai-api";
+    return selectedFiles.length ? "file-api" : "agent-api";
+  }
+
+  function isKnowledgeTask(task) {
+    const value = String(task || "").toLowerCase();
+    return value.includes("knowledge") || value.includes("policy") || value.includes("procedure") || value.includes("kb") || value.includes("ai-api") || value.includes("sidetalk") || value.includes("사내");
   }
 
   function bindUiEvents() {
+    bindFeatureSwitcherEvents();
     document.querySelectorAll(".menu-item").forEach((button) => {
       const label = button.textContent.trim();
       if (label.includes("새 대화")) {
@@ -1106,6 +1295,7 @@
     });
     document.addEventListener("click", (event) => {
       if (recentContextMenu && !event.target.closest(".recent-context-menu") && !event.target.closest(".recent-more-btn")) closeRecentContextMenu();
+      if (state.productModeMenu && !event.target.closest("#productSwitch")) closeFeatureMenu();
     });
     window.addEventListener("resize", () => {
       closeRecentContextMenu();
@@ -1115,6 +1305,13 @@
   }
 
   function getCardTemplate(card) {
+    if (card?.dataset?.featureTask || card?.dataset?.featureTemplate) {
+      return {
+        task: card.dataset.featureTask || "",
+        attach: card.dataset.featureAttach === "true",
+        template: card.dataset.featureTemplate || "",
+      };
+    }
     const title = card.querySelector(".card-title")?.textContent.trim() || card.textContent.trim();
     if (title.includes("문서 작성")) return { task: "document_draft", attach: false, template: "아래 내용을 바탕으로 업무용 문서 초안을 작성해 주세요.\n\n[작성할 내용]\n" };
     if (title.includes("문서 요약")) return { task: "document_summary", attach: false, template: "아래 내용을 핵심만 간결하게 요약해 주세요.\n\n[요약할 내용]\n" };
@@ -1220,6 +1417,10 @@
   }
 
   function addFiles(fileList) {
+    if (currentFeature === "knowledge") {
+      showToast("사내 지식 문의는 첨부 파일 없이 지식베이스 기준으로 답변합니다.");
+      return;
+    }
     const files = Array.from(fileList || []);
     const rejected = [];
     files.forEach((file) => {
@@ -1282,30 +1483,41 @@
 
     submitInProgress = true;
     setComposerDisabled(true);
+    if (currentFeature === "knowledge" && selectedFiles.length) {
+      selectedFiles = [];
+      renderFileChips();
+      showToast("사내 지식 문의는 첨부 파일 없이 지식베이스 기준으로 답변합니다.");
+    }
     const userText = message || "첨부한 파일을 분석해 주세요.";
+    const route = getCurrentApiRoute();
+    const task = getCurrentConversationTask();
     activeConversationHighlightQuery = "";
     const history = getRecentHistory();
     const displayUserMessage = buildDisplayUserMessage(userText);
     ensureActiveConversation(userText, displayUserMessage);
     appendConversationMessage("user", displayUserMessage);
-    void saveRemoteConversationMessage("user", displayUserMessage, { route: selectedFiles.length ? "file-api" : "agent-api", task: normalizeTask(currentTask) || currentTask || "general" });
+    void saveRemoteConversationMessage("user", displayUserMessage, { route, task, feature: currentFeature });
     addMessage("user", displayUserMessage);
     if (state.agentMessageInput) state.agentMessageInput.value = "";
     resizeTextarea(state.agentMessageInput);
-    const thinking = addThinkingMessage("생각 중");
+    const thinking = addThinkingMessage(currentFeature === "knowledge" ? "사내 지식 확인 중" : "생각 중");
 
     try {
-      const data = selectedFiles.length ? await requestFileAnalysis(userText, history) : await requestAgentAnswer(userText, history);
+      const data = currentFeature === "knowledge"
+        ? await requestKnowledgeAnswer(userText, history)
+        : selectedFiles.length
+          ? await requestFileAnalysis(userText, history)
+          : await requestAgentAnswer(userText, history);
       thinking.remove();
       const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
       addMessage("bot", answer);
       appendConversationMessage("assistant", answer);
-      void saveRemoteConversationMessage("assistant", answer, { route: selectedFiles.length ? "file-api" : "agent-api", task: normalizeTask(currentTask) || currentTask || "general" });
+      void saveRemoteConversationMessage("assistant", answer, { route, task, feature: currentFeature });
       saveLocalHistory(userText, answer);
       renderRecentWorkList();
     } catch (error) {
       thinking.remove();
-      const errorText = `업무 AI Agent 처리 중 오류가 발생했습니다.\n${getErrorMessage(error)}`;
+      const errorText = `${getCurrentFeatureProfile().label} 처리 중 오류가 발생했습니다\n${getErrorMessage(error)}`;
       addMessage("bot", errorText);
       appendConversationMessage("assistant", errorText);
       renderRecentWorkList();
@@ -1372,6 +1584,17 @@
       }
     })();
     return await sessionRefreshPromise;
+  }
+
+  async function requestKnowledgeAnswer(message, history) {
+    const activeToken = await ensureValidSession({ silent: false });
+    if (!activeToken) throw new Error("세션 갱신이 필요합니다. 그룹웨어 DS ONE 버튼으로 다시 접속해 주세요.");
+    const res = await fetch(AI_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
+      body: JSON.stringify({ message, stream: false, task: "knowledge_inquiry", history }),
+    });
+    return readApiResponse(res);
   }
 
   async function requestAgentAnswer(message, history) {
@@ -2062,7 +2285,7 @@
       id: activeConversationId,
       title,
       preview: createConversationPreview(displayUserMessage || userText),
-      task: normalizeTask(currentTask) || currentTask || "general",
+      task: getCurrentConversationTask(),
       createdAt: now,
       updatedAt: now,
       messages: [],
@@ -2213,6 +2436,8 @@
     activeConversationId = item.id;
     activeConversationHighlightQuery = normalizeSearchQuery(highlightQuery);
     currentTask = item.task || "";
+    if (isKnowledgeTask(currentTask)) applyFeatureMode("knowledge", { persist: true, silent: true });
+    else applyFeatureMode("agent", { persist: true, silent: true });
     selectedFiles = [];
     renderFileChips();
     clearMessages();
@@ -2223,6 +2448,9 @@
       try {
         const data = await agentStateRequest({ action: "load_session", sessionId: remoteId });
         const messages = Array.isArray(data.messages) ? data.messages : [];
+        if (messages.some((message) => isKnowledgeTask(message?.metadata?.task || message?.metadata?.feature || message?.route || ""))) {
+          applyFeatureMode("knowledge", { persist: true, silent: true });
+        }
         messages.forEach((message) => addMessage(message.role === "assistant" ? "bot" : "user", message.content || message.text || ""));
         if (messages.length) {
           item.messages = messages.map((message) => ({ role: message.role === "assistant" ? "assistant" : "user", text: message.content || message.text || "", at: Date.now() })).slice(-MAX_STORED_CONVERSATION_MESSAGES);
@@ -2462,6 +2690,7 @@
 
   function getTaskIconClass(task) {
     const value = String(task || "");
+    if (isKnowledgeTask(value)) return "knowledge";
     if (value.includes("excel")) return "excel";
     if (value.includes("translation")) return "translate";
     if (value.includes("summary")) return "summary";
@@ -2472,6 +2701,7 @@
 
   function getTaskIconText(task) {
     const value = String(task || "");
+    if (isKnowledgeTask(value)) return "규";
     if (value.includes("excel")) return "X";
     if (value.includes("translation")) return "A";
     if (value.includes("summary")) return "≡";
@@ -2495,9 +2725,11 @@
   }
 
   function setComposerDisabled(disabled) {
+    const attachDisabled = disabled || currentFeature === "knowledge";
     if (state.agentMessageInput) state.agentMessageInput.disabled = disabled;
     if (state.agentSendBtn) state.agentSendBtn.disabled = disabled;
-    if (state.agentAttachBtn) state.agentAttachBtn.disabled = disabled;
+    if (state.agentAttachBtn) state.agentAttachBtn.disabled = attachDisabled;
+    if (state.homeAttachBtn) state.homeAttachBtn.disabled = attachDisabled;
     if (state.homeSendBtn) state.homeSendBtn.disabled = disabled;
   }
 
