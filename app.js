@@ -1028,8 +1028,16 @@
     state.profileAvatar = document.querySelector(".avatar");
     state.recentList = document.querySelector(".recent-list");
     state.lowerRecentList = document.querySelector(".task-list");
+    state.productSwitch = document.getElementById("productSwitch");
+    state.productModeButton = document.getElementById("productModeButton");
+    state.productModeLabel = document.getElementById("productModeLabel");
+    state.productModeMenu = document.getElementById("productModeMenu");
+    state.heroTitle = document.querySelector(".hero-title");
+    state.heroSubtitle = document.querySelector(".hero-copy p, .hero-subtitle");
+    state.promptCard = document.querySelector(".prompt-card");
+    state.actionCards = Array.from(document.querySelectorAll(".action-card"));
 
-    const promptCard = document.querySelector(".prompt-card");
+    const promptCard = state.promptCard || document.querySelector(".prompt-card");
     if (promptCard && !document.getElementById("dsHomeFileChips")) {
       const chips = document.createElement("div");
       chips.id = "dsHomeFileChips";
@@ -1105,8 +1113,12 @@
   }
 
   function bindFeatureSwitcherEvents() {
-    const button = state.productModeButton;
-    const menu = state.productModeMenu;
+    const button = state.productModeButton || document.getElementById("productModeButton");
+    const menu = state.productModeMenu || document.getElementById("productModeMenu");
+    if (!state.productModeButton && button) state.productModeButton = button;
+    if (!state.productModeMenu && menu) state.productModeMenu = menu;
+    if (!state.productSwitch) state.productSwitch = document.getElementById("productSwitch");
+    if (!state.productModeLabel) state.productModeLabel = document.getElementById("productModeLabel");
     if (!button || !menu || button.dataset.bound === "true") return;
     button.dataset.bound = "true";
     button.addEventListener("click", (event) => {
