@@ -153,6 +153,7 @@
     createRuntimeAgentWorkspace();
     initializeFeatureSwitcher();
     bindUiEvents();
+    migrateLegacyRecentWorkByFeature();
     migrateAnonymousRecentWorkToCurrentUser();
     renderRecentWorkList();
     authBootstrapPromise = bootstrapProfile();
@@ -1149,7 +1150,8 @@
     const nextMode = normalizeFeatureMode(mode);
     const prevMode = currentFeature;
     currentFeature = nextMode;
-    if (prevMode !== nextMode) currentTask = "";
+    const featureChanged = prevMode !== nextMode;
+    if (featureChanged) currentTask = "";
     if (options.persist !== false) {
       try { localStorage.setItem(FEATURE_MODE_KEY, nextMode); } catch {}
     }
@@ -1168,9 +1170,37 @@
       renderFileChips();
       if (!options.silent) showToast("사내 지식 문의는 첨부 파일 없이 지식베이스 기준으로 답변합니다.");
     }
-    if (!options.silent && prevMode !== nextMode) {
+    if (featureChanged && options.resetConversation !== false) {
+      resetConversationForFeatureSwitch();
+    } else if (featureChanged) {
+      renderRecentWorkList();
+    }
+    if (!options.silent && featureChanged) {
       showToast(`${profile.label} 모드로 전환했습니다.`);
     }
+  }
+
+  function resetConversationForFeatureSwitch() {
+    closeRecentContextMenu();
+    activeConversationId = "";
+    activeConversationHighlightQuery = "";
+    remoteSessionCreatePromise = null;
+    remoteSessionCreateConversationId = "";
+    selectedFiles = [];
+    renderFileChips();
+    clearMessages();
+    if (state.agentMessageInput) {
+      state.agentMessageInput.value = "";
+      resetTextareaVisualState(state.agentMessageInput);
+    }
+    if (state.homePromptInput) {
+      state.homePromptInput.value = "";
+      resetTextareaVisualState(state.homePromptInput);
+      syncHomePromptEmptyClass();
+    }
+    setMode("home");
+    renderRecentWorkList();
+    window.requestAnimationFrame(() => normalizeHomeComposerLayout());
   }
 
   function updateHomeFeatureCopy() {
@@ -1939,12 +1969,24 @@
     return String(currentEmpNo || currentLoginId || "anonymous").replace(/[^a-zA-Z0-9_.:-]/g, "_");
   }
 
-  function getLocalHistoryKey() {
-    return LOCAL_HISTORY_PREFIX + getStorageUserKey();
+  function getFeatureStorageSuffix(mode = currentFeature) {
+    return normalizeFeatureMode(mode);
   }
 
-  function getRecentWorkKey() {
-    return RECENT_WORK_PREFIX + getStorageUserKey();
+  function getLocalHistoryKey(mode = currentFeature) {
+    return `${LOCAL_HISTORY_PREFIX}${getStorageUserKey()}_${getFeatureStorageSuffix(mode)}`;
+  }
+
+  function getRecentWorkKey(mode = currentFeature) {
+    return `${RECENT_WORK_PREFIX}${getStorageUserKey()}_${getFeatureStorageSuffix(mode)}`;
+  }
+
+  function getLegacyRecentWorkKey(userKey = getStorageUserKey()) {
+    return RECENT_WORK_PREFIX + userKey;
+  }
+
+  function getLegacyLocalHistoryKey(userKey = getStorageUserKey()) {
+    return LOCAL_HISTORY_PREFIX + userKey;
   }
 
   function getRecentHistory() {
@@ -1982,6 +2024,50 @@
     try {
       localStorage.setItem(getRecentWorkKey(), JSON.stringify((items || []).slice(0, MAX_RECENT_WORK)));
     } catch {}
+  }
+
+  function getConversationFeature(item) {
+    const explicit = normalizeFeatureMode(item?.feature || item?.featureMode || item?.mode || "");
+    if (explicit === "knowledge") return "knowledge";
+    return isKnowledgeTask(item?.task || item?.route || item?.metadata?.task || item?.metadata?.feature || "") ? "knowledge" : "agent";
+  }
+
+  function migrateLegacyRecentWorkByFeature() {
+    const userKey = getStorageUserKey();
+    const legacyKey = getLegacyRecentWorkKey(userKey);
+    const agentKey = getRecentWorkKey("agent");
+    const knowledgeKey = getRecentWorkKey("knowledge");
+    if (legacyKey === agentKey || legacyKey === knowledgeKey) return;
+    try {
+      const raw = localStorage.getItem(legacyKey);
+      if (!raw) return;
+      const legacyItems = JSON.parse(raw);
+      if (!Array.isArray(legacyItems) || !legacyItems.length) return;
+      const existingAgent = JSON.parse(localStorage.getItem(agentKey) || "[]");
+      const existingKnowledge = JSON.parse(localStorage.getItem(knowledgeKey) || "[]");
+      const agentItems = Array.isArray(existingAgent) ? existingAgent : [];
+      const knowledgeItems = Array.isArray(existingKnowledge) ? existingKnowledge : [];
+      legacyItems.forEach((item) => {
+        if (!item?.id) return;
+        const feature = getConversationFeature(item);
+        const normalized = { ...item, feature };
+        if (feature === "knowledge") knowledgeItems.push(normalized);
+        else agentItems.push(normalized);
+      });
+      localStorage.setItem(agentKey, JSON.stringify(sortRecentWorkItems(dedupeRecentItems(agentItems))));
+      localStorage.setItem(knowledgeKey, JSON.stringify(sortRecentWorkItems(dedupeRecentItems(knowledgeItems))));
+      localStorage.removeItem(legacyKey);
+    } catch {}
+  }
+
+  function dedupeRecentItems(items) {
+    const map = new Map();
+    (Array.isArray(items) ? items : []).forEach((item) => {
+      if (!item?.id) return;
+      const key = getRemoteSessionId(item) || item.id;
+      map.set(key, { ...(map.get(key) || {}), ...item });
+    });
+    return Array.from(map.values());
   }
 
 
@@ -2180,7 +2266,7 @@
     if (!sessionToken || options.localOnly) return;
 
     try {
-      const data = await agentStateRequest({ action: "search_sessions", query: q, limit: REMOTE_SESSION_LIST_LIMIT });
+      const data = await agentStateRequest({ action: "search_sessions", query: q, limit: REMOTE_SESSION_LIST_LIMIT, featureMode: currentFeature });
       if (requestSeq !== chatSearchRequestSeq) return;
       const remoteResults = Array.isArray(data.sessions) ? data.sessions.map(remoteSessionToRecentItem) : [];
       const merged = mergeConversationResults(localResults, remoteResults);
@@ -2213,7 +2299,8 @@
       preview: String(session.snippet || session.preview || "저장된 업무 대화").trim() || "저장된 업무 대화",
       updatedAt,
       isFavorite: Boolean(session.is_favorite ?? session.isFavorite),
-      task: "general",
+      feature: normalizeFeatureMode(session.feature_mode || session.featureMode || (isKnowledgeTask(session.task || "") ? "knowledge" : "agent")),
+      task: normalizeFeatureMode(session.feature_mode || session.featureMode || "agent") === "knowledge" ? "knowledge_inquiry" : "general",
       messages: [],
     };
   }
@@ -2298,6 +2385,7 @@
       title,
       preview: createConversationPreview(displayUserMessage || userText),
       task: getCurrentConversationTask(),
+      feature: currentFeature,
       createdAt: now,
       updatedAt: now,
       messages: [],
@@ -2448,8 +2536,8 @@
     activeConversationId = item.id;
     activeConversationHighlightQuery = normalizeSearchQuery(highlightQuery);
     currentTask = item.task || "";
-    if (isKnowledgeTask(currentTask)) applyFeatureMode("knowledge", { persist: true, silent: true });
-    else applyFeatureMode("agent", { persist: true, silent: true });
+    const targetFeature = getConversationFeature(item);
+    applyFeatureMode(targetFeature, { persist: true, silent: true, resetConversation: false });
     selectedFiles = [];
     renderFileChips();
     clearMessages();
@@ -2465,6 +2553,7 @@
         }
         messages.forEach((message) => addMessage(message.role === "assistant" ? "bot" : "user", message.content || message.text || ""));
         if (messages.length) {
+          item.feature = getConversationFeature(item);
           item.messages = messages.map((message) => ({ role: message.role === "assistant" ? "assistant" : "user", text: message.content || message.text || "", at: Date.now() })).slice(-MAX_STORED_CONVERSATION_MESSAGES);
           upsertRecentWorkItem(item);
         }
@@ -2578,7 +2667,7 @@
     if (!activeToken) return;
     recentRemoteRefreshInProgress = true;
     try {
-      const data = await agentStateRequest({ action: "list_sessions", limit: REMOTE_SESSION_LIST_LIMIT });
+      const data = await agentStateRequest({ action: "list_sessions", limit: REMOTE_SESSION_LIST_LIMIT, featureMode: currentFeature });
       const remote = Array.isArray(data.sessions) ? data.sessions : [];
       if (!remote.length) return;
       const local = loadRecentWorkItems();
@@ -2593,8 +2682,9 @@
           title: String(session.title || "새 업무 요청").trim() || "새 업무 요청",
           updatedAt,
           isFavorite: Boolean(session.is_favorite ?? session.isFavorite),
-          task: "general",
-          preview: "저장된 업무 대화",
+          feature: normalizeFeatureMode(session.feature_mode || session.featureMode || currentFeature),
+          task: normalizeFeatureMode(session.feature_mode || session.featureMode || currentFeature) === "knowledge" ? "knowledge_inquiry" : "general",
+          preview: normalizeFeatureMode(session.feature_mode || session.featureMode || currentFeature) === "knowledge" ? "저장된 사내 지식 문의" : "저장된 업무 대화",
         };
         if (foundIndex >= 0) next[foundIndex] = { ...next[foundIndex], ...patch };
         else next.push({ id: remoteId, ...patch, messages: [] });
@@ -2621,10 +2711,10 @@
     remoteSessionCreatePromise = (async () => {
       try {
         const title = createConversationTitle(titleText || item?.title || "새 업무 요청");
-        const data = await agentStateRequest({ action: "create_session", title });
+        const data = await agentStateRequest({ action: "create_session", title, featureMode: currentFeature });
         const remoteId = String(data?.session?.id || "").trim();
         if (remoteId && activeConversationId === conversationId) {
-          updateRecentWorkItem(conversationId, { remoteId, title: data.session.title || title });
+          updateRecentWorkItem(conversationId, { remoteId, title: data.session.title || title, feature: currentFeature, task: getCurrentConversationTask() });
         }
         return remoteId;
       } catch {
@@ -2645,8 +2735,8 @@
     const sessionId = await ensureRemoteSessionForActiveConversation(content);
     if (!sessionId) return null;
     try {
-      const data = await agentStateRequest({ action: "save_message", sessionId, role, content, route: metadata.route || "", metadata });
-      if (data?.session?.id) updateRecentWorkItem(activeConversationId, { remoteId: data.session.id, title: data.session.title || getActiveConversation()?.title || createConversationTitle(content), updatedAt: Date.now() });
+      const data = await agentStateRequest({ action: "save_message", sessionId, role, content, route: metadata.route || "", featureMode: metadata.feature || currentFeature, metadata: { ...metadata, feature: metadata.feature || currentFeature } });
+      if (data?.session?.id) updateRecentWorkItem(activeConversationId, { remoteId: data.session.id, title: data.session.title || getActiveConversation()?.title || createConversationTitle(content), updatedAt: Date.now(), feature: currentFeature, task: getCurrentConversationTask() });
       scheduleRemoteRecentRefresh();
       return data;
     } catch {
@@ -2904,17 +2994,37 @@
   function migrateAnonymousRecentWorkToCurrentUser() {
     const userKey = getStorageUserKey();
     if (!userKey || userKey === "anonymous") return;
-    const anonymousKey = RECENT_WORK_PREFIX + "anonymous";
-    const targetKey = getRecentWorkKey();
-    if (anonymousKey === targetKey) return;
+    ["agent", "knowledge"].forEach((feature) => {
+      const anonymousKey = `${RECENT_WORK_PREFIX}anonymous_${feature}`;
+      const currentKey = getRecentWorkKey(feature);
+      if (anonymousKey === currentKey) return;
+      try {
+        const raw = localStorage.getItem(anonymousKey);
+        if (!raw) return;
+        const anonymousItems = JSON.parse(raw);
+        if (!Array.isArray(anonymousItems) || !anonymousItems.length) return;
+        const existingRaw = localStorage.getItem(currentKey);
+        const existing = existingRaw ? JSON.parse(existingRaw) : [];
+        const merged = sortRecentWorkItems(dedupeRecentItems([...(Array.isArray(existing) ? existing : []), ...anonymousItems.map((item) => ({ ...item, feature }))]));
+        localStorage.setItem(currentKey, JSON.stringify(merged));
+        localStorage.removeItem(anonymousKey);
+      } catch {}
+    });
+
+    // v55 이전에는 feature suffix가 없는 anonymous key를 사용했습니다. 남아 있으면 mode별로 분리 이관합니다.
     try {
-      const raw = localStorage.getItem(anonymousKey);
+      const legacyKey = RECENT_WORK_PREFIX + "anonymous";
+      const raw = localStorage.getItem(legacyKey);
       if (!raw) return;
       const anonymousItems = JSON.parse(raw);
       if (!Array.isArray(anonymousItems) || !anonymousItems.length) return;
-      const merged = sortRecentWorkItems([...(loadRecentWorkItems() || []), ...anonymousItems]);
-      localStorage.setItem(targetKey, JSON.stringify(merged));
-      localStorage.removeItem(anonymousKey);
+      anonymousItems.forEach((item) => {
+        const feature = getConversationFeature(item);
+        const targetKey = getRecentWorkKey(feature);
+        const existing = JSON.parse(localStorage.getItem(targetKey) || "[]");
+        localStorage.setItem(targetKey, JSON.stringify(sortRecentWorkItems(dedupeRecentItems([...(Array.isArray(existing) ? existing : []), { ...item, feature }]))));
+      });
+      localStorage.removeItem(legacyKey);
     } catch {}
   }
 
