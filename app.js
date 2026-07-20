@@ -50,6 +50,7 @@
   let recentContextMenu = null;
   let recentRemoteRefreshTimer = 0;
   let recentRemoteRefreshInProgress = false;
+  let recentRemoteEverLoaded = false;
   let remoteSessionCreatePromise = null;
   let remoteSessionCreateConversationId = "";
   let chatSearchDialog = null;
@@ -593,9 +594,12 @@
       }
       .ds-agent-disclaimer { margin: 0; color: #8a93a5; font-size: 12px; text-align: center; }
       .ds-recent-empty {
+        width: calc(100% - 8px);
         min-height: 92px;
         display: grid;
         place-items: center;
+        box-sizing: border-box;
+        margin: 4px 0 0 0;
         padding: 14px;
         color: #8a93a5;
         font-size: 13px;
@@ -2547,9 +2551,32 @@
   }
 
   function renderRecentWorkList() {
-    const items = loadRecentWorkItems();
+    let items = [];
+    try {
+      items = loadRecentWorkItems();
+    } catch {
+      items = [];
+    }
     renderSidebarRecentList(items);
     renderLowerRecentList(items);
+    ensureRecentEmptyState(items);
+  }
+
+  function ensureRecentEmptyState(items = []) {
+    if (!state.recentList) return;
+    const hasRenderable = state.recentList.querySelector(".recent-item-wrap, .ds-recent-empty");
+    if (hasRenderable) return;
+    const empty = document.createElement("div");
+    empty.className = "ds-recent-empty";
+    empty.textContent = getRecentEmptyMessage(items);
+    state.recentList.appendChild(empty);
+  }
+
+  function getRecentEmptyMessage(items = []) {
+    if (Array.isArray(items) && items.length) return "";
+    if (currentFeature === "knowledge") return "아직 사내 지식 문의 기록이 없습니다.\n질문을 입력하면 자동으로 쌓입니다.";
+    if (recentRemoteRefreshInProgress && !recentRemoteEverLoaded) return "저장된 업무 대화를 불러오는 중입니다.\n잠시만 기다려 주세요.";
+    return "아직 최근 작업이 없습니다.\n업무를 요청하면 자동으로 쌓입니다.";
   }
 
   function renderSidebarRecentList(items) {
@@ -2558,7 +2585,7 @@
     if (!items.length) {
       const empty = document.createElement("div");
       empty.className = "ds-recent-empty";
-      empty.textContent = "아직 최근 작업이 없습니다.\n업무를 요청하면 자동으로 쌓입니다.";
+      empty.textContent = getRecentEmptyMessage(items);
       state.recentList.appendChild(empty);
       return;
     }
@@ -2793,11 +2820,31 @@
     const activeToken = await ensureValidSession({ silent: true });
     if (!activeToken) return;
     recentRemoteRefreshInProgress = true;
+    renderRecentWorkList();
     try {
-      const data = await agentStateRequest({ action: "list_sessions", limit: REMOTE_SESSION_LIST_LIMIT, featureMode: currentFeature });
-      const remote = Array.isArray(data.sessions) ? data.sessions : [];
-      if (!remote.length) return;
+      let data = await agentStateRequest({ action: "list_sessions", limit: REMOTE_SESSION_LIST_LIMIT, featureMode: currentFeature, includeLegacy: currentFeature === "agent" });
+      let remote = Array.isArray(data.sessions) ? data.sessions : [];
+      if (!remote.length && currentFeature === "agent") {
+        // 일부 배포 환경에서 feature_mode 마이그레이션 전 세션이 필터에서 제외되는 경우를 보정합니다.
+        try {
+          data = await agentStateRequest({ action: "list_sessions", limit: REMOTE_SESSION_LIST_LIMIT, featureMode: "all", includeLegacy: true });
+          remote = (Array.isArray(data.sessions) ? data.sessions : []).filter((session) => getConversationFeature({
+            id: session.id || session.sessionId || "",
+            title: session.title || "",
+            preview: session.snippet || session.preview || "",
+            feature: session.feature_mode || session.featureMode || "",
+            task: session.task || session.route || "",
+            metadata: session.metadata || {},
+          }) === "agent");
+        } catch {}
+      }
+      recentRemoteEverLoaded = true;
       const local = loadRecentWorkItems();
+      if (!remote.length) {
+        saveRecentWorkItems(sortRecentWorkItems(local));
+        renderRecentWorkList();
+        return;
+      }
       const next = [...local];
       remote.forEach((session) => {
         const remoteId = String(session.id || session.sessionId || "").trim();
@@ -2831,8 +2878,10 @@
       renderRecentWorkList();
     } catch {
       // 서버 세션 저장이 아직 배포되지 않은 환경에서는 로컬 최근 작업만 사용합니다.
+      renderRecentWorkList();
     } finally {
       recentRemoteRefreshInProgress = false;
+      ensureRecentEmptyState(loadRecentWorkItems());
     }
   }
 
