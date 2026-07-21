@@ -121,12 +121,12 @@
       disclaimer: "사내 지식 답변은 SideTalk 지식베이스 기준입니다. 중요한 업무에는 담당 부서와 원문을 확인해 주세요.",
       attachEnabled: false,
       cards: [
-        { iconClass: "knowledge", iconText: "규", title: "규정 확인", desc: "사내 규정과 기준<br>빠르게 확인", task: "knowledge_policy", attach: false, template: "사내 규정 기준으로 아래 내용을 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "절", title: "업무 절차", desc: "신청·승인·처리<br>절차 확인", task: "knowledge_process", attach: false, template: "사내 업무 절차 기준으로 아래 내용을 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "담", title: "담당 부서", desc: "문의 부서와<br>담당 기준 확인", task: "knowledge_owner", attach: false, template: "아래 업무의 담당 부서 또는 문의처를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "신", title: "신청 방법", desc: "양식, 결재, 요청<br>방법 확인", task: "knowledge_request", attach: false, template: "아래 신청/요청 방법을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "보", title: "보안 기준", desc: "보안·개인정보<br>처리 기준 확인", task: "knowledge_security", attach: false, template: "사내 보안/개인정보 기준으로 아래 내용을 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "복", title: "복리후생", desc: "휴가, 복지, 근태<br>기준 확인", task: "knowledge_welfare", attach: false, template: "사내 복리후생 또는 근태 기준으로 아래 내용을 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "규", title: "규정·기준", desc: "제도, 기준, 예외<br>적용 여부 확인", task: "knowledge_policy", attach: false, template: "아래 사내 규정 또는 기준을 지식베이스 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "신", title: "신청·결재", desc: "신청서, 결재선,<br>처리 절차 확인", task: "knowledge_request", attach: false, template: "아래 신청 또는 결재 절차를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "담", title: "담당 부서", desc: "문의처, 담당 기준,<br>연락 부서 확인", task: "knowledge_owner", attach: false, template: "아래 업무의 담당 부서 또는 문의처를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "시", title: "시스템·권한", desc: "그룹웨어, ERP, ECM<br>계정·권한 확인", task: "knowledge_system_access", attach: false, template: "아래 시스템, 계정 또는 권한 관련 문의를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "보", title: "보안·개인정보", desc: "파일 공유, 개인정보,<br>보안 기준 확인", task: "knowledge_security", attach: false, template: "아래 보안, 개인정보 또는 파일 처리 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "휴", title: "근태·복리후생", desc: "휴가, 근태, 복지<br>운영 기준 확인", task: "knowledge_welfare", attach: false, template: "아래 근태, 휴가 또는 복리후생 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
       ],
     },
   };
@@ -1316,9 +1316,12 @@
   function updateAttachmentAvailability() {
     const disabled = currentFeature === "knowledge";
     [state.homeAttachBtn, state.agentAttachBtn].filter(Boolean).forEach((button) => {
+      button.hidden = disabled;
       button.disabled = disabled || submitInProgress;
+      button.setAttribute("aria-hidden", disabled ? "true" : "false");
       button.setAttribute("aria-disabled", disabled ? "true" : "false");
-      button.title = disabled ? "사내 지식 문의는 첨부 파일 없이 지식베이스 기준으로 답변합니다." : "파일 첨부";
+      button.tabIndex = disabled ? -1 : 0;
+      button.title = disabled ? "" : "파일 첨부";
     });
   }
 
@@ -3115,11 +3118,20 @@
   }
 
   function setComposerDisabled(disabled) {
-    const attachDisabled = disabled || currentFeature === "knowledge";
+    const attachHidden = currentFeature === "knowledge";
+    const attachDisabled = disabled || attachHidden;
     if (state.agentMessageInput) state.agentMessageInput.disabled = disabled;
     if (state.agentSendBtn) state.agentSendBtn.disabled = disabled;
-    if (state.agentAttachBtn) state.agentAttachBtn.disabled = attachDisabled;
-    if (state.homeAttachBtn) state.homeAttachBtn.disabled = attachDisabled;
+    if (state.agentAttachBtn) {
+      state.agentAttachBtn.hidden = attachHidden;
+      state.agentAttachBtn.disabled = attachDisabled;
+      state.agentAttachBtn.tabIndex = attachHidden ? -1 : 0;
+    }
+    if (state.homeAttachBtn) {
+      state.homeAttachBtn.hidden = attachHidden;
+      state.homeAttachBtn.disabled = attachDisabled;
+      state.homeAttachBtn.tabIndex = attachHidden ? -1 : 0;
+    }
     if (state.homeSendBtn) state.homeSendBtn.disabled = disabled;
   }
 
