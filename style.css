@@ -721,7 +721,7 @@
       background: transparent;
       border-radius: var(--radius);
       padding: 6px 8px;
-      transition: color 160ms ease, background 160ms ease;
+      transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
     }
 
     .text-button:hover {
@@ -1116,7 +1116,7 @@
   color: #2b303b;
   background: transparent;
   border-radius: 12px;
-  transition: color 160ms ease, background 160ms ease;
+  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
 .product-switch-button:hover,
@@ -1174,17 +1174,30 @@
   width: 100%;
   display: grid;
   gap: 4px;
-  padding: 12px 36px 12px 13px;
+  padding: 12px 38px 12px 13px;
+  border: 1px solid transparent;
   border-radius: 13px;
   color: #182133;
   background: transparent;
   text-align: left;
-  transition: background 140ms ease, color 140ms ease;
+  transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease, color 150ms ease, transform 150ms ease;
 }
 
-.product-mode-menu button:hover,
+.product-mode-menu button:not([aria-checked="true"]):hover {
+  background: rgba(248, 251, 255, 0.96);
+  border-color: rgba(207, 219, 238, 0.92);
+  box-shadow: 0 8px 20px rgba(42, 57, 82, 0.08);
+  transform: translateY(-1px);
+}
+
 .product-mode-menu button[aria-checked="true"] {
-  background: linear-gradient(135deg, rgba(47, 111, 237, 0.10), rgba(125, 168, 255, 0.12));
+  background: linear-gradient(135deg, rgba(47, 111, 237, 0.14), rgba(125, 168, 255, 0.18));
+  border-color: rgba(47, 111, 237, 0.20);
+  box-shadow: inset 3px 0 0 rgba(47, 111, 237, 0.88);
+}
+
+.product-mode-menu button[aria-checked="true"]:hover {
+  background: linear-gradient(135deg, rgba(47, 111, 237, 0.18), rgba(125, 168, 255, 0.22));
 }
 
 .product-mode-menu button[aria-checked="true"]::after {
@@ -1214,6 +1227,14 @@
   color: #657186;
   font-size: 12px;
   line-height: 1.35;
+}
+
+.product-mode-menu button[aria-checked="true"] strong {
+  color: #1559d1;
+}
+
+.product-mode-menu button[aria-checked="true"] span {
+  color: #526b95;
 }
 
 .app-icon.knowledge,
