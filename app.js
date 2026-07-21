@@ -1750,7 +1750,15 @@
 
   function extractAnswerText(data) {
     if (!data) return "";
-    return String(data.answer || data.text || data.message || data.raw || "").trim();
+    const answer = String(data.answer || data.text || data.message || data.raw || "").trim();
+    const sources = Array.isArray(data.sources) ? data.sources : [];
+    if (!sources.length || /근거 문서/.test(answer)) return answer;
+    const lines = sources.slice(0, 5).map((source, index) => {
+      const title = String(source.title || source.name || source.id || source.url || `근거 ${index + 1}`).trim();
+      const snippet = String(source.snippet || "").trim();
+      return `${index + 1}. ${title}${snippet ? ` - ${snippet}` : ""}`;
+    });
+    return `${answer}\n\n근거 문서\n${lines.join("\n")}`;
   }
 
   function addMessage(role, text) {
@@ -2215,9 +2223,11 @@
   }
 
   function getConversationFeature(item) {
-    if (looksLikeAgentFileOrExcelConversation(item)) return "agent";
-    const explicit = getExplicitFeatureMode(item?.feature || item?.featureMode || item?.mode || item?.metadata?.feature || "");
+    // 명시적 feature_mode/metadata가 있으면 이를 최우선으로 신뢰합니다.
+    // 키워드 휴리스틱은 feature_mode가 없던 구버전 기록 복구용으로만 사용합니다.
+    const explicit = getExplicitFeatureMode(item?.feature || item?.featureMode || item?.feature_mode || item?.mode || item?.metadata?.feature || item?.metadata?.feature_mode || "");
     if (explicit) return explicit;
+    if (looksLikeAgentFileOrExcelConversation(item)) return "agent";
     return looksLikeKnowledgeConversation(item) ? "knowledge" : "agent";
   }
 
