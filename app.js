@@ -464,18 +464,50 @@
         border-radius: 6px;
         font-size: .92em;
       }
-      .ds-msg-table-wrap { margin: 12px 0 18px; }
-      .ds-msg-table-toolbar { display: flex; justify-content: flex-end; margin-bottom: 7px; }
+      .ds-msg-table-wrap { margin: 14px 0 20px; }
+      .ds-msg-table-toolbar {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        min-height: 30px;
+        margin-bottom: 8px;
+      }
       .ds-msg-table-toolbar button,
       .ds-bot-copy-btn {
-        height: 28px;
-        padding: 0 10px;
+        min-width: max-content;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 0 11px;
         color: #2f5fb6;
         font-size: 12px;
         font-weight: 850;
-        background: #eef5ff;
+        line-height: 1;
+        white-space: nowrap;
+        background: rgba(238, 245, 255, 0.92);
         border: 1px solid #d8e6ff;
         border-radius: 999px;
+        box-shadow: 0 6px 16px rgba(47, 111, 237, 0.08);
+      }
+      .ds-msg-table-toolbar button svg,
+      .ds-bot-copy-btn svg {
+        width: 14px;
+        height: 14px;
+        display: block;
+        flex: 0 0 auto;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .ds-msg-table-toolbar button:hover,
+      .ds-bot-copy-btn:hover {
+        color: #1d4ed8;
+        background: #e8f1ff;
+        border-color: #bcd3ff;
       }
       .ds-msg-table-scroll {
         max-width: 100%;
@@ -507,15 +539,46 @@
         font-weight: 900;
         color: #263146;
       }
-      .ds-bot-copy-btn {
-        align-self: flex-start;
-        margin-left: 42px;
+      .ds-bot-message-stack {
+        max-width: min(760px, calc(100% - 48px));
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .ds-bot-message-stack > .ds-msg {
+        max-width: 100%;
+      }
+      .ds-bot-actions {
+        min-height: 34px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 8px;
+        padding-left: 2px;
         opacity: 0;
         transform: translateY(-2px);
         transition: opacity .16s ease, transform .16s ease;
       }
-      .ds-bot-row:hover .ds-bot-copy-btn,
-      .ds-bot-copy-btn:focus-visible { opacity: .92; transform: translateY(0); }
+      .ds-bot-row:hover .ds-bot-actions,
+      .ds-bot-actions:focus-within,
+      .ds-bot-row.is-search-hit .ds-bot-actions {
+        opacity: .96;
+        transform: translateY(0);
+      }
+      .ds-bot-copy-btn {
+        color: #63718a;
+        background: transparent;
+        border-color: transparent;
+        box-shadow: none;
+      }
+      .ds-bot-copy-btn:hover,
+      .ds-bot-copy-btn:focus-visible {
+        color: #2f5fb6;
+        background: #eef5ff;
+        border-color: #d8e6ff;
+        outline: none;
+      }
       .ds-agent-composer {
         width: min(860px, 100%);
         margin: 0 auto;
@@ -719,7 +782,7 @@
         .ds-chat-avatar { display: none; }
         .ds-msg { max-width: min(720px, calc(100% - 24px)); }
         .ds-agent-body { padding-top: 28px; }
-        .ds-bot-copy-btn { margin-left: 0; }
+        .ds-bot-message-stack { max-width: calc(100% - 24px); }
       }
     `;
     document.head.appendChild(style);
@@ -1709,8 +1772,15 @@
     if (activeConversationHighlightQuery && String(text || "").toLowerCase().includes(activeConversationHighlightQuery.toLowerCase())) {
       row.classList.add("is-search-hit");
     }
-    row.appendChild(msg);
-    if (role === "bot") addCopyButton(row, msg);
+    if (role === "bot") {
+      const stack = document.createElement("div");
+      stack.className = "ds-bot-message-stack";
+      stack.appendChild(msg);
+      addCopyButton(stack, msg);
+      row.appendChild(stack);
+    } else {
+      row.appendChild(msg);
+    }
     state.agentBody.appendChild(row);
     state.agentBody.scrollTop = state.agentBody.scrollHeight;
     return row;
@@ -1865,12 +1935,13 @@
     toolbar.className = "ds-msg-table-toolbar";
     const copyBtn = document.createElement("button");
     copyBtn.type = "button";
-    copyBtn.textContent = "표 복사";
+    copyBtn.className = "ds-table-copy-btn";
+    setCopyButtonState(copyBtn, "표 복사");
     copyBtn.addEventListener("click", async () => {
       const tsv = tableLines.filter((line) => !isMarkdownTableSeparator(line)).map((line) => parseTableRow(line).join("\t")).join("\n");
       const ok = await copyToClipboard(tsv);
-      copyBtn.textContent = ok ? "복사 완료" : "복사 실패";
-      setTimeout(() => { copyBtn.textContent = "표 복사"; }, 1200);
+      setCopyButtonState(copyBtn, ok ? "복사 완료" : "복사 실패");
+      setTimeout(() => { setCopyButtonState(copyBtn, "표 복사"); }, 1200);
     });
     toolbar.appendChild(copyBtn);
     wrap.appendChild(toolbar);
@@ -1939,17 +2010,29 @@
     if (index < value.length) parent.appendChild(document.createTextNode(value.slice(index)));
   }
 
-  function addCopyButton(row, msg) {
+  function copyIconSvg() {
+    return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9.5h8.2a1.8 1.8 0 0 1 1.8 1.8v7.9a1.8 1.8 0 0 1-1.8 1.8H9.3a1.8 1.8 0 0 1-1.8-1.8V11.3A1.8 1.8 0 0 1 9.3 9.5Z"/><path d="M5 14.5H4.8A1.8 1.8 0 0 1 3 12.7V4.8A1.8 1.8 0 0 1 4.8 3h7.9a1.8 1.8 0 0 1 1.8 1.8V5"/></svg>`;
+  }
+
+  function setCopyButtonState(button, label) {
+    button.innerHTML = `${copyIconSvg()}<span>${escapeHtml(label)}</span>`;
+    button.setAttribute("aria-label", label);
+  }
+
+  function addCopyButton(stack, msg) {
+    const actions = document.createElement("div");
+    actions.className = "ds-bot-actions";
     const button = document.createElement("button");
     button.type = "button";
     button.className = "ds-bot-copy-btn";
-    button.textContent = "복사";
+    setCopyButtonState(button, "복사");
     button.addEventListener("click", async () => {
-      const ok = await copyToClipboard(msg.textContent || "");
-      button.textContent = ok ? "복사 완료" : "복사 실패";
-      setTimeout(() => { button.textContent = "복사"; }, 1200);
+      const ok = await copyToClipboard(msg.innerText || msg.textContent || "");
+      setCopyButtonState(button, ok ? "복사 완료" : "복사 실패");
+      setTimeout(() => { setCopyButtonState(button, "복사"); }, 1200);
     });
-    row.appendChild(button);
+    actions.appendChild(button);
+    stack.appendChild(actions);
   }
 
   async function copyToClipboard(text) {
