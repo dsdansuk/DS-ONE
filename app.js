@@ -1754,6 +1754,7 @@
   function extractAnswerText(data) {
     if (!data) return "";
     const answer = String(data.answer || data.text || data.message || data.raw || "").trim();
+    if (currentFeature === "knowledge") return stripKnowledgeEvidenceNotice(answer);
     const sources = Array.isArray(data.sources) ? data.sources : [];
     if (!sources.length || /근거 문서/.test(answer)) return answer;
     const lines = sources.slice(0, 5).map((source, index) => {
@@ -1762,6 +1763,13 @@
       return `${index + 1}. ${title}${snippet ? ` - ${snippet}` : ""}`;
     });
     return `${answer}\n\n근거 문서\n${lines.join("\n")}`;
+  }
+
+  function stripKnowledgeEvidenceNotice(text) {
+    return String(text || "")
+      .replace(/\n?\s*근거 안내\s*\n\s*SideTalk 응답에 별도 근거 문서 정보가 포함되지 않았습니다\.[\s\S]*$/i, "")
+      .replace(/\n?\s*근거 문서\s*\n(?:\s*\d+\.\s*[^\n]+\n?)+\s*$/i, "")
+      .trim();
   }
 
   function addMessage(role, text) {
