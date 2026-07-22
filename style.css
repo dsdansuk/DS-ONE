@@ -268,7 +268,7 @@
       display: flex;
       flex: 1;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
       margin-top: 24px;
       padding: 4px 0 0;
       overflow: hidden;
@@ -285,11 +285,12 @@
       display: grid;
       flex: 1 1 auto;
       align-content: start;
-      gap: 3px;
+      gap: 6px;
       min-height: 0;
+      max-height: clamp(270px, 39dvh, 390px);
       overflow-x: hidden;
       overflow-y: auto;
-      padding-right: 3px;
+      padding-right: 6px;
       overscroll-behavior: contain;
       scrollbar-gutter: stable;
     }
@@ -303,9 +304,16 @@
     }
 
     .recent-list::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.34);
+      background: rgba(148, 163, 184, 0);
       border: 2px solid transparent;
       border-radius: 999px;
+      background-clip: padding-box;
+    }
+
+    .recent-list:hover::-webkit-scrollbar-thumb,
+    .recent-list:focus-within::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.34);
+      border: 2px solid transparent;
       background-clip: padding-box;
     }
 
@@ -316,12 +324,12 @@
     }
 
     .recent-item {
-      min-height: clamp(42px, 5dvh, 48px);
+      min-height: clamp(46px, 5.25dvh, 52px);
       display: grid;
       align-content: center;
-      gap: 4px;
+      gap: 5px;
       width: 100%;
-      padding: 7px 18px;
+      padding: 8px 18px;
       color: #404958;
       text-align: left;
       background: transparent;
@@ -354,7 +362,7 @@
     }
 
     .recent-item-meta {
-      color: #818a9a;
+      color: rgba(113, 126, 148, 0.72);
       font-size: 12px;
       font-weight: 600;
     }
@@ -448,7 +456,7 @@
     .home-fit {
       position: relative;
       z-index: 1;
-      width: min(100%, 1180px);
+      width: min(100%, 1280px);
       transform: scale(var(--home-scale));
       transform-origin: top center;
       transition: transform 160ms ease;
@@ -462,7 +470,7 @@
 
     .hero h1 {
       margin: 0;
-      font-size: clamp(32px, 4dvh, 46px);
+      font-size: clamp(34px, 4.25dvh, 50px);
       font-weight: 800;
       line-height: 1.12;
       letter-spacing: 0;
@@ -479,12 +487,12 @@
     .hero p {
       margin: clamp(10px, 1.5dvh, 16px) 0 0;
       color: #4d5666;
-      font-size: clamp(15px, 1.7dvh, 18px);
+      font-size: clamp(15px, 1.8dvh, 19px);
       font-weight: 500;
     }
 
     .prompt-card {
-      width: min(760px, 100%);
+      width: min(940px, 100%);
       min-height: clamp(132px, 14.8dvh, 158px);
       display: grid;
       grid-template-rows: auto auto;
@@ -580,15 +588,15 @@
 
     .action-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(clamp(124px, 9vw, 136px), 1fr));
-      gap: clamp(10px, 1vw, 12px);
-      width: min(100%, 900px);
+      grid-template-columns: repeat(auto-fit, minmax(clamp(150px, 10vw, 164px), 1fr));
+      gap: clamp(12px, 1.1vw, 14px);
+      width: min(100%, 1060px);
       margin-inline: auto;
       margin-bottom: clamp(20px, 3dvh, 30px);
     }
 
     .action-card {
-      min-height: clamp(96px, 11.4dvh, 116px);
+      min-height: clamp(104px, 12.1dvh, 122px);
       display: grid;
       align-content: center;
       justify-content: start;
@@ -1043,7 +1051,7 @@
       }
 
       .action-grid {
-        grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
       }
 
       .lower-grid {
@@ -1249,6 +1257,56 @@
 
 .prompt-card.is-knowledge-mode .prompt-left {
   min-width: 0;
+}
+
+
+/* v70: monitor-scale and knowledge-mode refinements */
+@media (min-width: 1440px) and (min-height: 760px) {
+  .home-fit {
+    width: min(100%, 1320px);
+  }
+
+  .prompt-card {
+    width: min(960px, 100%);
+  }
+
+  .action-grid {
+    width: min(100%, 1100px);
+    grid-template-columns: repeat(6, minmax(150px, 1fr));
+  }
+}
+
+body.is-knowledge-feature .hero h1 {
+  font-size: clamp(36px, 4.35dvh, 50px);
+}
+
+.prompt-card.is-knowledge-mode {
+  width: min(900px, 100%);
+  min-height: clamp(112px, 12.6dvh, 134px);
+  padding: clamp(14px, 1.65dvh, 18px);
+  margin-bottom: clamp(20px, 3dvh, 34px);
+}
+
+.prompt-card.is-knowledge-mode textarea {
+  height: 36px;
+  min-height: 36px;
+  max-height: min(18dvh, 128px);
+}
+
+body.is-knowledge-feature .action-grid {
+  width: min(100%, 1080px);
+  grid-template-columns: repeat(6, minmax(150px, 1fr));
+}
+
+body.is-knowledge-feature .action-card {
+  min-height: clamp(96px, 10.7dvh, 112px);
+}
+
+@media (max-width: 1280px) {
+  body.is-knowledge-feature .action-grid,
+  .action-grid {
+    grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  }
 }
 
 @media (max-width: 1100px) {
