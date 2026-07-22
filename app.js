@@ -119,7 +119,7 @@
       subtitle: "사내 규정, 업무 절차 및 담당 부서를 빠르게 찾아드립니다.",
       placeholder: "사내 규정, 업무 절차, 담당 부서를 질문하세요.   (예: 모니터 지급 기준 알려줘)",
       disclaimer: "사내 지식 답변은 SideTalk 지식베이스 기준입니다. 중요한 업무에는 담당 부서와 원문을 확인해 주세요.",
-      attachEnabled: false,
+      attachEnabled: true,
       cards: [
         { iconClass: "knowledge", iconText: "규", title: "규정·기준", desc: "제도, 기준, 예외<br>적용 여부 확인", task: "knowledge_policy", attach: false, template: "아래 사내 규정 또는 기준을 지식베이스 기준으로 확인해 주세요.\n\n[질문]\n" },
         { iconClass: "knowledge", iconText: "신", title: "신청·결재", desc: "신청서, 결재선,<br>처리 절차 확인", task: "knowledge_request", attach: false, template: "아래 신청 또는 결재 절차를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
