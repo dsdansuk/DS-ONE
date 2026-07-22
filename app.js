@@ -1505,13 +1505,23 @@
     return text.length;
   }
 
+  function keepTemplateIntroVisible(textarea) {
+    if (!textarea) return;
+    // 템플릿 버튼 클릭 시 커서는 작성 위치로 두되,
+    // 입력창을 끝까지 스크롤하면 상단 안내 문장이 보이지 않아 사용자가 문맥을 놓칩니다.
+    // 첫 화면에서는 안내 문장과 [질문]/[작성할 내용]이 함께 보여야 하므로 스크롤은 항상 맨 위로 복원합니다.
+    try { textarea.scrollTop = 0; } catch {}
+  }
+
   function focusTextareaAtPosition(textarea, position) {
     if (!textarea) return;
     const safePosition = Math.max(0, Math.min(Number(position || 0), textarea.value.length));
     window.setTimeout(() => {
       textarea.focus();
       try { textarea.setSelectionRange(safePosition, safePosition); } catch {}
-      textarea.scrollTop = textarea.scrollHeight;
+      keepTemplateIntroVisible(textarea);
+      window.requestAnimationFrame(() => keepTemplateIntroVisible(textarea));
+      window.setTimeout(() => keepTemplateIntroVisible(textarea), 80);
     }, 30);
   }
 
