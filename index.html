@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DS ONE 업무 AI Agent 홈</title>
-  <link rel="stylesheet" href="style.css?v=20260722_v72_mode_size_stability">
+  <link rel="stylesheet" href="style.css?v=20260721_v69_knowledge_no_evidence_notice">
 </head>
 <body>
   <svg class="sr-only" aria-hidden="true">
@@ -94,8 +94,8 @@
           <div class="recent-list">
           </div>
           <button class="sidebar-guide-button" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-chat"></use></svg>
-            <span>문의·피드백</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-book"></use></svg>
+            <span>사용 가이드</span>
           </button>
         </section>
       </aside>
@@ -357,11 +357,36 @@
     function fitHomeToViewport() {
       if (!stage || !fitTarget) return;
 
-      // v72: do not scale the home canvas by feature-mode-specific content height.
-      // Agent and Knowledge modes must keep the same physical title/input/card sizes
-      // so the UI does not appear to jump when switching modes.
+      const previousScale = Number.parseFloat(getComputedStyle(fitTarget).getPropertyValue("--home-scale")) || 1;
       fitTarget.style.setProperty("--home-scale", "1");
-      stage.style.alignItems = "center";
+
+      const stageRect = stage.getBoundingClientRect();
+      const stageStyle = getComputedStyle(stage);
+      const availableHeight = Math.max(
+        0,
+        stage.clientHeight - parseFloat(stageStyle.paddingTop) - parseFloat(stageStyle.paddingBottom)
+      );
+      const availableWidth = Math.max(
+        0,
+        stage.clientWidth - parseFloat(stageStyle.paddingLeft) - parseFloat(stageStyle.paddingRight)
+      );
+      const naturalHeight = fitTarget.scrollHeight;
+      const naturalWidth = fitTarget.scrollWidth;
+
+      let nextScale = Math.min(1, availableHeight / naturalHeight, availableWidth / naturalWidth);
+      nextScale = Math.max(0.48, Number.isFinite(nextScale) ? nextScale : 1);
+
+      fitTarget.style.setProperty("--home-scale", nextScale.toFixed(3));
+      stage.style.alignItems = nextScale < 0.96 ? "flex-start" : "center";
+
+      if (Math.abs(previousScale - nextScale) > 0.001) {
+        requestAnimationFrame(() => {
+          const visualHeight = fitTarget.getBoundingClientRect().height;
+          if (visualHeight > stageRect.height + 1 && nextScale > 0.62) {
+            fitHomeToViewport();
+          }
+        });
+      }
     }
 
     const resizeObserver = new ResizeObserver(fitHomeToViewport);
@@ -384,7 +409,7 @@
     resizePromptTextarea();
     fitHomeToViewport();
   </script>
-  <script src="app.js?v=20260722_v72_mode_size_stability"></script>
+  <script src="app.js?v=20260721_v69_knowledge_no_evidence_notice"></script>
 </body>
 </html>
 

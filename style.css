@@ -268,7 +268,7 @@
       display: flex;
       flex: 1;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
       margin-top: 24px;
       padding: 4px 0 0;
       overflow: hidden;
@@ -285,12 +285,11 @@
       display: grid;
       flex: 1 1 auto;
       align-content: start;
-      gap: 6px;
+      gap: 3px;
       min-height: 0;
-      max-height: clamp(270px, 39dvh, 390px);
       overflow-x: hidden;
       overflow-y: auto;
-      padding-right: 6px;
+      padding-right: 3px;
       overscroll-behavior: contain;
       scrollbar-gutter: stable;
     }
@@ -304,16 +303,9 @@
     }
 
     .recent-list::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0);
-      border: 2px solid transparent;
-      border-radius: 999px;
-      background-clip: padding-box;
-    }
-
-    .recent-list:hover::-webkit-scrollbar-thumb,
-    .recent-list:focus-within::-webkit-scrollbar-thumb {
       background: rgba(148, 163, 184, 0.34);
       border: 2px solid transparent;
+      border-radius: 999px;
       background-clip: padding-box;
     }
 
@@ -324,12 +316,12 @@
     }
 
     .recent-item {
-      min-height: clamp(46px, 5.25dvh, 52px);
+      min-height: clamp(42px, 5dvh, 48px);
       display: grid;
       align-content: center;
-      gap: 5px;
+      gap: 4px;
       width: 100%;
-      padding: 8px 18px;
+      padding: 7px 18px;
       color: #404958;
       text-align: left;
       background: transparent;
@@ -362,7 +354,7 @@
     }
 
     .recent-item-meta {
-      color: rgba(113, 126, 148, 0.72);
+      color: #818a9a;
       font-size: 12px;
       font-weight: 600;
     }
@@ -456,7 +448,7 @@
     .home-fit {
       position: relative;
       z-index: 1;
-      width: min(100%, 1280px);
+      width: min(100%, 1180px);
       transform: scale(var(--home-scale));
       transform-origin: top center;
       transition: transform 160ms ease;
@@ -470,7 +462,7 @@
 
     .hero h1 {
       margin: 0;
-      font-size: clamp(34px, 4.25dvh, 50px);
+      font-size: clamp(32px, 4dvh, 46px);
       font-weight: 800;
       line-height: 1.12;
       letter-spacing: 0;
@@ -487,12 +479,12 @@
     .hero p {
       margin: clamp(10px, 1.5dvh, 16px) 0 0;
       color: #4d5666;
-      font-size: clamp(15px, 1.8dvh, 19px);
+      font-size: clamp(15px, 1.7dvh, 18px);
       font-weight: 500;
     }
 
     .prompt-card {
-      width: min(940px, 100%);
+      width: min(760px, 100%);
       min-height: clamp(132px, 14.8dvh, 158px);
       display: grid;
       grid-template-rows: auto auto;
@@ -588,15 +580,15 @@
 
     .action-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(clamp(150px, 10vw, 164px), 1fr));
-      gap: clamp(12px, 1.1vw, 14px);
-      width: min(100%, 1060px);
+      grid-template-columns: repeat(auto-fit, minmax(clamp(124px, 9vw, 136px), 1fr));
+      gap: clamp(10px, 1vw, 12px);
+      width: min(100%, 900px);
       margin-inline: auto;
       margin-bottom: clamp(20px, 3dvh, 30px);
     }
 
     .action-card {
-      min-height: clamp(104px, 12.1dvh, 122px);
+      min-height: clamp(96px, 11.4dvh, 116px);
       display: grid;
       align-content: center;
       justify-content: start;
@@ -1051,7 +1043,7 @@
       }
 
       .action-grid {
-        grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
       }
 
       .lower-grid {
@@ -1259,175 +1251,8 @@
   min-width: 0;
 }
 
-
-/* v71: unify home input and quick-action sizing across Agent/Knowledge modes */
-@media (min-width: 1440px) and (min-height: 760px) {
-  .home-fit {
-    width: min(100%, 1320px);
-  }
-
-  .prompt-card,
-  .prompt-card.is-knowledge-mode {
-    width: min(960px, 100%);
-  }
-
-  .action-grid,
-  body.is-knowledge-feature .action-grid {
-    width: min(100%, 1100px);
-    grid-template-columns: repeat(6, minmax(150px, 1fr));
-  }
-}
-
-body.is-knowledge-feature .hero h1 {
-  font-size: clamp(36px, 4.35dvh, 50px);
-}
-
-/* Keep the Knowledge inquiry home composer visually identical to the Agent composer.
-   Only the attachment affordance is hidden in Knowledge mode. */
-.prompt-card.is-knowledge-mode {
-  width: min(940px, 100%);
-  min-height: clamp(132px, 14.8dvh, 158px);
-  padding: clamp(14px, 1.8dvh, 20px);
-  margin-bottom: clamp(20px, 3.3dvh, 38px);
-}
-
-.prompt-card.is-knowledge-mode textarea {
-  height: 46px;
-  min-height: 46px;
-  max-height: min(24dvh, 168px);
-}
-
-body.is-knowledge-feature .action-grid {
-  width: min(100%, 1060px);
-}
-
-body.is-knowledge-feature .action-card {
-  min-height: clamp(104px, 12.1dvh, 122px);
-}
-
-@media (max-width: 1280px) {
-  body.is-knowledge-feature .action-grid,
-  .action-grid {
-    grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
-  }
-}
-
 @media (max-width: 1100px) {
   .product-mode-menu {
     left: -72px;
-  }
-}
-
-/* v72: mode-size stability
-   Keep the home hero, composer and quick cards physically identical between
-   업무 AI Agent and 사내 지식 문의 on both laptop and large monitor screens.
-   The previous viewport-fit transform used natural content height, so small
-   differences in text/cards made the entire home section scale differently by mode. */
-:root {
-  --ds-home-width: 1320px;
-  --ds-home-prompt-width: 960px;
-  --ds-home-actions-width: 1100px;
-  --ds-home-title-size: clamp(38px, 4.2dvh, 50px);
-  --ds-home-subtitle-size: clamp(15px, 1.75dvh, 18px);
-  --ds-home-prompt-min-height: clamp(132px, 14.8dvh, 158px);
-  --ds-home-prompt-textarea-height: 46px;
-  --ds-home-card-min-height: clamp(104px, 12.1dvh, 122px);
-}
-
-.home-stage {
-  align-items: center !important;
-}
-
-.home-fit {
-  width: min(100%, var(--ds-home-width)) !important;
-  transform: none !important;
-  --home-scale: 1 !important;
-}
-
-.hero,
-body.is-knowledge-feature .hero {
-  margin-bottom: clamp(14px, 2.1dvh, 24px) !important;
-}
-
-.hero h1,
-body.is-knowledge-feature .hero h1 {
-  font-size: var(--ds-home-title-size) !important;
-  line-height: 1.12 !important;
-  letter-spacing: -0.025em;
-}
-
-.hero p,
-body.is-knowledge-feature .hero p {
-  font-size: var(--ds-home-subtitle-size) !important;
-  line-height: 1.45 !important;
-}
-
-.prompt-card,
-.prompt-card.is-knowledge-mode,
-body.is-knowledge-feature .prompt-card {
-  width: min(var(--ds-home-prompt-width), 100%) !important;
-  min-height: var(--ds-home-prompt-min-height) !important;
-  padding: clamp(14px, 1.8dvh, 20px) !important;
-  margin: 0 auto clamp(20px, 3.3dvh, 38px) !important;
-}
-
-.prompt-card textarea,
-.prompt-card.is-knowledge-mode textarea,
-body.is-knowledge-feature .prompt-card textarea {
-  height: var(--ds-home-prompt-textarea-height) !important;
-  min-height: var(--ds-home-prompt-textarea-height) !important;
-  max-height: min(24dvh, 168px) !important;
-}
-
-.action-grid,
-body.is-knowledge-feature .action-grid {
-  width: min(100%, var(--ds-home-actions-width)) !important;
-  grid-template-columns: repeat(6, minmax(150px, 1fr)) !important;
-  margin-top: 0 !important;
-  margin-bottom: clamp(20px, 3dvh, 30px) !important;
-}
-
-.action-card,
-body.is-knowledge-feature .action-card {
-  min-height: var(--ds-home-card-min-height) !important;
-  padding: 16px !important;
-}
-
-@media (max-width: 1180px) {
-  .action-grid,
-  body.is-knowledge-feature .action-grid {
-    grid-template-columns: repeat(3, minmax(150px, 1fr)) !important;
-    width: min(100%, 720px) !important;
-  }
-}
-
-@media (max-width: 960px) {
-  .action-grid,
-  body.is-knowledge-feature .action-grid {
-    grid-template-columns: repeat(2, minmax(136px, 1fr)) !important;
-  }
-}
-
-@media (max-height: 770px) {
-  .home-stage {
-    padding-top: 12px !important;
-    padding-bottom: 12px !important;
-    align-items: center !important;
-  }
-
-  .hero,
-  body.is-knowledge-feature .hero {
-    margin-bottom: clamp(12px, 1.8dvh, 18px) !important;
-  }
-
-  .prompt-card,
-  .prompt-card.is-knowledge-mode,
-  body.is-knowledge-feature .prompt-card {
-    margin-bottom: clamp(16px, 2.3dvh, 24px) !important;
-  }
-
-  .action-grid,
-  body.is-knowledge-feature .action-grid {
-    margin-top: 0 !important;
   }
 }

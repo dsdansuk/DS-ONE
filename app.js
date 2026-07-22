@@ -115,9 +115,9 @@
     knowledge: {
       label: "사내 지식 문의",
       shortLabel: "사내 지식",
-      title: "사내 업무, 무엇이 궁금하신가요?",
-      subtitle: "사내 규정, 업무 절차 및 담당 부서를 빠르게 찾아드립니다.",
-      placeholder: "사내 규정, 업무 절차, 담당 부서를 질문하세요.   (예: 모니터 지급 기준 알려줘)",
+      title: "사내 기준을 확인해드릴까요?",
+      subtitle: "규정, 절차, 담당 부서 등은 SideTalk 지식베이스 기준으로 답변합니다.",
+      placeholder: "사내 규정, 업무 절차, 담당 부서를 질문하세요.   (예: 출장비 정산 기준 알려줘)",
       disclaimer: "사내 지식 답변은 SideTalk 지식베이스 기준입니다. 중요한 업무에는 담당 부서와 원문을 확인해 주세요.",
       attachEnabled: false,
       cards: [
@@ -1279,7 +1279,7 @@
     if (state.heroSubtitle) state.heroSubtitle.textContent = profile.subtitle;
     if (state.homePromptInput) state.homePromptInput.placeholder = profile.placeholder;
     if (state.agentMessageInput) state.agentMessageInput.placeholder = currentFeature === "knowledge"
-      ? "사내 규정, 절차, 담당 부서를 질문하세요. Shift+Enter로 줄바꿈"
+      ? "사내 규정, 절차, 기준을 질문하세요. Shift+Enter로 줄바꿈"
       : "메시지를 입력하세요. Shift+Enter로 줄바꿈";
     if (state.agentDisclaimer) state.agentDisclaimer.textContent = profile.disclaimer;
     state.promptCard?.classList.toggle("is-knowledge-mode", currentFeature === "knowledge");
