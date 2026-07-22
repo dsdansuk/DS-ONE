@@ -1100,8 +1100,8 @@
     state.productModeButton = document.getElementById("productModeButton");
     state.productModeLabel = document.getElementById("productModeLabel");
     state.productModeMenu = document.getElementById("productModeMenu");
-    state.heroTitle = document.querySelector(".hero-title");
-    state.heroSubtitle = document.querySelector(".hero-copy p, .hero-subtitle");
+    state.heroTitle = document.querySelector("#home-title, .hero-title, .hero h1");
+    state.heroSubtitle = document.querySelector(".hero-copy p, .hero-subtitle, .hero > p");
     state.promptCard = document.querySelector(".prompt-card");
     state.actionCards = Array.from(document.querySelectorAll(".action-card"));
 
@@ -1431,6 +1431,12 @@
     if (title.includes("엑셀 분석")) return { task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요." };
     if (title.includes("PDF 분석")) return { task: "file_question", attach: true, template: "첨부한 파일을 기준으로 질문에 답변해 주세요.\n\n[질문]\n" };
     if (title.includes("PPT 생성")) return { task: "report_summary", attach: false, template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" };
+    if (title.includes("규정") || title.includes("기준")) return { task: "knowledge_policy", attach: false, template: "아래 사내 규정 또는 기준을 지식베이스 기준으로 확인해 주세요.\n\n[질문]\n" };
+    if (title.includes("신청") || title.includes("결재")) return { task: "knowledge_request", attach: false, template: "아래 신청 또는 결재 절차를 사내 기준으로 확인해 주세요.\n\n[질문]\n" };
+    if (title.includes("담당")) return { task: "knowledge_owner", attach: false, template: "아래 업무의 담당 부서 또는 문의처를 사내 기준으로 확인해 주세요.\n\n[질문]\n" };
+    if (title.includes("시스템") || title.includes("권한")) return { task: "knowledge_system_access", attach: false, template: "아래 시스템, 계정 또는 권한 관련 문의를 사내 기준으로 확인해 주세요.\n\n[질문]\n" };
+    if (title.includes("보안") || title.includes("개인정보")) return { task: "knowledge_security", attach: false, template: "아래 보안, 개인정보 또는 파일 처리 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" };
+    if (title.includes("근태") || title.includes("복리후생") || title.includes("휴가")) return { task: "knowledge_welfare", attach: false, template: "아래 근태, 휴가 또는 복리후생 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" };
     return { task: "", attach: false, template: "" };
   }
 
@@ -1485,12 +1491,37 @@
     window.setTimeout(() => state.agentMessageInput?.focus(), 30);
   }
 
+  function getTemplateCursorPosition(value) {
+    const text = String(value || "");
+    const markers = ["[질문]", "[작성할 내용]", "[요약할 내용]", "[번역할 내용]", "[정리할 내용]"];
+    for (const marker of markers) {
+      const index = text.indexOf(marker);
+      if (index >= 0) {
+        const nextIndex = index + marker.length;
+        if (text.charAt(nextIndex) === "\n") return nextIndex + 1;
+        return nextIndex;
+      }
+    }
+    return text.length;
+  }
+
+  function focusTextareaAtPosition(textarea, position) {
+    if (!textarea) return;
+    const safePosition = Math.max(0, Math.min(Number(position || 0), textarea.value.length));
+    window.setTimeout(() => {
+      textarea.focus();
+      try { textarea.setSelectionRange(safePosition, safePosition); } catch {}
+      textarea.scrollTop = textarea.scrollHeight;
+    }, 30);
+  }
+
   function setHomeInput(value) {
     if (!state.homePromptInput) return;
-    state.homePromptInput.value = String(value || "");
+    const text = String(value || "");
+    state.homePromptInput.value = text;
     syncHomePromptEmptyClass();
     resizeTextarea(state.homePromptInput);
-    window.setTimeout(() => state.homePromptInput?.focus(), 30);
+    focusTextareaAtPosition(state.homePromptInput, getTemplateCursorPosition(text));
   }
 
   function startNewConversation(options = {}) {
