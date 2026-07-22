@@ -115,8 +115,8 @@
     knowledge: {
       label: "사내 지식 문의",
       shortLabel: "사내 지식",
-      title: "사내 기준을 확인해드릴까요?",
-      subtitle: "규정, 절차, 담당 부서 등은 SideTalk 지식베이스 기준으로 답변합니다.",
+      title: "사내 업무, 무엇이 궁금하신가요?",
+      subtitle: "사내 규정, 업무 절차 및 담당 부서를 빠르게 찾아드립니다.",
       placeholder: "사내 규정, 업무 절차, 담당 부서를 질문하세요.   (예: 출장비 정산 기준 알려줘)",
       disclaimer: "사내 지식 답변은 SideTalk 지식베이스 기준입니다. 중요한 업무에는 담당 부서와 원문을 확인해 주세요.",
       attachEnabled: false,
@@ -1100,8 +1100,8 @@
     state.productModeButton = document.getElementById("productModeButton");
     state.productModeLabel = document.getElementById("productModeLabel");
     state.productModeMenu = document.getElementById("productModeMenu");
-    state.heroTitle = document.querySelector(".hero-title");
-    state.heroSubtitle = document.querySelector(".hero-copy p, .hero-subtitle");
+    state.heroTitle = document.querySelector("#home-title, .hero-title, .hero h1");
+    state.heroSubtitle = document.querySelector(".hero-copy p, .hero-subtitle, .hero p");
     state.promptCard = document.querySelector(".prompt-card");
     state.actionCards = Array.from(document.querySelectorAll(".action-card"));
 

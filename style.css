@@ -448,7 +448,7 @@
     .home-fit {
       position: relative;
       z-index: 1;
-      width: min(100%, 1180px);
+      width: min(100%, 1280px);
       transform: scale(var(--home-scale));
       transform-origin: top center;
       transition: transform 160ms ease;
@@ -462,7 +462,7 @@
 
     .hero h1 {
       margin: 0;
-      font-size: clamp(32px, 4dvh, 46px);
+      font-size: clamp(34px, 4.15dvh, 50px);
       font-weight: 800;
       line-height: 1.12;
       letter-spacing: 0;
@@ -484,7 +484,7 @@
     }
 
     .prompt-card {
-      width: min(760px, 100%);
+      width: min(940px, 100%);
       min-height: clamp(132px, 14.8dvh, 158px);
       display: grid;
       grid-template-rows: auto auto;
@@ -580,9 +580,9 @@
 
     .action-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(clamp(124px, 9vw, 136px), 1fr));
-      gap: clamp(10px, 1vw, 12px);
-      width: min(100%, 900px);
+      grid-template-columns: repeat(auto-fit, minmax(clamp(150px, 10vw, 160px), 1fr));
+      gap: clamp(12px, 1.1vw, 14px);
+      width: min(100%, 1060px);
       margin-inline: auto;
       margin-bottom: clamp(20px, 3dvh, 30px);
     }
@@ -1043,7 +1043,7 @@
       }
 
       .action-grid {
-        grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
       }
 
       .lower-grid {
@@ -1227,6 +1227,30 @@
   color: #657186;
   font-size: 12px;
   line-height: 1.35;
+}
+
+
+/* v76: monitor hero presence and knowledge copy alignment
+   Visual-only home layout tuning. Chat composer behavior, textarea resize,
+   template insertion and cursor logic are intentionally untouched. */
+@media (min-width: 1440px) and (min-height: 760px) {
+  .home-fit {
+    width: min(100%, 1320px);
+  }
+
+  .hero h1 {
+    font-size: clamp(38px, 4.25dvh, 52px);
+    letter-spacing: -0.025em;
+  }
+
+  .prompt-card {
+    width: min(960px, 100%);
+  }
+
+  .action-grid {
+    width: min(100%, 1100px);
+    grid-template-columns: repeat(6, minmax(150px, 1fr));
+  }
 }
 
 .product-mode-menu button[aria-checked="true"] strong {
