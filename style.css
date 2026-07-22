@@ -1260,17 +1260,19 @@
 }
 
 
-/* v70: monitor-scale and knowledge-mode refinements */
+/* v71: unify home input and quick-action sizing across Agent/Knowledge modes */
 @media (min-width: 1440px) and (min-height: 760px) {
   .home-fit {
     width: min(100%, 1320px);
   }
 
-  .prompt-card {
+  .prompt-card,
+  .prompt-card.is-knowledge-mode {
     width: min(960px, 100%);
   }
 
-  .action-grid {
+  .action-grid,
+  body.is-knowledge-feature .action-grid {
     width: min(100%, 1100px);
     grid-template-columns: repeat(6, minmax(150px, 1fr));
   }
@@ -1280,26 +1282,27 @@ body.is-knowledge-feature .hero h1 {
   font-size: clamp(36px, 4.35dvh, 50px);
 }
 
+/* Keep the Knowledge inquiry home composer visually identical to the Agent composer.
+   Only the attachment affordance is hidden in Knowledge mode. */
 .prompt-card.is-knowledge-mode {
-  width: min(900px, 100%);
-  min-height: clamp(112px, 12.6dvh, 134px);
-  padding: clamp(14px, 1.65dvh, 18px);
-  margin-bottom: clamp(20px, 3dvh, 34px);
+  width: min(940px, 100%);
+  min-height: clamp(132px, 14.8dvh, 158px);
+  padding: clamp(14px, 1.8dvh, 20px);
+  margin-bottom: clamp(20px, 3.3dvh, 38px);
 }
 
 .prompt-card.is-knowledge-mode textarea {
-  height: 36px;
-  min-height: 36px;
-  max-height: min(18dvh, 128px);
+  height: 46px;
+  min-height: 46px;
+  max-height: min(24dvh, 168px);
 }
 
 body.is-knowledge-feature .action-grid {
-  width: min(100%, 1080px);
-  grid-template-columns: repeat(6, minmax(150px, 1fr));
+  width: min(100%, 1060px);
 }
 
 body.is-knowledge-feature .action-card {
-  min-height: clamp(96px, 10.7dvh, 112px);
+  min-height: clamp(104px, 12.1dvh, 122px);
 }
 
 @media (max-width: 1280px) {
