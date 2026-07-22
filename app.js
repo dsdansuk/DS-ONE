@@ -119,7 +119,7 @@
       subtitle: "사내 규정, 업무 절차 및 담당 부서를 빠르게 찾아드립니다.",
       placeholder: "사내 규정, 업무 절차, 담당 부서를 질문하세요.   (예: 모니터 지급 기준 알려줘)",
       disclaimer: "사내 지식 답변은 SideTalk 지식베이스 기준입니다. 중요한 업무에는 담당 부서와 원문을 확인해 주세요.",
-      attachEnabled: true,
+      attachEnabled: false,
       cards: [
         { iconClass: "knowledge", iconText: "규", title: "규정·기준", desc: "제도, 기준, 예외<br>적용 여부 확인", task: "knowledge_policy", attach: false, template: "아래 사내 규정 또는 기준을 지식베이스 기준으로 확인해 주세요.\n\n[질문]\n" },
         { iconClass: "knowledge", iconText: "신", title: "신청·결재", desc: "신청서, 결재선,<br>처리 절차 확인", task: "knowledge_request", attach: false, template: "아래 신청 또는 결재 절차를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
@@ -1100,8 +1100,11 @@
     state.productModeButton = document.getElementById("productModeButton");
     state.productModeLabel = document.getElementById("productModeLabel");
     state.productModeMenu = document.getElementById("productModeMenu");
-    state.heroTitle = document.querySelector(".hero-title");
-    state.heroSubtitle = document.querySelector(".hero-copy p, .hero-subtitle");
+    // v73: 실제 메인 HTML은 .hero-title/.hero-subtitle 클래스가 아니라
+    // #home-title / .hero > p 구조입니다. 기능 전환 시 hero 문구가 바뀌지 않던
+    // 문제를 막기 위해 현재/과거 마크업을 모두 지원합니다.
+    state.heroTitle = document.getElementById("home-title") || document.querySelector(".hero-title");
+    state.heroSubtitle = document.querySelector(".hero p") || document.querySelector(".hero-copy p, .hero-subtitle");
     state.promptCard = document.querySelector(".prompt-card");
     state.actionCards = Array.from(document.querySelectorAll(".action-card"));
 
@@ -1272,6 +1275,8 @@
 
   function updateHomeFeatureCopy() {
     const profile = getCurrentFeatureProfile();
+    if (!state.heroTitle) state.heroTitle = document.getElementById("home-title") || document.querySelector(".hero-title");
+    if (!state.heroSubtitle) state.heroSubtitle = document.querySelector(".hero p") || document.querySelector(".hero-copy p, .hero-subtitle");
     if (state.heroTitle) {
       const sparkle = state.heroTitle.querySelector(".sparkle")?.outerHTML || '<span class="sparkle">✦</span>';
       state.heroTitle.innerHTML = `${escapeHtml(profile.title)}${sparkle}`;
@@ -1487,10 +1492,26 @@
 
   function setHomeInput(value) {
     if (!state.homePromptInput) return;
-    state.homePromptInput.value = String(value || "");
+    const text = String(value || "");
+    state.homePromptInput.value = text;
     syncHomePromptEmptyClass();
     resizeTextarea(state.homePromptInput);
-    window.setTimeout(() => state.homePromptInput?.focus(), 30);
+
+    // v73: 빠른 작업 버튼을 눌렀을 때 템플릿이 들어갔는지 바로 알 수 있도록
+    // 사용자가 작성해야 하는 위치([질문]/[작성할 내용] 등)로 커서를 이동합니다.
+    // 긴 템플릿의 첫 줄만 보이면 "입력되지 않았다"고 느껴질 수 있어,
+    // 작성 위치가 보이도록 scroll도 함께 맞춥니다.
+    const markerMatch = text.match(/\[(질문|작성할 내용|요약할 내용|번역할 내용|정리할 내용)\]\s*$/);
+    const cursorAt = markerMatch ? text.length : text.length;
+    window.setTimeout(() => {
+      if (!state.homePromptInput) return;
+      state.homePromptInput.focus();
+      try {
+        state.homePromptInput.setSelectionRange(cursorAt, cursorAt);
+      } catch {}
+      state.homePromptInput.scrollTop = state.homePromptInput.scrollHeight;
+      resizeTextarea(state.homePromptInput);
+    }, 30);
   }
 
   function startNewConversation(options = {}) {
