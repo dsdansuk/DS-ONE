@@ -1317,3 +1317,117 @@ body.is-knowledge-feature .action-card {
     left: -72px;
   }
 }
+
+/* v72: mode-size stability
+   Keep the home hero, composer and quick cards physically identical between
+   업무 AI Agent and 사내 지식 문의 on both laptop and large monitor screens.
+   The previous viewport-fit transform used natural content height, so small
+   differences in text/cards made the entire home section scale differently by mode. */
+:root {
+  --ds-home-width: 1320px;
+  --ds-home-prompt-width: 960px;
+  --ds-home-actions-width: 1100px;
+  --ds-home-title-size: clamp(38px, 4.2dvh, 50px);
+  --ds-home-subtitle-size: clamp(15px, 1.75dvh, 18px);
+  --ds-home-prompt-min-height: clamp(132px, 14.8dvh, 158px);
+  --ds-home-prompt-textarea-height: 46px;
+  --ds-home-card-min-height: clamp(104px, 12.1dvh, 122px);
+}
+
+.home-stage {
+  align-items: center !important;
+}
+
+.home-fit {
+  width: min(100%, var(--ds-home-width)) !important;
+  transform: none !important;
+  --home-scale: 1 !important;
+}
+
+.hero,
+body.is-knowledge-feature .hero {
+  margin-bottom: clamp(14px, 2.1dvh, 24px) !important;
+}
+
+.hero h1,
+body.is-knowledge-feature .hero h1 {
+  font-size: var(--ds-home-title-size) !important;
+  line-height: 1.12 !important;
+  letter-spacing: -0.025em;
+}
+
+.hero p,
+body.is-knowledge-feature .hero p {
+  font-size: var(--ds-home-subtitle-size) !important;
+  line-height: 1.45 !important;
+}
+
+.prompt-card,
+.prompt-card.is-knowledge-mode,
+body.is-knowledge-feature .prompt-card {
+  width: min(var(--ds-home-prompt-width), 100%) !important;
+  min-height: var(--ds-home-prompt-min-height) !important;
+  padding: clamp(14px, 1.8dvh, 20px) !important;
+  margin: 0 auto clamp(20px, 3.3dvh, 38px) !important;
+}
+
+.prompt-card textarea,
+.prompt-card.is-knowledge-mode textarea,
+body.is-knowledge-feature .prompt-card textarea {
+  height: var(--ds-home-prompt-textarea-height) !important;
+  min-height: var(--ds-home-prompt-textarea-height) !important;
+  max-height: min(24dvh, 168px) !important;
+}
+
+.action-grid,
+body.is-knowledge-feature .action-grid {
+  width: min(100%, var(--ds-home-actions-width)) !important;
+  grid-template-columns: repeat(6, minmax(150px, 1fr)) !important;
+  margin-top: 0 !important;
+  margin-bottom: clamp(20px, 3dvh, 30px) !important;
+}
+
+.action-card,
+body.is-knowledge-feature .action-card {
+  min-height: var(--ds-home-card-min-height) !important;
+  padding: 16px !important;
+}
+
+@media (max-width: 1180px) {
+  .action-grid,
+  body.is-knowledge-feature .action-grid {
+    grid-template-columns: repeat(3, minmax(150px, 1fr)) !important;
+    width: min(100%, 720px) !important;
+  }
+}
+
+@media (max-width: 960px) {
+  .action-grid,
+  body.is-knowledge-feature .action-grid {
+    grid-template-columns: repeat(2, minmax(136px, 1fr)) !important;
+  }
+}
+
+@media (max-height: 770px) {
+  .home-stage {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+    align-items: center !important;
+  }
+
+  .hero,
+  body.is-knowledge-feature .hero {
+    margin-bottom: clamp(12px, 1.8dvh, 18px) !important;
+  }
+
+  .prompt-card,
+  .prompt-card.is-knowledge-mode,
+  body.is-knowledge-feature .prompt-card {
+    margin-bottom: clamp(16px, 2.3dvh, 24px) !important;
+  }
+
+  .action-grid,
+  body.is-knowledge-feature .action-grid {
+    margin-top: 0 !important;
+  }
+}
