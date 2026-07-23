@@ -446,6 +446,54 @@
         border-left: 3px solid #8fb3ff;
         border-radius: 0 12px 12px 0;
       }
+      .ds-pdf-evidence {
+        margin: 16px 0 2px;
+        border-top: 1px solid #e7edf7;
+      }
+      .ds-pdf-evidence > summary {
+        position: relative;
+        display: flex;
+        align-items: center;
+        min-height: 42px;
+        padding: 10px 30px 10px 2px;
+        color: #53627a;
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+      }
+      .ds-pdf-evidence > summary::-webkit-details-marker { display: none; }
+      .ds-pdf-evidence > summary::after {
+        content: "";
+        position: absolute;
+        right: 6px;
+        width: 7px;
+        height: 7px;
+        border-right: 1.8px solid #7d8aa1;
+        border-bottom: 1.8px solid #7d8aa1;
+        transform: rotate(45deg) translateY(-2px);
+        transition: transform .18s ease;
+      }
+      .ds-pdf-evidence[open] > summary::after {
+        transform: rotate(225deg) translate(-1px, -1px);
+      }
+      .ds-pdf-evidence-body {
+        margin: 0 0 8px;
+        padding: 12px 14px;
+        color: #475569;
+        background: #f8fafc;
+        border: 1px solid #e6ecf5;
+        border-radius: 12px;
+        font-size: 13px;
+        line-height: 1.68;
+      }
+      .ds-pdf-evidence-body .ds-msg-bullet { margin: 4px 0; }
+      .ds-pdf-evidence-body .ds-msg-quote {
+        margin: 6px 0 12px;
+        padding: 8px 12px;
+        font-size: 12px;
+      }
       .ds-msg-codeblock {
         margin: 12px 0 16px;
         padding: 14px 16px;
@@ -1909,6 +1957,17 @@
         codeLines.push(line);
         continue;
       }
+      if (trimmed === "[[DS_PDF_EVIDENCE_START]]") {
+        const evidenceLines = [];
+        i += 1;
+        while (i < rawLines.length && rawLines[i].trim() !== "[[DS_PDF_EVIDENCE_END]]") {
+          evidenceLines.push(rawLines[i]);
+          i += 1;
+        }
+        appendPdfEvidenceDetails(container, evidenceLines, highlightQuery);
+        continue;
+      }
+      if (trimmed === "[[DS_PDF_EVIDENCE_END]]") continue;
       if (!trimmed) {
         appendSpacer(container);
         continue;
@@ -1974,6 +2033,31 @@
     }
 
     if (inCode && codeLines.length) appendCodeBlock(container, codeLines.join("\n"));
+  }
+
+  function appendPdfEvidenceDetails(container, lines, highlightQuery = "") {
+    const cleanLines = Array.isArray(lines) ? [...lines] : [];
+    while (cleanLines.length && !String(cleanLines[0] || "").trim()) cleanLines.shift();
+    let summaryText = "근거 확인";
+    if (cleanLines.length) {
+      const first = String(cleanLines[0] || "").trim();
+      if (first && !/^[-•>|#]/.test(first) && !/^\d+[.)]\s+/.test(first)) {
+        summaryText = first;
+        cleanLines.shift();
+      }
+    }
+
+    const details = document.createElement("details");
+    details.className = "ds-pdf-evidence";
+    const summary = document.createElement("summary");
+    summary.textContent = summaryText;
+    details.appendChild(summary);
+
+    const body = document.createElement("div");
+    body.className = "ds-pdf-evidence-body";
+    renderMessageContent(body, cleanLines.join("\n"), highlightQuery);
+    details.appendChild(body);
+    container.appendChild(details);
   }
 
   function getHeadingText(line) {
