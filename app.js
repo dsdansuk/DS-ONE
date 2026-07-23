@@ -13,6 +13,7 @@
   const AI_API_URL = ENDPOINTS.aiApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/ai-api";
   const AGENT_API_URL = ENDPOINTS.agentApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/agent-api";
   const FILE_API_URL = ENDPOINTS.fileApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api";
+  const PDF_API_URL = ENDPOINTS.pdfApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/pdf-api";
   const SESSION_TOKEN_KEY = "sso_session_token";
   const PERSISTED_SESSION_TOKEN_KEY = STORAGE.persistedSessionTokenKey || "ds_one_sso_token_cache_v1";
   const LAST_IDENTITY_KEY = STORAGE.lastIdentityKey || "ds_one_last_identity_v1";
@@ -108,7 +109,7 @@
         { iconClass: "summary", iconText: "≡", title: "문서 요약", desc: "긴 문서나 회의 내용을<br>핵심만 요약", task: "document_summary", attach: false, template: "아래 내용을 핵심만 간결하게 요약해 주세요.\n\n[요약할 내용]\n" },
         { iconClass: "translate", iconText: "A", title: "문서 번역", desc: "다국어 문서를<br>자연스럽게 번역", task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" },
         { iconClass: "excel", iconText: "X", title: "엑셀 분석", desc: "데이터 분석 및<br>시각화, 인사이트 도출", task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요." },
-        { iconClass: "file", iconText: "▰", title: "PDF 분석", desc: "파일을 업로드하고<br>질문하기", task: "file_question", attach: true, template: "첨부한 파일을 기준으로 질문에 답변해 주세요.\n\n[질문]\n" },
+        { iconClass: "file", iconText: "▰", title: "PDF 분석", desc: "근거 페이지 기반<br>정밀 분석 및 질문", task: "pdf_analysis", attach: true, template: "첨부한 PDF를 원문 근거와 페이지를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" },
         { iconClass: "report", iconText: "▥", title: "PPT 생성", desc: "보고서 구조화 및<br>핵심 내용 정리", task: "report_summary", attach: false, template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" },
       ],
     },
@@ -1218,7 +1219,10 @@
     const prevMode = currentFeature;
     currentFeature = nextMode;
     const featureChanged = prevMode !== nextMode;
-    if (featureChanged) currentTask = "";
+    if (featureChanged) {
+      currentTask = "";
+      setFileInputAcceptForTask("");
+    }
     if (options.persist !== false) {
       try { localStorage.setItem(FEATURE_MODE_KEY, nextMode); } catch {}
     }
@@ -1332,7 +1336,42 @@
 
   function getCurrentApiRoute() {
     if (currentFeature === "knowledge") return "ai-api";
-    return selectedFiles.length ? "file-api" : "agent-api";
+    if (!selectedFiles.length) return "agent-api";
+    return isPdfOnlySelection() ? "pdf-api" : "file-api";
+  }
+
+  function isPdfOnlySelection(files = selectedFiles) {
+    return files.length > 0 && files.every((file) => getFileExtension(file.name) === "pdf");
+  }
+
+  function hasMixedPdfSelection(files = selectedFiles) {
+    const hasPdf = files.some((file) => getFileExtension(file.name) === "pdf");
+    const hasNonPdf = files.some((file) => getFileExtension(file.name) !== "pdf");
+    return hasPdf && hasNonPdf;
+  }
+
+  function validateSelectedFileCombination(files = selectedFiles) {
+    if (hasMixedPdfSelection(files)) return "PDF와 Excel·문서 파일은 분석 엔진이 다르므로 한 요청에 함께 첨부할 수 없습니다.";
+    if (currentTask === "pdf_analysis" && files.some((file) => getFileExtension(file.name) !== "pdf")) {
+      return "PDF 분석 메뉴에는 PDF 파일만 첨부할 수 있습니다.";
+    }
+    if (currentTask === "excel_analysis" && files.some((file) => !["xlsx", "csv"].includes(getFileExtension(file.name)))) {
+      return "엑셀 분석 메뉴에는 XLSX 또는 CSV 파일만 첨부할 수 있습니다.";
+    }
+    return "";
+  }
+
+  function setFileInputAcceptForTask(task) {
+    if (!state.fileInput) return;
+    if (task === "pdf_analysis") {
+      state.fileInput.accept = ".pdf,application/pdf";
+      return;
+    }
+    if (task === "excel_analysis") {
+      state.fileInput.accept = ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
+      return;
+    }
+    state.fileInput.accept = ALLOWED_EXTENSIONS.map((ext) => `.${ext}`).join(",");
   }
 
   function isKnowledgeTask(task) {
@@ -1361,6 +1400,13 @@
       card.addEventListener("click", () => {
         const meta = getCardTemplate(card);
         currentTask = meta.task;
+        setFileInputAcceptForTask(currentTask);
+        const incompatibleSelection = validateSelectedFileCombination();
+        if (incompatibleSelection && selectedFiles.length) {
+          selectedFiles = [];
+          renderFileChips();
+          showToast("선택한 분석 기능에 맞지 않는 기존 첨부 파일을 제거했습니다.");
+        }
         if (meta.template) setHomeInput(meta.template);
         if (meta.attach) state.fileInput?.click();
       });
@@ -1429,7 +1475,7 @@
     if (title.includes("문서 요약")) return { task: "document_summary", attach: false, template: "아래 내용을 핵심만 간결하게 요약해 주세요.\n\n[요약할 내용]\n" };
     if (title.includes("문서 번역")) return { task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" };
     if (title.includes("엑셀 분석")) return { task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요." };
-    if (title.includes("PDF 분석")) return { task: "file_question", attach: true, template: "첨부한 파일을 기준으로 질문에 답변해 주세요.\n\n[질문]\n" };
+    if (title.includes("PDF 분석")) return { task: "pdf_analysis", attach: true, template: "첨부한 PDF를 원문 근거와 페이지를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" };
     if (title.includes("PPT 생성")) return { task: "report_summary", attach: false, template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" };
     return { task: "", attach: false, template: "" };
   }
@@ -1501,6 +1547,7 @@
     remoteSessionCreatePromise = null;
     remoteSessionCreateConversationId = "";
     currentTask = "";
+    setFileInputAcceptForTask("");
     selectedFiles = [];
     renderFileChips();
     clearMessages();
@@ -1542,7 +1589,14 @@
         return;
       }
       const duplicated = selectedFiles.some((item) => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified);
-      if (!duplicated) selectedFiles.push(file);
+      if (duplicated) return;
+      const nextFiles = [...selectedFiles, file];
+      const combinationError = validateSelectedFileCombination(nextFiles);
+      if (combinationError) {
+        rejected.push(combinationError);
+        return;
+      }
+      selectedFiles.push(file);
     });
     renderFileChips();
     if (rejected.length) showToast(rejected[0]);
@@ -1554,6 +1608,8 @@
     if (!ext) return `${name || "파일"}의 확장자를 확인할 수 없습니다.`;
     if (BLOCKED_EXTENSIONS.has(ext)) return `${name} 파일 형식은 보안 정책상 첨부할 수 없습니다.`;
     if (ALLOWED_EXTENSIONS.length && !ALLOWED_EXTENSIONS.includes(ext)) return `${name} 파일 형식은 지원하지 않습니다.`;
+    if (currentTask === "pdf_analysis" && ext !== "pdf") return "PDF 분석 메뉴에는 PDF 파일만 첨부할 수 있습니다.";
+    if (currentTask === "excel_analysis" && !["xlsx", "csv"].includes(ext)) return "엑셀 분석 메뉴에는 XLSX 또는 CSV 파일만 첨부할 수 있습니다.";
     if (file.size > MAX_FILE_SIZE_BYTES) return `${name} 파일은 ${formatFileSize(MAX_FILE_SIZE_BYTES)} 이하만 첨부할 수 있습니다.`;
     return "";
   }
@@ -1590,6 +1646,12 @@
     const activeToken = await ensureValidSession({ silent: false });
     if (!activeToken) {
       addMessage("bot", "세션 갱신이 필요합니다. 기존 채팅 기록은 유지됩니다. 그룹웨어의 DS ONE 버튼으로 다시 접속한 뒤 이어서 사용해 주세요.");
+      return;
+    }
+    const fileCombinationError = validateSelectedFileCombination();
+    if (fileCombinationError) {
+      showToast(fileCombinationError);
+      addMessage("bot", fileCombinationError);
       return;
     }
 
@@ -1730,7 +1792,8 @@
     const normalizedTask = normalizeTask(currentTask);
     if (normalizedTask) formData.append("task", normalizedTask);
     selectedFiles.forEach((file) => formData.append("files", file, file.name));
-    const res = await fetch(FILE_API_URL, { method: "POST", headers: { Authorization: `Bearer ${activeToken}` }, body: formData });
+    const endpoint = isPdfOnlySelection() ? PDF_API_URL : FILE_API_URL;
+    const res = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${activeToken}` }, body: formData });
     return readApiResponse(res);
   }
 
@@ -1744,7 +1807,10 @@
 
   function normalizeTask(task) {
     const value = String(task || "").trim();
-    if (!value || value === "excel_analysis" || value === "file_question" || value === "document_draft") return "";
+    if (!value || value === "document_draft") return "";
+    if (value === "file_question") return "pdf_analysis";
+    if (value === "pdf_analysis") return "pdf_analysis";
+    if (value === "excel_analysis") return "excel_analysis";
     if (value === "document_summary") return "document_summary";
     if (value === "translation") return "translation";
     if (value === "report_summary") return "report_summary";
@@ -2802,6 +2868,7 @@
     activeConversationId = item.id;
     activeConversationHighlightQuery = normalizeSearchQuery(highlightQuery);
     currentTask = item.task || "";
+    setFileInputAcceptForTask(currentTask);
     const targetFeature = getConversationFeature(item);
     applyFeatureMode(targetFeature, { persist: true, silent: true, resetConversation: false });
     selectedFiles = [];

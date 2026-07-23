@@ -5,6 +5,7 @@ window.DS_ONE_CONFIG = Object.freeze({
     aiApi: "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/ai-api",
     agentApi: "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/agent-api",
     fileApi: "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api",
+    pdfApi: "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/pdf-api",
     rpaApi: "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api",
   }),
   tasks: Object.freeze({
