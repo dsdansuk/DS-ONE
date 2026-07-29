@@ -110,7 +110,7 @@
         { iconClass: "translate", iconText: "A", title: "문서 번역", desc: "다국어 문서를<br>자연스럽게 번역", task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" },
         { iconClass: "excel", iconText: "X", title: "엑셀 분석", desc: "데이터 분석 및<br>시각화, 인사이트 도출", task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요." },
         { iconClass: "file", iconText: "▰", title: "PDF 분석", desc: "근거 페이지 기반<br>정밀 분석 및 질문", task: "pdf_analysis", attach: true, template: "첨부한 PDF를 원문 근거와 페이지를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" },
-        { iconClass: "report", iconText: "▥", title: "PPT 생성", desc: "보고서 구조화 및<br>핵심 내용 정리", task: "report_summary", attach: false, template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" },
+        { iconClass: "report", iconText: "▥", title: "PPT 생성", desc: "보고서 구조화 및<br>핵심 내용 정리", task: "report_summary", attach: false, disabled: true, disabledLabel: "준비 중", disabledReason: "PPT 생성 기능은 현재 준비 중입니다.", template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" },
       ],
     },
     knowledge: {
@@ -123,7 +123,7 @@
       attachEnabled: false,
       cards: [
         { iconClass: "knowledge", iconText: "규", title: "규정·기준", desc: "제도, 기준, 예외<br>적용 여부 확인", task: "knowledge_policy", attach: false, template: "아래 사내 규정 또는 기준을 지식베이스 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "신", title: "신청·결재", desc: "신청서, 결재선,<br>처리 절차 확인", task: "knowledge_request", attach: false, template: "아래 신청 또는 결재 절차를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "신", title: "신청·결재", desc: "신청서, 결재선,<br>처리 절차 확인", task: "knowledge_request", attach: false, disabled: true, disabledLabel: "준비 중", disabledReason: "신청·결재 기능은 현재 준비 중입니다.", template: "아래 신청 또는 결재 절차를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
         { iconClass: "knowledge", iconText: "담", title: "담당 부서", desc: "문의처, 담당 기준,<br>연락 부서 확인", task: "knowledge_owner", attach: false, template: "아래 업무의 담당 부서 또는 문의처를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
         { iconClass: "knowledge", iconText: "시", title: "시스템·권한", desc: "그룹웨어, ERP, ECM<br>계정·권한 확인", task: "knowledge_system_access", attach: false, template: "아래 시스템, 계정 또는 권한 관련 문의를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
         { iconClass: "knowledge", iconText: "보", title: "보안·개인정보", desc: "파일 공유, 개인정보,<br>보안 기준 확인", task: "knowledge_security", attach: false, template: "아래 보안, 개인정보 또는 파일 처리 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
@@ -1346,16 +1346,33 @@
       const item = profile.cards[index];
       if (!item) {
         card.hidden = true;
+        card.disabled = true;
+        card.dataset.featureDisabled = "true";
         return;
       }
+      const isDisabled = item.disabled === true;
       card.hidden = false;
+      card.disabled = isDisabled;
+      card.dataset.featureDisabled = isDisabled ? "true" : "false";
       card.dataset.featureTask = item.task || "";
       card.dataset.featureTemplate = item.template || "";
       card.dataset.featureAttach = item.attach ? "true" : "false";
       card.dataset.featureMode = currentFeature;
+      card.classList.toggle("is-disabled", isDisabled);
+      card.setAttribute("aria-disabled", isDisabled ? "true" : "false");
+      card.title = isDisabled ? (item.disabledReason || `${item.title || "해당"} 기능은 현재 준비 중입니다.`) : "";
       const icon = card.querySelector(".app-icon");
       const title = card.querySelector(".card-title");
       const desc = card.querySelector(".card-desc");
+      let status = card.querySelector(".card-status");
+      if (!status) {
+        status = document.createElement("span");
+        status.className = "card-status";
+        status.setAttribute("aria-hidden", "true");
+        card.appendChild(status);
+      }
+      status.textContent = item.disabledLabel || "준비 중";
+      status.hidden = !isDisabled;
       if (icon) {
         icon.className = `app-icon ${item.iconClass || "doc"}`;
         icon.textContent = item.iconText || "▤";
@@ -1446,6 +1463,7 @@
 
     document.querySelectorAll(".action-card").forEach((card) => {
       card.addEventListener("click", () => {
+        if (card.disabled || card.dataset.featureDisabled === "true") return;
         const meta = getCardTemplate(card);
         currentTask = meta.task;
         setFileInputAcceptForTask(currentTask);
