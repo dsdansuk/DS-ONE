@@ -1373,10 +1373,10 @@
       }
       status.textContent = item.disabledLabel || "준비 중";
       status.hidden = !isDisabled;
-      if (icon) {
-        icon.className = `app-icon ${item.iconClass || "doc"}`;
-        icon.textContent = item.iconText || "▤";
-      }
+      // if (icon) {
+      //   icon.className = `app-icon ${item.iconClass || "doc"}`;
+      //   icon.textContent = item.iconText || "▤";
+      // }
       if (title) title.textContent = item.title || "업무 요청";
       if (desc) desc.innerHTML = item.desc || "";
     });
