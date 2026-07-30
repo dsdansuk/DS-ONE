@@ -161,7 +161,64 @@
 
             <button class="action-card" type="button">
               <span class="card-head">
-                <span class="app-icon summary">≡</span>
+                <span class="app-icon summary">
+                  <svg
+                    class="icon-file-question"
+                    viewBox="0 0 512 512"
+                    width="100%"
+                    height="100%"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <g
+                      stroke="currentColor"
+                      stroke-width="44"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <!-- 문서 외곽 -->
+                      <path
+                        d="M301 448H129
+                          C104.7 448 85 428.3 85 404
+                          V108
+                          C85 83.7 104.7 64 129 64
+                          H256
+                          L384 192
+                          V234"
+                      />
+
+                      <!-- 접힌 모서리 -->
+                      <path
+                        d="M256 64
+                          V149
+                          C256 172.7 275.3 192 299 192
+                          H384"
+                      />
+
+                      <!-- 문서 내용 -->
+                      <path d="M171 192H192"/>
+                      <path d="M171 277H279"/>
+                      <path d="M171 363H279"/>
+
+                      <!-- 물음표 -->
+                      <path
+                        d="M346 320
+                          C354 306 369 298 384 298
+                          C408 298 428 317 428 341
+                          C428 365 409 384 385 384
+                          H383"
+                      />
+                    </g>
+
+                    <!-- 물음표 점 -->
+                    <circle
+                      cx="383"
+                      cy="448"
+                      r="22"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </span>
                 <span class="card-title">문서 요약</span>
               </span>
               <span class="card-desc">긴 문서나 회의 내용을<br>핵심만 요약</span>
@@ -181,7 +238,27 @@
 
             <button class="action-card" type="button">
               <span class="card-head">
-                <span class="app-icon excel">X</span>
+                <span class="app-icon excel">
+                  <svg
+                    class="icon-x"
+                    viewBox="0 0 512 512"
+                    width="100%"
+                    height="100%"
+                    fill="none"
+                    preserveAspectRatio="xMidYMid meet"
+                    aria-hidden="true"
+                  >
+                    <g
+                      stroke="currentColor"
+                      stroke-width="44"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M156 156L356 356"/>
+                      <path d="M356 156L156 356"/>
+                    </g>
+                  </svg>
+                </span>
                 <span class="card-title">엑셀 분석</span>
               </span>
               <span class="card-desc">데이터 분석 및<br>시각화, 인사이트 도출</span>
