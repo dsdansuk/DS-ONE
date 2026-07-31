@@ -13,7 +13,6 @@
   const AI_API_URL = ENDPOINTS.aiApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/ai-api";
   const AGENT_API_URL = ENDPOINTS.agentApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/agent-api";
   const FILE_API_URL = ENDPOINTS.fileApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api";
-  const PDF_API_URL = ENDPOINTS.pdfApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/pdf-api";
   const SESSION_TOKEN_KEY = "sso_session_token";
   const PERSISTED_SESSION_TOKEN_KEY = STORAGE.persistedSessionTokenKey || "ds_one_sso_token_cache_v1";
   const LAST_IDENTITY_KEY = STORAGE.lastIdentityKey || "ds_one_last_identity_v1";
@@ -109,8 +108,8 @@
         { iconClass: "summary", iconText: "≡", title: "문서 요약", desc: "긴 문서나 회의 내용을<br>핵심만 요약", task: "document_summary", attach: false, template: "아래 내용을 핵심만 간결하게 요약해 주세요.\n\n[요약할 내용]\n" },
         { iconClass: "translate", iconText: "A", title: "문서 번역", desc: "다국어 문서를<br>자연스럽게 번역", task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" },
         { iconClass: "excel", iconText: "X", title: "엑셀 분석", desc: "데이터 분석 및<br>시각화, 인사이트 도출", task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요." },
-        { iconClass: "file", iconText: "▰", title: "PDF 분석", desc: "근거 페이지 기반<br>정밀 분석 및 질문", task: "pdf_analysis", attach: true, template: "첨부한 PDF를 원문 근거와 페이지를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" },
-        { iconClass: "report", iconText: "▥", title: "PPT 생성", desc: "보고서 구조화 및<br>핵심 내용 정리", task: "report_summary", attach: false, disabled: true, disabledLabel: "준비 중", disabledReason: "PPT 생성 기능은 현재 준비 중입니다.", template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" },
+        { iconClass: "file", iconText: "▰", title: "PDF 분석", desc: "파일을 업로드하고<br>질문하기", task: "file_question", attach: true, template: "첨부한 파일을 기준으로 질문에 답변해 주세요.\n\n[질문]\n" },
+        { iconClass: "report", iconText: "▥", title: "PPT 생성", desc: "보고서 구조화 및<br>핵심 내용 정리", task: "report_summary", attach: false, template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" },
       ],
     },
     knowledge: {
@@ -118,12 +117,12 @@
       shortLabel: "사내 지식",
       title: "사내 업무, 무엇이 궁금하신가요?",
       subtitle: "사내 규정, 업무 절차 및 담당 부서를 빠르게 찾아드립니다.",
-      placeholder: "사내 규정, 업무 절차, 담당 부서를 질문하세요.   (예: 출장비 정산 기준 알려줘)",
+      placeholder: "사내 규정, 업무 절차, 담당 부서를 질문하세요.   (예: 모니터 지급 기준 알려줘)",
       disclaimer: "사내 지식 답변은 SideTalk 지식베이스 기준입니다. 중요한 업무에는 담당 부서와 원문을 확인해 주세요.",
-      attachEnabled: false,
+      attachEnabled: true,
       cards: [
         { iconClass: "knowledge", iconText: "규", title: "규정·기준", desc: "제도, 기준, 예외<br>적용 여부 확인", task: "knowledge_policy", attach: false, template: "아래 사내 규정 또는 기준을 지식베이스 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "신", title: "신청·결재", desc: "신청서, 결재선,<br>처리 절차 확인", task: "knowledge_request", attach: false, disabled: true, disabledLabel: "준비 중", disabledReason: "신청·결재 기능은 현재 준비 중입니다.", template: "아래 신청 또는 결재 절차를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "신", title: "신청·결재", desc: "신청서, 결재선,<br>처리 절차 확인", task: "knowledge_request", attach: false, template: "아래 신청 또는 결재 절차를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
         { iconClass: "knowledge", iconText: "담", title: "담당 부서", desc: "문의처, 담당 기준,<br>연락 부서 확인", task: "knowledge_owner", attach: false, template: "아래 업무의 담당 부서 또는 문의처를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
         { iconClass: "knowledge", iconText: "시", title: "시스템·권한", desc: "그룹웨어, ERP, ECM<br>계정·권한 확인", task: "knowledge_system_access", attach: false, template: "아래 시스템, 계정 또는 권한 관련 문의를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
         { iconClass: "knowledge", iconText: "보", title: "보안·개인정보", desc: "파일 공유, 개인정보,<br>보안 기준 확인", task: "knowledge_security", attach: false, template: "아래 보안, 개인정보 또는 파일 처리 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
@@ -445,54 +444,6 @@
         background: #f8fbff;
         border-left: 3px solid #8fb3ff;
         border-radius: 0 12px 12px 0;
-      }
-      .ds-pdf-evidence {
-        margin: 16px 0 2px;
-        border-top: 1px solid #e7edf7;
-      }
-      .ds-pdf-evidence > summary {
-        position: relative;
-        display: flex;
-        align-items: center;
-        min-height: 42px;
-        padding: 10px 30px 10px 2px;
-        color: #53627a;
-        font-size: 13px;
-        font-weight: 800;
-        cursor: pointer;
-        list-style: none;
-        user-select: none;
-      }
-      .ds-pdf-evidence > summary::-webkit-details-marker { display: none; }
-      .ds-pdf-evidence > summary::after {
-        content: "";
-        position: absolute;
-        right: 6px;
-        width: 7px;
-        height: 7px;
-        border-right: 1.8px solid #7d8aa1;
-        border-bottom: 1.8px solid #7d8aa1;
-        transform: rotate(45deg) translateY(-2px);
-        transition: transform .18s ease;
-      }
-      .ds-pdf-evidence[open] > summary::after {
-        transform: rotate(225deg) translate(-1px, -1px);
-      }
-      .ds-pdf-evidence-body {
-        margin: 0 0 8px;
-        padding: 12px 14px;
-        color: #475569;
-        background: #f8fafc;
-        border: 1px solid #e6ecf5;
-        border-radius: 12px;
-        font-size: 13px;
-        line-height: 1.68;
-      }
-      .ds-pdf-evidence-body .ds-msg-bullet { margin: 4px 0; }
-      .ds-pdf-evidence-body .ds-msg-quote {
-        margin: 6px 0 12px;
-        padding: 8px 12px;
-        font-size: 12px;
       }
       .ds-msg-codeblock {
         margin: 12px 0 16px;
@@ -1149,8 +1100,8 @@
     state.productModeButton = document.getElementById("productModeButton");
     state.productModeLabel = document.getElementById("productModeLabel");
     state.productModeMenu = document.getElementById("productModeMenu");
-    state.heroTitle = document.querySelector("#home-title, .hero-title, .hero h1");
-    state.heroSubtitle = document.querySelector(".hero-copy p, .hero-subtitle, .hero p");
+    state.heroTitle = document.querySelector(".hero-title");
+    state.heroSubtitle = document.querySelector(".hero-copy p, .hero-subtitle");
     state.promptCard = document.querySelector(".prompt-card");
     state.actionCards = Array.from(document.querySelectorAll(".action-card"));
 
@@ -1267,10 +1218,7 @@
     const prevMode = currentFeature;
     currentFeature = nextMode;
     const featureChanged = prevMode !== nextMode;
-    if (featureChanged) {
-      currentTask = "";
-      setFileInputAcceptForTask("");
-    }
+    if (featureChanged) currentTask = "";
     if (options.persist !== false) {
       try { localStorage.setItem(FEATURE_MODE_KEY, nextMode); } catch {}
     }
@@ -1331,7 +1279,7 @@
     if (state.heroSubtitle) state.heroSubtitle.textContent = profile.subtitle;
     if (state.homePromptInput) state.homePromptInput.placeholder = profile.placeholder;
     if (state.agentMessageInput) state.agentMessageInput.placeholder = currentFeature === "knowledge"
-      ? "사내 규정, 절차, 기준을 질문하세요. Shift+Enter로 줄바꿈"
+      ? "사내 규정, 절차, 담당 부서를 질문하세요. Shift+Enter로 줄바꿈"
       : "메시지를 입력하세요. Shift+Enter로 줄바꿈";
     if (state.agentDisclaimer) state.agentDisclaimer.textContent = profile.disclaimer;
     state.promptCard?.classList.toggle("is-knowledge-mode", currentFeature === "knowledge");
@@ -1346,33 +1294,16 @@
       const item = profile.cards[index];
       if (!item) {
         card.hidden = true;
-        card.disabled = true;
-        card.dataset.featureDisabled = "true";
         return;
       }
-      const isDisabled = item.disabled === true;
       card.hidden = false;
-      card.disabled = isDisabled;
-      card.dataset.featureDisabled = isDisabled ? "true" : "false";
       card.dataset.featureTask = item.task || "";
       card.dataset.featureTemplate = item.template || "";
       card.dataset.featureAttach = item.attach ? "true" : "false";
       card.dataset.featureMode = currentFeature;
-      card.classList.toggle("is-disabled", isDisabled);
-      card.setAttribute("aria-disabled", isDisabled ? "true" : "false");
-      card.title = isDisabled ? (item.disabledReason || `${item.title || "해당"} 기능은 현재 준비 중입니다.`) : "";
       const icon = card.querySelector(".app-icon");
       const title = card.querySelector(".card-title");
       const desc = card.querySelector(".card-desc");
-      let status = card.querySelector(".card-status");
-      if (!status) {
-        status = document.createElement("span");
-        status.className = "card-status";
-        status.setAttribute("aria-hidden", "true");
-        card.appendChild(status);
-      }
-      status.textContent = item.disabledLabel || "준비 중";
-      status.hidden = !isDisabled;
       if (icon) {
         icon.className = `app-icon ${item.iconClass || "doc"}`;
         icon.textContent = item.iconText || "▤";
@@ -1401,42 +1332,7 @@
 
   function getCurrentApiRoute() {
     if (currentFeature === "knowledge") return "ai-api";
-    if (!selectedFiles.length) return "agent-api";
-    return isPdfOnlySelection() ? "pdf-api" : "file-api";
-  }
-
-  function isPdfOnlySelection(files = selectedFiles) {
-    return files.length > 0 && files.every((file) => getFileExtension(file.name) === "pdf");
-  }
-
-  function hasMixedPdfSelection(files = selectedFiles) {
-    const hasPdf = files.some((file) => getFileExtension(file.name) === "pdf");
-    const hasNonPdf = files.some((file) => getFileExtension(file.name) !== "pdf");
-    return hasPdf && hasNonPdf;
-  }
-
-  function validateSelectedFileCombination(files = selectedFiles) {
-    if (hasMixedPdfSelection(files)) return "PDF와 Excel·문서 파일은 분석 엔진이 다르므로 한 요청에 함께 첨부할 수 없습니다.";
-    if (currentTask === "pdf_analysis" && files.some((file) => getFileExtension(file.name) !== "pdf")) {
-      return "PDF 분석 메뉴에는 PDF 파일만 첨부할 수 있습니다.";
-    }
-    if (currentTask === "excel_analysis" && files.some((file) => !["xlsx", "csv"].includes(getFileExtension(file.name)))) {
-      return "엑셀 분석 메뉴에는 XLSX 또는 CSV 파일만 첨부할 수 있습니다.";
-    }
-    return "";
-  }
-
-  function setFileInputAcceptForTask(task) {
-    if (!state.fileInput) return;
-    if (task === "pdf_analysis") {
-      state.fileInput.accept = ".pdf,application/pdf";
-      return;
-    }
-    if (task === "excel_analysis") {
-      state.fileInput.accept = ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
-      return;
-    }
-    state.fileInput.accept = ALLOWED_EXTENSIONS.map((ext) => `.${ext}`).join(",");
+    return selectedFiles.length ? "file-api" : "agent-api";
   }
 
   function isKnowledgeTask(task) {
@@ -1463,16 +1359,8 @@
 
     document.querySelectorAll(".action-card").forEach((card) => {
       card.addEventListener("click", () => {
-        if (card.disabled || card.dataset.featureDisabled === "true") return;
         const meta = getCardTemplate(card);
         currentTask = meta.task;
-        setFileInputAcceptForTask(currentTask);
-        const incompatibleSelection = validateSelectedFileCombination();
-        if (incompatibleSelection && selectedFiles.length) {
-          selectedFiles = [];
-          renderFileChips();
-          showToast("선택한 분석 기능에 맞지 않는 기존 첨부 파일을 제거했습니다.");
-        }
         if (meta.template) setHomeInput(meta.template);
         if (meta.attach) state.fileInput?.click();
       });
@@ -1541,7 +1429,7 @@
     if (title.includes("문서 요약")) return { task: "document_summary", attach: false, template: "아래 내용을 핵심만 간결하게 요약해 주세요.\n\n[요약할 내용]\n" };
     if (title.includes("문서 번역")) return { task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" };
     if (title.includes("엑셀 분석")) return { task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요." };
-    if (title.includes("PDF 분석")) return { task: "pdf_analysis", attach: true, template: "첨부한 PDF를 원문 근거와 페이지를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" };
+    if (title.includes("PDF 분석")) return { task: "file_question", attach: true, template: "첨부한 파일을 기준으로 질문에 답변해 주세요.\n\n[질문]\n" };
     if (title.includes("PPT 생성")) return { task: "report_summary", attach: false, template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" };
     return { task: "", attach: false, template: "" };
   }
@@ -1613,7 +1501,6 @@
     remoteSessionCreatePromise = null;
     remoteSessionCreateConversationId = "";
     currentTask = "";
-    setFileInputAcceptForTask("");
     selectedFiles = [];
     renderFileChips();
     clearMessages();
@@ -1655,14 +1542,7 @@
         return;
       }
       const duplicated = selectedFiles.some((item) => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified);
-      if (duplicated) return;
-      const nextFiles = [...selectedFiles, file];
-      const combinationError = validateSelectedFileCombination(nextFiles);
-      if (combinationError) {
-        rejected.push(combinationError);
-        return;
-      }
-      selectedFiles.push(file);
+      if (!duplicated) selectedFiles.push(file);
     });
     renderFileChips();
     if (rejected.length) showToast(rejected[0]);
@@ -1674,8 +1554,6 @@
     if (!ext) return `${name || "파일"}의 확장자를 확인할 수 없습니다.`;
     if (BLOCKED_EXTENSIONS.has(ext)) return `${name} 파일 형식은 보안 정책상 첨부할 수 없습니다.`;
     if (ALLOWED_EXTENSIONS.length && !ALLOWED_EXTENSIONS.includes(ext)) return `${name} 파일 형식은 지원하지 않습니다.`;
-    if (currentTask === "pdf_analysis" && ext !== "pdf") return "PDF 분석 메뉴에는 PDF 파일만 첨부할 수 있습니다.";
-    if (currentTask === "excel_analysis" && !["xlsx", "csv"].includes(ext)) return "엑셀 분석 메뉴에는 XLSX 또는 CSV 파일만 첨부할 수 있습니다.";
     if (file.size > MAX_FILE_SIZE_BYTES) return `${name} 파일은 ${formatFileSize(MAX_FILE_SIZE_BYTES)} 이하만 첨부할 수 있습니다.`;
     return "";
   }
@@ -1712,12 +1590,6 @@
     const activeToken = await ensureValidSession({ silent: false });
     if (!activeToken) {
       addMessage("bot", "세션 갱신이 필요합니다. 기존 채팅 기록은 유지됩니다. 그룹웨어의 DS ONE 버튼으로 다시 접속한 뒤 이어서 사용해 주세요.");
-      return;
-    }
-    const fileCombinationError = validateSelectedFileCombination();
-    if (fileCombinationError) {
-      showToast(fileCombinationError);
-      addMessage("bot", fileCombinationError);
       return;
     }
 
@@ -1858,8 +1730,7 @@
     const normalizedTask = normalizeTask(currentTask);
     if (normalizedTask) formData.append("task", normalizedTask);
     selectedFiles.forEach((file) => formData.append("files", file, file.name));
-    const endpoint = isPdfOnlySelection() ? PDF_API_URL : FILE_API_URL;
-    const res = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${activeToken}` }, body: formData });
+    const res = await fetch(FILE_API_URL, { method: "POST", headers: { Authorization: `Bearer ${activeToken}` }, body: formData });
     return readApiResponse(res);
   }
 
@@ -1873,10 +1744,7 @@
 
   function normalizeTask(task) {
     const value = String(task || "").trim();
-    if (!value || value === "document_draft") return "";
-    if (value === "file_question") return "pdf_analysis";
-    if (value === "pdf_analysis") return "pdf_analysis";
-    if (value === "excel_analysis") return "excel_analysis";
+    if (!value || value === "excel_analysis" || value === "file_question" || value === "document_draft") return "";
     if (value === "document_summary") return "document_summary";
     if (value === "translation") return "translation";
     if (value === "report_summary") return "report_summary";
@@ -1975,17 +1843,6 @@
         codeLines.push(line);
         continue;
       }
-      if (trimmed === "[[DS_PDF_EVIDENCE_START]]") {
-        const evidenceLines = [];
-        i += 1;
-        while (i < rawLines.length && rawLines[i].trim() !== "[[DS_PDF_EVIDENCE_END]]") {
-          evidenceLines.push(rawLines[i]);
-          i += 1;
-        }
-        appendPdfEvidenceDetails(container, evidenceLines, highlightQuery);
-        continue;
-      }
-      if (trimmed === "[[DS_PDF_EVIDENCE_END]]") continue;
       if (!trimmed) {
         appendSpacer(container);
         continue;
@@ -2051,31 +1908,6 @@
     }
 
     if (inCode && codeLines.length) appendCodeBlock(container, codeLines.join("\n"));
-  }
-
-  function appendPdfEvidenceDetails(container, lines, highlightQuery = "") {
-    const cleanLines = Array.isArray(lines) ? [...lines] : [];
-    while (cleanLines.length && !String(cleanLines[0] || "").trim()) cleanLines.shift();
-    let summaryText = "근거 확인";
-    if (cleanLines.length) {
-      const first = String(cleanLines[0] || "").trim();
-      if (first && !/^[-•>|#]/.test(first) && !/^\d+[.)]\s+/.test(first)) {
-        summaryText = first;
-        cleanLines.shift();
-      }
-    }
-
-    const details = document.createElement("details");
-    details.className = "ds-pdf-evidence";
-    const summary = document.createElement("summary");
-    summary.textContent = summaryText;
-    details.appendChild(summary);
-
-    const body = document.createElement("div");
-    body.className = "ds-pdf-evidence-body";
-    renderMessageContent(body, cleanLines.join("\n"), highlightQuery);
-    details.appendChild(body);
-    container.appendChild(details);
   }
 
   function getHeadingText(line) {
@@ -2970,7 +2802,6 @@
     activeConversationId = item.id;
     activeConversationHighlightQuery = normalizeSearchQuery(highlightQuery);
     currentTask = item.task || "";
-    setFileInputAcceptForTask(currentTask);
     const targetFeature = getConversationFeature(item);
     applyFeatureMode(targetFeature, { persist: true, silent: true, resetConversation: false });
     selectedFiles = [];
