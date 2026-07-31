@@ -38,13 +38,9 @@
     .map((value) => String(value || "").toLowerCase().replace(/^\./, ""))
     .filter(Boolean));
   const MAX_FILE_SIZE_BYTES = Number(FILE_POLICY.maxFileSizeBytes || 50 * 1024 * 1024);
-  const LOCAL_SPREADSHEET_MAX_ROWS_PER_SHEET = Number(FILE_POLICY.maxSpreadsheetRowsPerSheet || 160);
-  const LOCAL_SPREADSHEET_MAX_COLS = Number(FILE_POLICY.maxSpreadsheetCols || 32);
-  const LOCAL_SPREADSHEET_MAX_CONTEXT_CHARS = Number(FILE_POLICY.maxSpreadsheetContextChars || 36000);
 
   let sessionToken = "";
   let selectedFiles = [];
-  let sheetJsLoadPromise = null;
   let submitInProgress = false;
   let currentTask = "";
   let currentLoginId = "";
@@ -1377,10 +1373,10 @@
       }
       status.textContent = item.disabledLabel || "준비 중";
       status.hidden = !isDisabled;
-      // if (icon) {
-      //   icon.className = `app-icon ${item.iconClass || "doc"}`;
-      //   icon.textContent = item.iconText || "▤";
-      // }
+      if (icon) {
+        icon.className = `app-icon ${item.iconClass || "doc"}`;
+        icon.textContent = item.iconText || "▤";
+      }
       if (title) title.textContent = item.title || "업무 요청";
       if (desc) desc.innerHTML = item.desc || "";
     });
@@ -1406,16 +1402,11 @@
   function getCurrentApiRoute() {
     if (currentFeature === "knowledge") return "ai-api";
     if (!selectedFiles.length) return "agent-api";
-    if (isSpreadsheetSelection()) return "agent-api";
     return isPdfOnlySelection() ? "pdf-api" : "file-api";
   }
 
   function isPdfOnlySelection(files = selectedFiles) {
     return files.length > 0 && files.every((file) => getFileExtension(file.name) === "pdf");
-  }
-
-  function isSpreadsheetSelection(files = selectedFiles) {
-    return files.length > 0 && files.every((file) => ["xlsx", "csv"].includes(getFileExtension(file.name)));
   }
 
   function hasMixedPdfSelection(files = selectedFiles) {
@@ -1846,14 +1837,13 @@
     return readApiResponse(res);
   }
 
-  async function requestAgentAnswer(message, history, options = {}) {
+  async function requestAgentAnswer(message, history) {
     const activeToken = await ensureValidSession({ silent: false });
     if (!activeToken) throw new Error("세션 갱신이 필요합니다. 그룹웨어 DS ONE 버튼으로 다시 접속해 주세요.");
-    const task = Object.prototype.hasOwnProperty.call(options, "task") ? options.task : normalizeTask(currentTask);
     const res = await fetch(AGENT_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
-      body: JSON.stringify({ message, stream: false, task, history }),
+      body: JSON.stringify({ message, stream: false, task: normalizeTask(currentTask), history }),
     });
     return readApiResponse(res);
   }
@@ -1861,339 +1851,16 @@
   async function requestFileAnalysis(message, history) {
     const activeToken = await ensureValidSession({ silent: false });
     if (!activeToken) throw new Error("세션 갱신이 필요합니다. 그룹웨어 DS ONE 버튼으로 다시 접속해 주세요.");
-    const normalizedTask = normalizeTask(currentTask);
-
-    if (isSpreadsheetSelection()) {
-      const spreadsheetContext = await buildLocalSpreadsheetContext(selectedFiles);
-      const directAnswer = answerSpreadsheetQuestionLocally(message, spreadsheetContext);
-      if (directAnswer) return { ok: true, answer: directAnswer };
-      const spreadsheetPrompt = buildSpreadsheetAgentPrompt(message, spreadsheetContext);
-      return requestAgentAnswer(spreadsheetPrompt, history, { task: normalizedTask || "excel_analysis" });
-    }
-
     const formData = new FormData();
     formData.append("message", message);
     formData.append("stream", "false");
     formData.append("history", JSON.stringify(history));
+    const normalizedTask = normalizeTask(currentTask);
     if (normalizedTask) formData.append("task", normalizedTask);
     selectedFiles.forEach((file) => formData.append("files", file, file.name));
     const endpoint = isPdfOnlySelection() ? PDF_API_URL : FILE_API_URL;
     const res = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${activeToken}` }, body: formData });
     return readApiResponse(res);
-  }
-
-  async function buildLocalSpreadsheetContext(files) {
-    const parsedFiles = [];
-    for (const file of files) {
-      parsedFiles.push(await parseSpreadsheetFile(file));
-    }
-    const text = buildSpreadsheetContextText(parsedFiles);
-    return { files: parsedFiles, text };
-  }
-
-  async function parseSpreadsheetFile(file) {
-    const ext = getFileExtension(file.name);
-    if (ext === "csv") {
-      const text = await file.text();
-      const rows = normalizeSpreadsheetRows(parseCsvRows(text));
-      return {
-        name: file.name,
-        type: "csv",
-        sheets: [{ name: "CSV", rows, tables: inferSpreadsheetTables(rows) }],
-      };
-    }
-
-    const XLSX = await ensureSpreadsheetParser();
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
-    const sheets = workbook.SheetNames.slice(0, 12).map((sheetName) => {
-      const rows = normalizeSpreadsheetRows(XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
-        header: 1,
-        raw: false,
-        defval: "",
-      }));
-      return { name: sheetName, rows, tables: inferSpreadsheetTables(rows) };
-    });
-    return { name: file.name, type: "xlsx", sheets };
-  }
-
-  async function ensureSpreadsheetParser() {
-    if (window.XLSX?.read && window.XLSX?.utils) return window.XLSX;
-    if (sheetJsLoadPromise) return await sheetJsLoadPromise;
-
-    const configuredUrls = Array.isArray(FILE_POLICY.spreadsheetParserUrls)
-      ? FILE_POLICY.spreadsheetParserUrls
-      : [];
-    const urls = [
-      ...configuredUrls,
-      "xlsx.full.min.js",
-      "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
-    ];
-    sheetJsLoadPromise = (async () => {
-      let lastError = null;
-      for (const url of urls) {
-        try {
-          await loadScriptOnce(url);
-          if (window.XLSX?.read && window.XLSX?.utils) return window.XLSX;
-        } catch (error) {
-          lastError = error;
-        }
-      }
-      throw new Error(`엑셀 파서 로드에 실패했습니다${lastError ? `: ${getErrorMessage(lastError)}` : ""}`);
-    })();
-    return await sheetJsLoadPromise;
-  }
-
-  function loadScriptOnce(src) {
-    return new Promise((resolve, reject) => {
-      const existing = document.querySelector(`script[data-ds-one-loader="${cssEscapeValue(src)}"]`);
-      if (existing?.dataset.loaded === "true") {
-        resolve();
-        return;
-      }
-      if (existing) {
-        existing.addEventListener("load", () => resolve(), { once: true });
-        existing.addEventListener("error", () => reject(new Error(`${src} 로드 실패`)), { once: true });
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = src;
-      script.async = true;
-      script.dataset.dsOneLoader = src;
-      script.addEventListener("load", () => {
-        script.dataset.loaded = "true";
-        resolve();
-      }, { once: true });
-      script.addEventListener("error", () => reject(new Error(`${src} 로드 실패`)), { once: true });
-      document.head.appendChild(script);
-    });
-  }
-
-  function cssEscapeValue(value) {
-    if (window.CSS?.escape) return window.CSS.escape(String(value || ""));
-    return String(value || "").replace(/["\\]/g, "\\$&");
-  }
-
-  function parseCsvRows(text) {
-    const rows = [];
-    let row = [];
-    let cell = "";
-    let quoted = false;
-    const input = String(text || "").replace(/^\uFEFF/, "");
-
-    for (let index = 0; index < input.length; index += 1) {
-      const char = input[index];
-      const next = input[index + 1];
-      if (quoted) {
-        if (char === "\"" && next === "\"") {
-          cell += "\"";
-          index += 1;
-        } else if (char === "\"") {
-          quoted = false;
-        } else {
-          cell += char;
-        }
-        continue;
-      }
-      if (char === "\"") {
-        quoted = true;
-      } else if (char === ",") {
-        row.push(cell);
-        cell = "";
-      } else if (char === "\n") {
-        row.push(cell);
-        rows.push(row);
-        row = [];
-        cell = "";
-      } else if (char !== "\r") {
-        cell += char;
-      }
-    }
-    row.push(cell);
-    rows.push(row);
-    return rows;
-  }
-
-  function normalizeSpreadsheetRows(rows) {
-    const normalized = (rows || []).map((row) => (row || []).map(normalizeSpreadsheetCell));
-    while (normalized.length && normalized[normalized.length - 1].every((cell) => !cell)) normalized.pop();
-    let lastCol = 0;
-    normalized.forEach((row) => {
-      row.forEach((cell, index) => {
-        if (cell) lastCol = Math.max(lastCol, index + 1);
-      });
-    });
-    return normalized.map((row) => row.slice(0, lastCol));
-  }
-
-  function normalizeSpreadsheetCell(value) {
-    if (value == null) return "";
-    if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
-    return String(value).replace(/\s+/g, " ").trim();
-  }
-
-  function inferSpreadsheetTables(rows) {
-    const tables = [];
-    for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
-      const headers = (rows[rowIndex] || []).map(normalizeSpreadsheetCell);
-      const nonEmptyHeaders = headers.filter(Boolean).length;
-      if (nonEmptyHeaders < 2) continue;
-      const nextNonEmpty = (rows[rowIndex + 1] || []).filter((cell) => normalizeSpreadsheetCell(cell)).length;
-      if (nextNonEmpty < 2) continue;
-      if (!looksLikeHeaderRow(headers, rowIndex)) continue;
-
-      const records = [];
-      for (let dataRowIndex = rowIndex + 1; dataRowIndex < rows.length; dataRowIndex += 1) {
-        const row = rows[dataRowIndex] || [];
-        if (!row.some((cell) => normalizeSpreadsheetCell(cell))) break;
-        const values = {};
-        headers.forEach((header, colIndex) => {
-          if (header) values[header] = normalizeSpreadsheetCell(row[colIndex]);
-        });
-        records.push({ rowNumber: dataRowIndex + 1, values });
-      }
-      if (records.length) tables.push({ headerRowNumber: rowIndex + 1, headers, records });
-    }
-    return tables.slice(0, 12);
-  }
-
-  function looksLikeHeaderRow(headers, rowIndex) {
-    const joined = headers.map(normalizeForLookup).join(" ");
-    const scoreTerms = ["월", "month", "제품", "품목", "구분", "생산", "매출", "수율", "원료", "단가", "비고", "date", "product", "amount", "volume", "revenue"];
-    const score = scoreTerms.reduce((sum, term) => sum + (joined.includes(term) ? 1 : 0), 0);
-    if (score >= 2) return true;
-    return rowIndex <= 2 && headers.some((header) => /[A-Za-z가-힣]/.test(header));
-  }
-
-  function buildSpreadsheetContextText(files) {
-    const parts = [];
-    for (const file of files) {
-      parts.push(`파일: ${file.name}`);
-      for (const sheet of file.sheets) {
-        const rows = sheet.rows || [];
-        const displayedRows = rows.slice(0, LOCAL_SPREADSHEET_MAX_ROWS_PER_SHEET);
-        const maxCols = Math.min(LOCAL_SPREADSHEET_MAX_COLS, displayedRows.reduce((max, row) => Math.max(max, row.length), 0));
-        parts.push(`시트: ${sheet.name} (${rows.length}행 x ${maxCols}열)`);
-        parts.push("```tsv");
-        displayedRows.forEach((row) => {
-          parts.push(row.slice(0, maxCols).map(escapeTsvCell).join("\t"));
-        });
-        if (rows.length > displayedRows.length) parts.push(`... ${rows.length - displayedRows.length}행 생략`);
-        parts.push("```");
-      }
-    }
-    const text = parts.join("\n");
-    if (text.length <= LOCAL_SPREADSHEET_MAX_CONTEXT_CHARS) return text;
-    return `${text.slice(0, LOCAL_SPREADSHEET_MAX_CONTEXT_CHARS)}\n... 문맥 길이 제한으로 일부 행이 생략되었습니다.`;
-  }
-
-  function escapeTsvCell(value) {
-    return normalizeSpreadsheetCell(value).replace(/\t/g, " ").replace(/\r?\n/g, " ");
-  }
-
-  function buildSpreadsheetAgentPrompt(message, context) {
-    return [
-      "아래는 사용자가 첨부한 Excel/CSV 파일을 브라우저에서 직접 추출한 데이터입니다.",
-      "질문에 답할 때는 첨부 데이터에 있는 값만 근거로 삼고, 값이 보이면 시트명/행 또는 열 라벨을 함께 짧게 밝혀 주세요.",
-      "",
-      "[사용자 질문]",
-      message || "첨부한 파일을 분석해 주세요.",
-      "",
-      "[첨부 스프레드시트 데이터]",
-      context.text,
-    ].join("\n");
-  }
-
-  function answerSpreadsheetQuestionLocally(message, context) {
-    const monthMatch = String(message || "").match(/(\d{1,2})\s*월/);
-    if (!monthMatch) return "";
-    const targetMonth = `${Number(monthMatch[1])}월`;
-
-    for (const file of context.files || []) {
-      for (const sheet of file.sheets || []) {
-        for (const table of sheet.tables || []) {
-          const monthHeader = findHeader(table.headers, ["월", "month"]);
-          const metricHeader = findMetricHeader(table.headers, message);
-          if (!monthHeader || !metricHeader) continue;
-          const productHeader = findHeader(table.headers, ["제품", "품목", "상품", "원료명", "원료", "구분"]);
-          const requestedProduct = productHeader ? findMentionedRecordValue(message, table.records, productHeader) : "";
-
-          for (const record of table.records) {
-            const monthValue = normalizeSpreadsheetCell(record.values[monthHeader]);
-            if (normalizeForLookup(monthValue) !== normalizeForLookup(targetMonth)) continue;
-            if (requestedProduct) {
-              const productValue = normalizeSpreadsheetCell(record.values[productHeader]);
-              if (!normalizeForLookup(productValue).includes(normalizeForLookup(requestedProduct))) continue;
-            }
-            const value = normalizeSpreadsheetCell(record.values[metricHeader]);
-            if (!value) continue;
-            const productValue = productHeader ? normalizeSpreadsheetCell(record.values[productHeader]) : "";
-            const metricLabel = cleanMetricLabel(metricHeader);
-            const formattedValue = formatSpreadsheetValue(value, metricHeader);
-            const subject = [targetMonth, productValue, metricLabel].filter(Boolean).join(" ");
-            return `첨부한 엑셀 파일 기준으로 ${subject}은 ${formattedValue}입니다.\n\n근거: ${file.name} > ${sheet.name} 시트 ${record.rowNumber}행 (${monthHeader}=${monthValue}${productValue ? `, ${productHeader}=${productValue}` : ""}, ${metricHeader}=${value})`;
-          }
-        }
-      }
-    }
-    return "";
-  }
-
-  function findHeader(headers, candidates) {
-    const normalizedCandidates = candidates.map(normalizeForLookup);
-    return (headers || []).find((header) => {
-      const normalized = normalizeForLookup(header);
-      return normalizedCandidates.some((candidate) => normalized.includes(candidate));
-    }) || "";
-  }
-
-  function findMetricHeader(headers, message) {
-    const normalizedMessage = normalizeForLookup(message);
-    const metricGroups = [
-      { terms: ["생산량", "생산", "몇톤"], headers: ["생산량", "생산"] },
-      { terms: ["원료투입량", "투입량", "원료투입"], headers: ["원료투입량", "원료투입", "투입량"] },
-      { terms: ["매입단가", "단가"], headers: ["매입단가", "단가"] },
-      { terms: ["매출액", "매출"], headers: ["매출액", "매출"] },
-      { terms: ["수율"], headers: ["수율"] },
-    ];
-    for (const group of metricGroups) {
-      if (!group.terms.some((term) => normalizedMessage.includes(normalizeForLookup(term)))) continue;
-      const header = findHeader(headers, group.headers);
-      if (header) return header;
-    }
-    return "";
-  }
-
-  function findMentionedRecordValue(message, records, header) {
-    const normalizedMessage = normalizeForLookup(message);
-    const candidates = Array.from(new Set((records || [])
-      .map((record) => normalizeSpreadsheetCell(record.values[header]))
-      .filter(Boolean)));
-    return candidates.find((candidate) => normalizedMessage.includes(normalizeForLookup(candidate))) || "";
-  }
-
-  function cleanMetricLabel(header) {
-    return normalizeSpreadsheetCell(header).replace(/\([^)]*\)/g, "").trim() || header;
-  }
-
-  function formatSpreadsheetValue(value, header) {
-    const unitMatch = String(header || "").match(/\(([^)]+)\)/);
-    const unit = unitMatch ? unitMatch[1].trim() : "";
-    const cleaned = normalizeSpreadsheetCell(value);
-    const numeric = Number(cleaned.replace(/,/g, ""));
-    const formatted = Number.isFinite(numeric) && cleaned !== ""
-      ? numeric.toLocaleString("ko-KR", { maximumFractionDigits: 6 })
-      : cleaned;
-    if (!unit || new RegExp(`${escapeRegExp(unit)}\\s*$`).test(formatted)) return formatted;
-    return `${formatted}${unit}`;
-  }
-
-  function normalizeForLookup(value) {
-    return normalizeSpreadsheetCell(value).toLowerCase().replace(/[\s()[\]{}:_\-·,./\\]/g, "");
-  }
-
-  function escapeRegExp(value) {
-    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
   async function readApiResponse(res) {
