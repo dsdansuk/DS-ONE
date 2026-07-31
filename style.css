@@ -686,8 +686,8 @@
 
     /* 모든 기능 아이콘의 내부 크기 통일 */
     .app-icon > svg {
-      width: 16px;
-      height: 16px;
+      width: 18px;
+      height: 18px;
       display: block;
       flex: none;
       overflow: visible;
