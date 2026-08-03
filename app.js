@@ -2081,7 +2081,7 @@
   function getHeadingText(line) {
     const markdown = line.match(/^#{1,4}\s+(.+)$/);
     if (markdown) return markdown[1].replace(/[:：]\s*$/, "").trim();
-    const section = line.match(/^\s*(결론|요약|분석 결과|파일 구조 요약|핵심 이슈|우선 조치|기준 및 근거|확인 필요|확인되지 않은 항목|다음 조치|상세 내용|참고 사항)\s*[:：]?\s*$/);
+    const section = line.match(/^\s*(결론|요약|판정 요약|분석 결과|점검 결과|파일 구조 요약|핵심 이슈|우선 조치|기준 및 근거|확인 필요|확인되지 않은 항목|다음 조치|상세 내용|참고 사항)\s*[:：]?\s*$/);
     return section ? section[1] : "";
   }
 
