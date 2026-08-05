@@ -2022,7 +2022,7 @@
       if (trimmed === "[[DS_PDF_EVIDENCE_END]]") continue;
       const imageBlock = parseMarkdownImageBlock(rawLines, i);
       if (imageBlock) {
-        appendMessageImage(container, imageBlock.url, imageBlock.alt);
+        imageBlock.images.forEach((image) => appendMessageImage(container, image.url, image.alt));
         i = imageBlock.nextIndex;
         continue;
       }
@@ -2149,21 +2149,40 @@
     let combined = String(lines[index] || "").trim();
     if (!/^!\[[^\]]{0,120}\]/.test(combined)) return null;
     let nextIndex = index;
-    while (!/\)\s*$/.test(combined) && nextIndex + 1 < lines.length && nextIndex - index < 4) {
+    while (!extractMarkdownImagesFromText(combined).length && nextIndex + 1 < lines.length && nextIndex - index < 4) {
       const next = String(lines[nextIndex + 1] || "").trim();
       if (!next || /^```/.test(next) || isMarkdownTableLine(next)) break;
       combined += next;
       nextIndex += 1;
     }
-    const match = combined.match(/^!\[([^\]]{0,120})\]\s*\((.+?)\)\s*$/);
-    if (!match) return null;
-    const url = normalizeSafeImageUrl(match[2]);
-    if (!url) return null;
+    const images = extractMarkdownImagesFromText(combined);
+    if (!images.length) return null;
     return {
-      url,
-      alt: normalizeText(match[1] || "지식베이스 이미지") || "지식베이스 이미지",
+      images,
       nextIndex,
     };
+  }
+
+  function extractMarkdownImagesFromText(text) {
+    const source = String(text || "");
+    const images = [];
+    const marker = /!\[([^\]]{0,120})\]\s*\(/g;
+    let match;
+    while ((match = marker.exec(source))) {
+      const urlStart = marker.lastIndex;
+      const urlEnd = source.indexOf(")", urlStart);
+      if (urlEnd < 0) break;
+      const rawUrl = source.slice(urlStart, urlEnd);
+      const url = normalizeSafeImageUrl(rawUrl);
+      if (url) {
+        images.push({
+          url,
+          alt: normalizeText(match[1] || "지식베이스 이미지") || "지식베이스 이미지",
+        });
+      }
+      marker.lastIndex = urlEnd + 1;
+    }
+    return images;
   }
 
   function parseStandaloneImageUrl(line) {
@@ -2204,9 +2223,25 @@
     }
   }
 
+  function shouldProxyKnowledgeImage(url) {
+    try {
+      const parsed = new URL(String(url || ""), window.location.href);
+      const host = parsed.hostname.toLowerCase();
+      return parsed.protocol === "https:" && (host === "chatimg.sidetalk.ai" || host.endsWith(".sidetalk.ai"));
+    } catch {
+      return false;
+    }
+  }
+
+  function buildKnowledgeImageProxyUrl(url) {
+    if (!shouldProxyKnowledgeImage(url)) return url;
+    return `${AI_API_URL}?imageProxy=1&url=${encodeURIComponent(url)}`;
+  }
+
   function appendMessageImage(container, url, alt = "지식베이스 이미지") {
     const figure = document.createElement("figure");
     figure.className = "ds-msg-image";
+    const displayUrl = buildKnowledgeImageProxyUrl(url);
 
     const link = document.createElement("a");
     link.className = "ds-msg-image-link";
@@ -2215,10 +2250,11 @@
     link.rel = "noopener noreferrer";
 
     const img = document.createElement("img");
-    img.src = url;
+    img.src = displayUrl;
     img.alt = alt || "지식베이스 이미지";
     img.loading = "lazy";
     img.decoding = "async";
+    img.referrerPolicy = "no-referrer";
     img.addEventListener("error", () => {
       figure.classList.add("is-error");
       img.hidden = true;
