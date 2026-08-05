@@ -14,6 +14,7 @@
   const AGENT_API_URL = ENDPOINTS.agentApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/agent-api";
   const FILE_API_URL = ENDPOINTS.fileApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/file-api";
   const PDF_API_URL = ENDPOINTS.pdfApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/pdf-api";
+  const RPA_API_URL = ENDPOINTS.rpaApi || "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api";
   const SESSION_TOKEN_KEY = "sso_session_token";
   const PERSISTED_SESSION_TOKEN_KEY = STORAGE.persistedSessionTokenKey || "ds_one_sso_token_cache_v1";
   const LAST_IDENTITY_KEY = STORAGE.lastIdentityKey || "ds_one_last_identity_v1";
@@ -1804,6 +1805,8 @@
         ? await requestKnowledgeAnswer(userText, history)
         : selectedFiles.length
           ? await requestFileAnalysis(userText, history)
+          : isGroupwareApprovalDraftRequest(userText, task)
+            ? await requestGroupwareApprovalDraft(userText, history)
           : await requestAgentAnswer(userText, history);
       thinking.remove();
       const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
@@ -1903,6 +1906,121 @@
       body: JSON.stringify({ message, stream: false, task: normalizeTask(currentTask), history }),
     });
     return readApiResponse(res);
+  }
+
+  function isGroupwareApprovalDraftRequest(message, task) {
+    if (currentFeature !== "agent" || selectedFiles.length) return false;
+    const text = String(message || "").replace(/\s+/g, " ").trim();
+    if (!text) return false;
+    const normalizedTask = normalizeTask(task);
+    const documentIntent = /(기안\s*품의서|기안품의서|품의서|기안서|전자결재|결재\s*문서|결재문서)/.test(text);
+    const writeIntent = /(작성|써줘|써\s*줘|생성|만들|초안|보관|저장|상신\s*준비|상신준비)/.test(text);
+    return documentIntent && (writeIntent || normalizedTask === "document_draft");
+  }
+
+  function buildGroupwareDraftPrompt(message) {
+    return [
+      message,
+      "",
+      "위 요청을 그룹웨어 기안품의서 본문으로 바로 저장할 수 있게 작성해 주세요.",
+      "형식은 1. 기안 목적, 2. 주요 내용, 3. 요청 사항 순서로 작성하세요.",
+      "금액, 일정, 결재라인처럼 원문에 없는 값은 임의로 만들지 말고 '확인 필요'로 표시하세요.",
+      "사용자에게 설명하는 안내 문장은 제외하고 문서 본문만 작성하세요.",
+    ].join("\n");
+  }
+
+  function deriveGroupwareApprovalTitle(message) {
+    const cleaned = String(message || "")
+      .replace(/\[[\s\S]*?\]/g, " ")
+      .replace(/(기안\s*품의서|기안품의서|품의서|기안서|전자결재|결재\s*문서|결재문서)/g, " ")
+      .replace(/(작성해줘|작성해\s*줘|작성해\s*주세요|써줘|써\s*줘|생성해줘|만들어줘|보관해줘|저장해줘|해줘|해주세요)/g, " ")
+      .replace(/(에\s*대한|관련|대해서|으로|로)$/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const base = cleaned || "DS ONE";
+    const title = /기안|품의/.test(base) ? base : `${base} 기안품의서`;
+    return title.slice(0, 80);
+  }
+
+  function textToGroupwareBodyHtml(text) {
+    const lines = String(text || "")
+      .replace(/\r/g, "")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (!lines.length) return `<p>${escapeHtml("내용 확인 필요")}</p>`;
+    return lines.map((line) => `<p>${escapeHtml(line).replace(/  /g, "&nbsp; ")}</p>`).join("");
+  }
+
+  async function requestGroupwareApprovalDraft(message, history) {
+    const activeToken = await ensureValidSession({ silent: false });
+    if (!activeToken) throw new Error("세션 갱신이 필요합니다. 그룹웨어 DS ONE 버튼으로 다시 접속해 주세요.");
+
+    const draftData = await requestAgentAnswer(buildGroupwareDraftPrompt(message), history);
+    const draftText = extractAnswerText(draftData) || message;
+    const title = deriveGroupwareApprovalTitle(message);
+    const bodyHtml = textToGroupwareBodyHtml(draftText);
+
+    const res = await fetch(RPA_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
+      body: JSON.stringify({
+        action: "groupware_approval_draft",
+        requestText: message,
+        title,
+        bodyHtml,
+        formId: "1176",
+        saveMode: "draft",
+      }),
+    });
+    const data = await readApiResponse(res);
+    const completed = await pollGroupwareApprovalDraftStatus(data.jobId, activeToken).catch(() => null);
+    return { ...data, answer: formatGroupwareApprovalDraftAnswer(completed || data, title) };
+  }
+
+  async function pollGroupwareApprovalDraftStatus(jobId, activeToken) {
+    if (!jobId) return null;
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < 30000) {
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      const res = await fetch(RPA_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
+        body: JSON.stringify({ action: "groupware_approval_status", jobId }),
+      });
+      const data = await readApiResponse(res);
+      if (["succeeded", "failed", "blocked"].includes(String(data.status || ""))) return data;
+    }
+    return null;
+  }
+
+  function formatGroupwareApprovalDraftAnswer(data, title) {
+    const status = String(data?.status || "").trim();
+    if (data?.ok && status === "succeeded") {
+      return [
+        "기안품의서가 그룹웨어에 보관되었습니다.",
+        "",
+        `제목: ${title}`,
+        data.jobId ? `작업 ID: ${data.jobId}` : "",
+        "다음 단계: 그룹웨어 보관함에서 문서 내용을 확인한 뒤 상신하세요.",
+      ].filter(Boolean).join("\n");
+    }
+    if (status === "failed" || status === "blocked" || data?.ok === false) {
+      return [
+        "기안품의서 자동 보관에 실패했습니다.",
+        "",
+        `제목: ${title}`,
+        data?.message || data?.error || "RPA 워커 실행 결과를 확인해 주세요.",
+        data?.jobId ? `작업 ID: ${data.jobId}` : "",
+      ].filter(Boolean).join("\n");
+    }
+    return [
+      "기안품의서 보관 작업을 접수했습니다.",
+      "",
+      `제목: ${title}`,
+      data?.jobId ? `작업 ID: ${data.jobId}` : "",
+      "현재 자동 보관 중입니다. 완료 여부는 RPA 작업 상태에서 확인하세요.",
+    ].filter(Boolean).join("\n");
   }
 
   async function requestFileAnalysis(message, history) {
