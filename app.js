@@ -513,6 +513,40 @@
         border-radius: 6px;
         font-size: .92em;
       }
+      .ds-msg-image {
+        width: min(520px, 100%);
+        margin: 12px 0 16px;
+      }
+      .ds-msg-image-link {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+      }
+      .ds-msg-image img {
+        display: block;
+        width: 100%;
+        max-height: 360px;
+        object-fit: contain;
+        background: #fff;
+        border: 1px solid #e0e7f3;
+        border-radius: 8px;
+        box-shadow: 0 12px 28px rgba(37, 48, 77, 0.08);
+      }
+      .ds-msg-image-caption {
+        margin-top: 6px;
+        color: #66758c;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      .ds-msg-image-fallback {
+        display: none;
+        margin-top: 6px;
+        color: #2f5fb6;
+        font-size: 12px;
+        font-weight: 800;
+        text-decoration: none;
+      }
+      .ds-msg-image.is-error .ds-msg-image-fallback { display: inline-flex; }
       .ds-msg-table-wrap { margin: 14px 0 20px; }
       .ds-msg-table-toolbar {
         display: flex;
@@ -1986,6 +2020,17 @@
         continue;
       }
       if (trimmed === "[[DS_PDF_EVIDENCE_END]]") continue;
+      const imageBlock = parseMarkdownImageBlock(rawLines, i);
+      if (imageBlock) {
+        appendMessageImage(container, imageBlock.url, imageBlock.alt);
+        i = imageBlock.nextIndex;
+        continue;
+      }
+      const standaloneImageUrl = parseStandaloneImageUrl(trimmed);
+      if (standaloneImageUrl) {
+        appendMessageImage(container, standaloneImageUrl, "지식베이스 이미지");
+        continue;
+      }
       if (!trimmed) {
         appendSpacer(container);
         continue;
@@ -2098,6 +2143,106 @@
     pre.className = "ds-msg-codeblock";
     pre.textContent = String(code || "");
     container.appendChild(pre);
+  }
+
+  function parseMarkdownImageBlock(lines, index) {
+    let combined = String(lines[index] || "").trim();
+    if (!/^!\[[^\]]{0,120}\]/.test(combined)) return null;
+    let nextIndex = index;
+    while (!/\)\s*$/.test(combined) && nextIndex + 1 < lines.length && nextIndex - index < 4) {
+      const next = String(lines[nextIndex + 1] || "").trim();
+      if (!next || /^```/.test(next) || isMarkdownTableLine(next)) break;
+      combined += next;
+      nextIndex += 1;
+    }
+    const match = combined.match(/^!\[([^\]]{0,120})\]\s*\((.+?)\)\s*$/);
+    if (!match) return null;
+    const url = normalizeSafeImageUrl(match[2]);
+    if (!url) return null;
+    return {
+      url,
+      alt: normalizeText(match[1] || "지식베이스 이미지") || "지식베이스 이미지",
+      nextIndex,
+    };
+  }
+
+  function parseStandaloneImageUrl(line) {
+    const url = normalizeSafeImageUrl(line);
+    if (!url) return "";
+    return isLikelyDisplayImageUrl(url) ? url : "";
+  }
+
+  function normalizeSafeImageUrl(raw) {
+    const cleaned = String(raw || "")
+      .trim()
+      .replace(/^<|>$/g, "")
+      .replace(/^\(|\)$/g, "")
+      .replace(/^['"]|['"]$/g, "")
+      .replace(/\s+/g, "");
+    if (!cleaned) return "";
+    try {
+      const url = new URL(cleaned, window.location.href);
+      const isLocalHttp = url.protocol === "http:" && /^(localhost|127\.0\.0\.1)$/i.test(url.hostname);
+      if (url.protocol !== "https:" && !isLocalHttp) return "";
+      if (!isLikelyDisplayImageUrl(url.href)) return "";
+      return url.href;
+    } catch {
+      return "";
+    }
+  }
+
+  function isLikelyDisplayImageUrl(url) {
+    try {
+      const parsed = new URL(String(url || ""), window.location.href);
+      const host = parsed.hostname.toLowerCase();
+      const path = parsed.pathname.toLowerCase();
+      return /\.(png|jpe?g|gif|webp|bmp)$/i.test(path)
+        || host === "chatimg.sidetalk.ai"
+        || host.endsWith(".sidetalk.ai");
+    } catch {
+      return false;
+    }
+  }
+
+  function appendMessageImage(container, url, alt = "지식베이스 이미지") {
+    const figure = document.createElement("figure");
+    figure.className = "ds-msg-image";
+
+    const link = document.createElement("a");
+    link.className = "ds-msg-image-link";
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = alt || "지식베이스 이미지";
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.addEventListener("error", () => {
+      figure.classList.add("is-error");
+      img.hidden = true;
+    }, { once: true });
+    link.appendChild(img);
+    figure.appendChild(link);
+
+    const caption = normalizeText(alt || "");
+    if (caption && !/^image$/i.test(caption) && caption !== "이미지" && caption !== "지식베이스 이미지") {
+      const figcaption = document.createElement("figcaption");
+      figcaption.className = "ds-msg-image-caption";
+      figcaption.textContent = caption;
+      figure.appendChild(figcaption);
+    }
+
+    const fallback = document.createElement("a");
+    fallback.className = "ds-msg-image-fallback";
+    fallback.href = url;
+    fallback.target = "_blank";
+    fallback.rel = "noopener noreferrer";
+    fallback.textContent = "이미지를 새 창에서 열기";
+    figure.appendChild(fallback);
+
+    container.appendChild(figure);
   }
 
   function normalizeAnswerText(text) {
