@@ -86,6 +86,7 @@
     searchMenuButton: null,
     productSwitch: null,
     productModeButton: null,
+    productModeIcon: null,
     productModeLabel: null,
     productModeMenu: null,
     heroTitle: null,
@@ -99,6 +100,7 @@
     agent: {
       label: "업무 AI Agent",
       shortLabel: "업무 AI",
+      switchIcon: "i-star",
       title: "무엇을 도와드릴까요?",
       subtitle: "업무에 필요한 다양한 작업을 AI가 빠르고 정확하게 도와드립니다.",
       placeholder: "메시지를 입력하세요.   (예: 회의록 요약해줘)",
@@ -116,6 +118,7 @@
     knowledge: {
       label: "사내 지식 문의",
       shortLabel: "사내 지식",
+      switchIcon: "i-book",
       title: "사내 업무, 무엇이 궁금하신가요?",
       subtitle: "사내 규정, 업무 절차 및 담당 부서를 빠르게 찾아드립니다.",
       placeholder: "사내 규정, 업무 절차, 담당 부서를 질문하세요.   (예: 출장비 정산 기준 알려줘)",
@@ -1181,6 +1184,7 @@
     state.lowerRecentList = document.querySelector(".task-list");
     state.productSwitch = document.getElementById("productSwitch");
     state.productModeButton = document.getElementById("productModeButton");
+    state.productModeIcon = document.getElementById("productModeIcon");
     state.productModeLabel = document.getElementById("productModeLabel");
     state.productModeMenu = document.getElementById("productModeMenu");
     state.heroTitle = document.querySelector("#home-title, .hero-title, .hero h1");
@@ -1269,6 +1273,7 @@
     if (!state.productModeButton && button) state.productModeButton = button;
     if (!state.productModeMenu && menu) state.productModeMenu = menu;
     if (!state.productSwitch) state.productSwitch = document.getElementById("productSwitch");
+    if (!state.productModeIcon) state.productModeIcon = document.getElementById("productModeIcon");
     if (!state.productModeLabel) state.productModeLabel = document.getElementById("productModeLabel");
     if (!button || !menu || button.dataset.bound === "true") return;
     button.dataset.bound = "true";
@@ -1309,6 +1314,7 @@
       try { localStorage.setItem(FEATURE_MODE_KEY, nextMode); } catch {}
     }
     const profile = getCurrentFeatureProfile();
+    syncProductModeIcon(nextMode, profile);
     if (state.productModeLabel) state.productModeLabel.textContent = profile.label;
     if (state.productModeButton) state.productModeButton.setAttribute("aria-label", `${profile.label} 선택됨. 기능 변경`);
     state.productModeMenu?.querySelectorAll("button[data-feature-mode]").forEach((item) => {
@@ -1331,6 +1337,18 @@
     if (!options.silent && featureChanged) {
       showToast(`${profile.label} 모드로 전환했습니다.`);
     }
+  }
+
+  function syncProductModeIcon(mode, profile = FEATURE_PROFILES.agent) {
+    const icon = state.productModeIcon || document.getElementById("productModeIcon");
+    if (!icon) return;
+    state.productModeIcon = icon;
+    const nextMode = normalizeFeatureMode(mode);
+    icon.classList.remove("product-mode-icon-agent", "product-mode-icon-knowledge");
+    icon.classList.add(`product-mode-icon-${nextMode}`);
+    icon.dataset.featureModeIcon = nextMode;
+    const use = icon.querySelector("use");
+    if (use) use.setAttribute("href", `#${profile.switchIcon || "i-star"}`);
   }
 
   function resetConversationForFeatureSwitch() {

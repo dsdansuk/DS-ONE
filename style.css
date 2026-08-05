@@ -1178,7 +1178,7 @@
     }
 
 
-/* v54 feature switcher: 업무 AI Agent / 사내 지식 문의 */
+/* v80 feature switcher: 업무 AI Agent / 사내 지식 문의 icon split */
 .product-switch {
   position: relative;
   display: inline-flex;
@@ -1190,8 +1190,8 @@
   min-height: 38px;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 0 10px;
+  gap: 8px;
+  padding: 0 10px 0 8px;
   color: #2b303b;
   background: transparent;
   border-radius: 12px;
@@ -1202,6 +1202,38 @@
 .product-switch-button[aria-expanded="true"] {
   color: var(--blue);
   background: rgba(47, 111, 237, 0.06);
+}
+
+body.is-knowledge-feature .product-switch-button:hover,
+body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
+  color: #0f8f70;
+  background: rgba(15, 143, 112, 0.08);
+}
+
+.product-mode-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #fff;
+  box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.product-mode-icon .icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  stroke-width: 2.2;
+}
+
+.product-mode-icon-agent {
+  background: linear-gradient(145deg, #2f6fed, #7da8ff);
+}
+
+.product-mode-icon-knowledge {
+  background: linear-gradient(145deg, #0f9f79, #53d2b1);
 }
 
 .product-switch-chevron {
@@ -1252,7 +1284,10 @@
   position: relative;
   width: 100%;
   display: grid;
-  gap: 4px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 0;
+  align-items: center;
   padding: 12px 38px 12px 13px;
   border: 1px solid transparent;
   border-radius: 13px;
@@ -1279,6 +1314,16 @@
   background: linear-gradient(135deg, rgba(47, 111, 237, 0.18), rgba(125, 168, 255, 0.22));
 }
 
+.product-mode-menu button[data-feature-mode="knowledge"][aria-checked="true"] {
+  background: linear-gradient(135deg, rgba(15, 159, 121, 0.14), rgba(83, 210, 177, 0.18));
+  border-color: rgba(15, 159, 121, 0.22);
+  box-shadow: inset 3px 0 0 rgba(15, 159, 121, 0.88);
+}
+
+.product-mode-menu button[data-feature-mode="knowledge"][aria-checked="true"]:hover {
+  background: linear-gradient(135deg, rgba(15, 159, 121, 0.18), rgba(83, 210, 177, 0.24));
+}
+
 .product-mode-menu button[aria-checked="true"]::after {
   content: "✓";
   position: absolute;
@@ -1296,13 +1341,48 @@
   font-weight: 900;
 }
 
+.product-mode-menu button[data-feature-mode="knowledge"][aria-checked="true"]::after {
+  background: #0f9f79;
+}
+
+.product-mode-menu-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #fff;
+  box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.product-mode-menu-icon .icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  stroke-width: 2.2;
+}
+
+.product-mode-menu-icon-agent {
+  background: linear-gradient(145deg, #2f6fed, #7da8ff);
+}
+
+.product-mode-menu-icon-knowledge {
+  background: linear-gradient(145deg, #0f9f79, #53d2b1);
+}
+
+.product-mode-menu-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
 .product-mode-menu strong {
   font-size: 14px;
   font-weight: 900;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
-.product-mode-menu span {
+.product-mode-menu .product-mode-menu-copy > span {
   color: #657186;
   font-size: 12px;
   line-height: 1.35;
@@ -1336,12 +1416,19 @@
   color: #1559d1;
 }
 
-.product-mode-menu button[aria-checked="true"] span {
+.product-mode-menu button[aria-checked="true"] .product-mode-menu-copy > span {
   color: #526b95;
 }
 
-.app-icon.knowledge,
-.knowledge {
+.product-mode-menu button[data-feature-mode="knowledge"][aria-checked="true"] strong {
+  color: #087b60;
+}
+
+.product-mode-menu button[data-feature-mode="knowledge"][aria-checked="true"] .product-mode-menu-copy > span {
+  color: #3d7668;
+}
+
+.app-icon.knowledge {
   background: linear-gradient(145deg, #2f6fed, #7da8ff);
 }
 
