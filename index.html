@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DS ONE 업무 AI Agent 홈</title>
-  <link rel="stylesheet" href="style.css?v=20260805_v80_feature_icon_split">
+  <link rel="stylesheet" href="style.css?v=20260805_v81_action_card_icon_split">
 </head>
 <body>
   <svg class="sr-only" aria-hidden="true">
@@ -137,32 +137,37 @@
           <section class="action-grid" aria-label="빠른 작업">
             <button class="action-card" type="button">
               <span class="card-head">
-                <span class="app-icon doc">
-                  <svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="0 0 512 512"
-     width="100%"
-     height="100%"
-     preserveAspectRatio="xMidYMid meet"
-     aria-hidden="true"
-     color="#ffffff"
-     fill="none">
-  <g
-    stroke="currentColor"
-    stroke-width="42"
-    stroke-linecap="round"
-    stroke-linejoin="round">
+                <span class="app-icon doc card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent" aria-hidden="true">
+                  <svg
+                    class="icon-add-file"
+                    viewBox="0 0 512 512"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <g
+                      stroke="currentColor"
+                      stroke-width="44"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <!-- 문서 외곽 -->
+                      <path d="M277 448H128C104 448 85 429 85 405V107C85 83 104 64 128 64H256L384 192V278"/>
 
-    <!-- 문서 외곽 -->
-    <path d="M238 106H108C84 106 64 126 64 150V404C64 428 84 448 108 448H340C364 448 384 428 384 404V264"/>
+                      <!-- 문서 접힌 부분 -->
+                      <path d="M256 64V149C256 173 275 192 299 192H384"/>
 
-    <!-- 연필 외곽 -->
-    <path d="M183 289L196 223L371 48C390 29 421 29 440 48C459 67 459 98 440 117L265 292L183 310Z"/>
+                      <!-- 문서 내용 -->
+                      <path d="M171 192H192"/>
+                      <path d="M171 277H299"/>
+                      <path d="M171 363H277"/>
 
-    <!-- 연필 캡 구분선 -->
-    <path d="M366 53L435 122"/>
-  </g>
-</svg>
+                      <!-- 추가 아이콘 -->
+                      <path d="M384 363V448"/>
+                      <path d="M341 405H427"/>
+                    </g>
+                  </svg>
                 </span>
+                <span class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" aria-hidden="true" hidden>규</span>
                 <span class="card-title">문서 작성</span>
               </span>
               <span class="card-desc">기획서, 보고서, 메일<br>초안 작성 등</span>
@@ -170,7 +175,7 @@
 
             <button class="action-card" type="button">
               <span class="card-head">
-                <span class="app-icon summary">
+                <span class="app-icon summary card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent" aria-hidden="true">
                   <svg
                     class="icon-file-question"
                     viewBox="0 0 512 512"
@@ -228,6 +233,7 @@
                     />
                   </svg>
                 </span>
+                <span class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" aria-hidden="true" hidden>신</span>
                 <span class="card-title">문서 요약</span>
               </span>
               <span class="card-desc">긴 문서나 회의 내용을<br>핵심만 요약</span>
@@ -235,11 +241,12 @@
 
             <button class="action-card" type="button">
               <span class="card-head">
-                <span class="app-icon translate">
+                <span class="app-icon translate card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent" aria-hidden="true">
                   <svg class="icon-translate" viewBox="0 0 512 512" aria-hidden="true">
                     <path fill="currentColor" fill-rule="evenodd" d="M 166 42 L 163 43 L 161 44 L 159 45 L 156 47 L 154 49 L 154 50 L 151 53 L 150 55 L 149 58 L 148 85 L 80 85 L 77 86 L 75 87 L 73 88 L 67 94 L 65 97 L 64 100 L 63 104 L 63 108 L 64 113 L 65 115 L 66 117 L 68 120 L 71 123 L 74 125 L 76 126 L 78 127 L 83 128 L 231 129 L 230 133 L 227 145 L 223 157 L 221 162 L 218 169 L 211 183 L 208 188 L 200 200 L 197 204 L 192 210 L 185 217 L 182 214 L 177 208 L 165 192 L 159 183 L 154 175 L 146 159 L 144 156 L 142 154 L 141 154 L 138 151 L 136 150 L 133 149 L 122 149 L 119 150 L 117 151 L 114 154 L 113 154 L 111 156 L 109 159 L 108 161 L 107 163 L 106 166 L 106 174 L 107 177 L 108 180 L 111 186 L 119 200 L 123 206 L 131 218 L 136 225 L 147 238 L 148 243 L 146 243 L 141 246 L 129 250 L 125 251 L 121 252 L 116 253 L 110 254 L 102 255 L 83 255 L 78 256 L 76 257 L 74 258 L 71 260 L 68 263 L 66 266 L 65 268 L 64 270 L 63 275 L 63 279 L 64 283 L 65 286 L 67 289 L 73 295 L 75 296 L 77 297 L 80 298 L 103 298 L 113 297 L 119 296 L 125 295 L 130 294 L 142 291 L 154 287 L 159 285 L 166 282 L 170 280 L 176 277 L 178 275 L 181 274 L 186 278 L 191 283 L 196 287 L 208 296 L 217 302 L 222 305 L 227 308 L 236 313 L 238 314 L 240 315 L 249 319 L 253 319 L 254 320 L 257 320 L 258 319 L 262 319 L 268 316 L 273 311 L 275 308 L 276 305 L 277 302 L 277 294 L 276 291 L 275 289 L 274 287 L 272 284 L 270 282 L 269 282 L 266 279 L 264 278 L 262 277 L 258 276 L 254 274 L 247 270 L 242 267 L 230 259 L 222 253 L 216 247 L 220 243 L 220 242 L 227 235 L 231 230 L 234 226 L 237 222 L 243 213 L 246 208 L 249 203 L 252 197 L 257 187 L 260 180 L 262 175 L 265 167 L 266 164 L 267 161 L 271 147 L 273 138 L 274 133 L 275 128 L 276 121 L 276 111 L 275 107 L 273 102 L 271 99 L 268 95 L 265 92 L 262 90 L 259 88 L 257 87 L 254 86 L 251 85 L 192 84 L 192 62 L 191 57 L 188 51 L 183 46 L 180 44 L 177 43 L 174 42 Z M 334 231 L 331 232 L 328 233 L 326 234 L 324 235 L 321 237 L 316 242 L 313 246 L 312 248 L 311 250 L 307 260 L 299 280 L 283 320 L 235 440 L 234 444 L 234 452 L 235 455 L 236 457 L 237 459 L 244 466 L 246 467 L 248 468 L 252 469 L 259 469 L 263 468 L 265 467 L 267 466 L 274 459 L 275 457 L 276 455 L 280 445 L 294 408 L 295 406 L 385 405 L 387 407 L 388 409 L 390 414 L 394 426 L 404 451 L 406 456 L 407 458 L 410 461 L 410 462 L 412 464 L 415 466 L 417 467 L 419 468 L 422 469 L 430 469 L 433 468 L 436 467 L 439 465 L 444 460 L 447 454 L 447 450 L 448 449 L 448 446 L 447 445 L 447 441 L 445 436 L 441 426 L 433 406 L 417 366 L 371 251 L 368 245 L 364 240 L 359 236 L 356 234 L 351 232 L 347 231 Z M 341 293 L 343 297 L 345 302 L 349 312 L 368 359 L 367 362 L 313 361 L 314 358 L 317 351 L 323 336 L 338 298 Z"/>
                   </svg>
                 </span>
+                <span class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" aria-hidden="true" hidden>담</span>
                 <span class="card-title">문서 번역</span>
               </span>
               <span class="card-desc">다국어 문서를<br>자연스럽게 번역</span>
@@ -247,7 +254,7 @@
 
             <button class="action-card" type="button">
               <span class="card-head">
-                <span class="app-icon excel">X
+                <span class="app-icon excel card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent" aria-hidden="true">X
                   <!-- <svg
                     class="icon-excel"
                     viewBox="0 0 512 512"
@@ -276,6 +283,7 @@
                     />
                   </svg> -->
                 </span>
+                <span class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" aria-hidden="true" hidden>시</span>
                 <span class="card-title">엑셀 분석</span>
               </span>
               <span class="card-desc">데이터 분석 및<br>시각화, 인사이트 도출</span>
@@ -283,7 +291,7 @@
 
             <button class="action-card" type="button">
               <span class="card-head">
-                <span class="app-icon file">
+                <span class="app-icon file card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent" aria-hidden="true">
                   <span class="app-icon pdf">
                     <svg xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 512 512"
@@ -329,6 +337,7 @@
                     </svg>
                   </span>
                 </span>
+                <span class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" aria-hidden="true" hidden>보</span>
                 <span class="card-title">PDF 분석</span>
               </span>
               <span class="card-desc">파일을 업로드하고<br>질문하기</span>
@@ -337,7 +346,8 @@
             <button class="action-card is-disabled" type="button" disabled aria-disabled="true" title="PPT 생성 기능은 현재 준비 중입니다.">
               <span class="card-status" aria-hidden="true">준비 중</span>
               <span class="card-head">
-                <span class="app-icon report">▥</span>
+                <span class="app-icon report card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent" aria-hidden="true">▥</span>
+                <span class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" aria-hidden="true" hidden>휴</span>
                 <span class="card-title">PPT 생성</span>
               </span>
               <span class="card-desc">보고서 구조화 및<br>핵심 내용 정리</span>
@@ -582,6 +592,6 @@
     resizePromptTextarea();
     fitHomeToViewport();
   </script>
-  <script src="app.js?v=20260805_v80_feature_icon_split"></script>
+  <script src="app.js?v=20260805_v81_action_card_icon_split"></script>
 </body>
 </html>

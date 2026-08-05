@@ -693,6 +693,17 @@
       overflow: visible;
     }
 
+    .card-mode-icon {
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0;
+      line-height: 1;
+    }
+
+    .card-mode-icon[hidden] {
+      display: none !important;
+    }
+
     .doc {
       background: #3177ee;
     }
@@ -1429,7 +1440,7 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 }
 
 .app-icon.knowledge {
-  background: linear-gradient(145deg, #2f6fed, #7da8ff);
+  background: linear-gradient(145deg, #0f9f79, #53d2b1);
 }
 
 .prompt-card.is-knowledge-mode .icon-btn,

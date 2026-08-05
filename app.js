@@ -1413,7 +1413,6 @@
       card.classList.toggle("is-disabled", isDisabled);
       card.setAttribute("aria-disabled", isDisabled ? "true" : "false");
       card.title = isDisabled ? (item.disabledReason || `${item.title || "해당"} 기능은 현재 준비 중입니다.`) : "";
-      const icon = card.querySelector(".app-icon");
       const title = card.querySelector(".card-title");
       const desc = card.querySelector(".card-desc");
       let status = card.querySelector(".card-status");
@@ -1425,12 +1424,18 @@
       }
       status.textContent = item.disabledLabel || "준비 중";
       status.hidden = !isDisabled;
-      // if (icon) {
-      //   icon.className = `app-icon ${item.iconClass || "doc"}`;
-      //   icon.textContent = item.iconText || "▤";
-      // }
+      syncActionCardIconVisibility(card, currentFeature);
       if (title) title.textContent = item.title || "업무 요청";
       if (desc) desc.innerHTML = item.desc || "";
+    });
+  }
+
+  function syncActionCardIconVisibility(card, mode) {
+    const icons = Array.from(card.querySelectorAll(".card-mode-icon[data-card-icon-mode]"));
+    if (!icons.length) return;
+    const nextMode = normalizeFeatureMode(mode);
+    icons.forEach((icon) => {
+      icon.hidden = icon.dataset.cardIconMode !== nextMode;
     });
   }
 
