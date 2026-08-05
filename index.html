@@ -202,26 +202,25 @@
                       height="100%"
                       preserveAspectRatio="xMidYMid meet"
                       aria-hidden="true"
-                      color="#ffffff">
-                    <g>
-                      <path
-                        fill="currentColor"
-                        fill-rule="evenodd"
-                        clip-rule="evenodd"
-                        shape-rendering="geometricPrecision"
-                        d="M64 64
-                          H176
-                          L256 190
-                          L336 64
-                          H448
-                          L320 256
-                          L448 448
-                          H336
-                          L256 322
-                          L176 448
-                          H64
-                          L192 256
-                          Z"/>
+                      color="#ffffff"
+                      fill="none">
+                    <g
+                      stroke="currentColor"
+                      stroke-width="24"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      shape-rendering="geometricPrecision">
+
+                      <!-- 바깥 테두리 -->
+                      <rect x="64" y="64" width="384" height="384" rx="12" ry="12"/>
+
+                      <!-- 세로 줄 -->
+                      <path d="M192 64V448"/>
+                      <path d="M320 64V448"/>
+
+                      <!-- 가로 줄 -->
+                      <path d="M64 192H448"/>
+                      <path d="M64 320H448"/>
                     </g>
                   </svg>
                 </span>
