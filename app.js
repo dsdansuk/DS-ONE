@@ -695,10 +695,24 @@
         height: 20px;
         display: grid;
         place-items: center;
+        padding: 0;
         color: #6a7690;
         background: #fff;
         border: 1px solid #d8e6ff;
         border-radius: 999px;
+        font-size: 0;
+        line-height: 0;
+      }
+      .ds-file-chip button svg {
+        width: 10px;
+        height: 10px;
+        display: block;
+        margin: auto;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
       .ds-agent-input-row {
         display: flex;
@@ -1750,7 +1764,7 @@
       selectedFiles.forEach((file, index) => {
         const chip = document.createElement("span");
         chip.className = "ds-file-chip";
-        chip.innerHTML = `<span>${escapeHtml(file.name)}</span><em>${formatFileSize(file.size)}</em><button type="button" aria-label="첨부 파일 제거">×</button>`;
+        chip.innerHTML = `<span>${escapeHtml(file.name)}</span><em>${formatFileSize(file.size)}</em><button type="button" aria-label="첨부 파일 제거"><svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3 3l6 6"></path><path d="M9 3 3 9"></path></svg></button>`;
         chip.querySelector("button")?.addEventListener("click", () => {
           selectedFiles.splice(index, 1);
           renderFileChips();

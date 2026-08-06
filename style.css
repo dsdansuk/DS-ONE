@@ -1458,16 +1458,18 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   }
 }
 
-/* v82: enterprise open polish
+/* v83: enterprise open polish
    Keep the composer and quick-action row on one shared visual width,
-   so laptop and monitor layouts keep the same center line and density. */
+   with a monitor-like content ratio on scaled laptop displays. */
 :root {
   --home-content-max-width: 1100px;
+  --home-content-min-width: 900px;
+  --home-content-fluid-width: 70%;
 }
 
 .home-fit {
-  --home-primary-width: min(var(--home-content-max-width), 100%);
-  width: min(100%, 1220px);
+  --home-primary-width: min(100%, clamp(var(--home-content-min-width), var(--home-content-fluid-width), var(--home-content-max-width)));
+  width: 100%;
   margin-inline: auto;
 }
 
@@ -1529,8 +1531,8 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 
 @media (min-width: 1440px) and (min-height: 760px) {
   .home-fit {
-    --home-primary-width: min(var(--home-content-max-width), 100%);
-    width: min(100%, 1220px);
+    --home-primary-width: min(100%, clamp(var(--home-content-min-width), var(--home-content-fluid-width), var(--home-content-max-width)));
+    width: 100%;
   }
 
   .prompt-card,
@@ -1545,7 +1547,7 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 
 @media (max-width: 1180px) {
   .home-fit {
-    --home-primary-width: min(940px, 100%);
+    --home-primary-width: min(100%, clamp(860px, 74%, 940px));
   }
 
   .action-grid {
