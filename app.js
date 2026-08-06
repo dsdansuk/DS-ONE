@@ -1922,9 +1922,10 @@
     return [
       message,
       "",
-      "위 요청을 그룹웨어 기안품의서 본문으로 바로 저장할 수 있게 작성해 주세요.",
-      "형식은 1. 기안 목적, 2. 주요 내용, 3. 요청 사항 순서로 작성하세요.",
-      "금액, 일정, 결재라인처럼 원문에 없는 값은 임의로 만들지 말고 '확인 필요'로 표시하세요.",
+      "위 요청을 그룹웨어 기안품의서 본문으로 바로 보관할 수 있게 작성해 주세요.",
+      "반드시 다음 항목을 포함하세요: 1. 기안 목적, 2. 구매/진행 개요, 3. 검토 내용, 4. 예산 및 일정, 5. 요청 사항, 6. 첨부.",
+      "노트북/비품/서비스 구매 요청이면 품목, 수량, 사용 목적, 필요 사유, 예산, 납기, 첨부 예정 자료를 구분하세요.",
+      "요청에 없는 금액, 수량, 업체명, 결재라인, 일정은 임의로 만들지 말고 '확인 필요'로 표시하세요.",
       "사용자에게 설명하는 안내 문장은 제외하고 문서 본문만 작성하세요.",
     ].join("\n");
   }
@@ -1937,8 +1938,9 @@
       .replace(/(에\s*대한|관련|대해서|으로|로)$/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-    const base = cleaned || "DS ONE";
-    const title = /기안|품의/.test(base) ? base : `${base} 기안품의서`;
+    const base = cleaned || "업무 요청";
+    if (/노트북|laptop|랩톱/i.test(base) && /구매|구입|도입/.test(base)) return "노트북 구매 품의";
+    const title = /기안|품의/.test(base) ? base : `${base} 품의`;
     return title.slice(0, 80);
   }
 
@@ -1952,6 +1954,65 @@
     return lines.map((line) => `<p>${escapeHtml(line).replace(/  /g, "&nbsp; ")}</p>`).join("");
   }
 
+  function buildGroupwareApprovalBodyHtml(message, draftText) {
+    const text = String(draftText || "").trim();
+    const request = String(message || "").trim();
+    const item = inferApprovalItemName(request);
+    const purpose = request ? `${request.replace(/(기안\s*품의서|기안품의서|품의서|작성해줘|작성해\s*줘|써줘|해줘)/g, "").trim()} 건을 진행하기 위해 품의합니다.` : "업무 진행을 위해 품의합니다.";
+    const reviewText = text
+      ? text.replace(/\r/g, "").split("\n").map((line) => line.trim()).filter(Boolean).slice(0, 12)
+      : [];
+    const rows = [
+      ["1. 기안 목적", [`- ${purpose || "확인 필요"}`]],
+      ["2. 구매/진행 개요", [
+        `- 품목/내용: ${item}`,
+        "- 수량: 확인 필요",
+        "- 사용 부서/사용자: 확인 필요",
+        "- 필요 사유: 업무 수행에 필요한 장비/서비스 확보",
+      ]],
+      ["3. 검토 내용", reviewText.length ? reviewText.map((line) => `- ${line.replace(/^[-ㆍ•]\s*/, "")}`) : [
+        "- 요청 내용 기준으로 검토 필요",
+        "- 세부 사양, 업체, 단가, 예산 적정성 확인 필요",
+      ]],
+      ["4. 예산 및 일정", [
+        "- 예상 금액: 확인 필요",
+        "- 예산 과목/부서: 확인 필요",
+        "- 필요 시점/납기: 확인 필요",
+      ]],
+      ["5. 요청 사항", [
+        "- 상기 건에 대한 구매/진행 승인을 요청드립니다.",
+        "- 세부 금액 및 업체 선정 자료는 확인 후 보완 예정입니다.",
+      ]],
+      ["6. 첨부", inferApprovalAttachmentLines(request, item)],
+    ];
+    return rows.map(([heading, lines]) => [
+      `<p><strong>${escapeHtml(heading)}</strong></p>`,
+      ...lines.map((line) => `<p>${escapeHtml(line)}</p>`),
+      "<p>&nbsp;</p>",
+    ].join("")).join("");
+  }
+
+  function inferApprovalItemName(message) {
+    const text = String(message || "");
+    if (/노트북|laptop|랩톱/i.test(text)) return "노트북";
+    if (/PC|컴퓨터|데스크탑|데스크톱/i.test(text)) return "PC/전산장비";
+    if (/모니터/i.test(text)) return "모니터";
+    if (/소프트웨어|라이선스|라이센스/i.test(text)) return "소프트웨어/라이선스";
+    return "확인 필요";
+  }
+
+  function inferApprovalAttachmentLines(message, item) {
+    const base = [
+      "- 견적서: 첨부 예정",
+      "- 비교견적서: 필요 시 첨부",
+    ];
+    if (/노트북|PC|컴퓨터|모니터|장비|소프트웨어|라이선스|라이센스/i.test(`${message} ${item}`)) {
+      base.push("- 제품 사양서 또는 구성 내역: 첨부 예정");
+    }
+    base.push("- 기타 참고자료: 필요 시 첨부");
+    return base;
+  }
+
   async function requestGroupwareApprovalDraft(message, history) {
     const activeToken = await ensureValidSession({ silent: false });
     if (!activeToken) throw new Error("세션 갱신이 필요합니다. 그룹웨어 DS ONE 버튼으로 다시 접속해 주세요.");
@@ -1959,7 +2020,7 @@
     const draftData = await requestAgentAnswer(buildGroupwareDraftPrompt(message), history);
     const draftText = extractAnswerText(draftData) || message;
     const title = deriveGroupwareApprovalTitle(message);
-    const bodyHtml = textToGroupwareBodyHtml(draftText);
+    const bodyHtml = buildGroupwareApprovalBodyHtml(message, draftText);
 
     const extensionResult = await requestGroupwareApprovalViaExtension({
       requestText: message,
@@ -2008,7 +2069,7 @@
       }, 1500);
       const finalTimer = setTimeout(() => {
         finish(latest);
-      }, 45000);
+      }, 90000);
       const onMessage = (event) => {
         if (event.source !== window) return;
         const data = event.data || {};
