@@ -1966,7 +1966,7 @@
   function groupwareParagraph(text = "", options = {}) {
     const indent = "&nbsp;".repeat(Number(options.indent || 0));
     const bold = options.bold ? "font-weight:bold;" : "";
-    const body = text ? `${indent}${preserveGroupwareSpaces(text)}` : "<br />";
+    const body = text ? `${indent}${preserveGroupwareSpaces(text)}` : "&nbsp;";
     return `<p style="${GROUPWARE_APPROVAL_P_STYLE}"><span style="${GROUPWARE_APPROVAL_SPAN_STYLE}${bold}">${body}</span></p>`;
   }
 
@@ -2051,15 +2051,15 @@
     const blocks = [];
 
     groupwarePushParagraph(blocks, "1. 기안 목적", { bold: true });
-    groupwarePushParagraph(blocks, "- 사내 업무 시스템의 안정적 운영, 확장성 확보 및 인프라 운영 효율화를 위해 클라우드 서버 도입 필요성을 검토하고자 합니다.", { indent: 4 });
-    groupwarePushParagraph(blocks, `- 본 품의는 ${providers.join(", ")}를 대상으로 서비스 적합성, 보안/운영 요건, 비용 구조 및 향후 확장성을 비교하여 최적 도입안을 선정하기 위한 사전 검토 승인 요청입니다.`, { indent: 4 });
+    groupwarePushParagraph(blocks, "- 사내 주요 업무 시스템의 안정적 운영과 향후 사용량 증가에 대응하기 위해 클라우드 서버 도입 필요성을 검토하고자 합니다.", { indent: 4 });
+    groupwarePushParagraph(blocks, `- 본 품의는 ${providers.join(", ")}를 동일 기준으로 비교하여 안정성, 보안성, 운영 편의성, 비용 효율성 및 확장성을 종합 검토한 뒤 최적의 도입 방향을 선정하기 위한 사전 승인 요청입니다.`, { indent: 4 });
 
     groupwarePushParagraph(blocks, "2. 내용", { bold: true });
     groupwarePushParagraph(blocks, "2.1 추진 배경", { indent: 4, bold: true });
     for (const line of [
-      "업무 시스템 사용량 증가와 서비스 연속성 요구가 높아짐에 따라, 기존 인프라 방식만으로는 탄력적인 증설, 장애 대응 및 운영 자동화에 한계가 발생할 수 있습니다.",
-      "클라우드 기반 서버 환경은 초기 투자 부담을 낮추고, 사용량 기반 확장, 백업/복구, 모니터링, 보안 정책 적용 측면에서 운영 유연성을 확보할 수 있습니다.",
-      "도입 전 주요 사업자별 장단점과 내부 운영 적합성을 비교하여 비용 집행의 타당성과 기술적 리스크를 사전에 검토할 필요가 있습니다.",
+      "업무 시스템의 사용량 증가, 장애 대응 요구, 데이터 백업/복구 중요성이 높아지면서 인프라 운영 방식에 대한 재검토가 필요합니다.",
+      "클라우드 서버는 사용량에 따른 탄력적 확장, 신속한 자원 증설, 모니터링 및 백업 자동화, 보안 정책 표준화 측면에서 기존 방식 대비 운영 유연성을 확보할 수 있습니다.",
+      "다만 사업자별 비용 구조, 보안 기능, 국내 지원 체계, 운영 난이도와 연계 서비스 범위가 달라 동일 기준의 비교 검토 후 도입 여부를 결정해야 합니다.",
     ]) {
       groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
     }
@@ -2074,19 +2074,32 @@
     ]));
     blocks.push(groupwareBlank(1));
 
-    groupwarePushParagraph(blocks, "2.3 사업자별 비교 검토", { indent: 4, bold: true });
+    groupwarePushParagraph(blocks, "2.3 평가 기준", { indent: 4, bold: true });
+    blocks.push(groupwareMatrixTable(
+      ["평가 항목", "검토 기준", "확인 필요 사항"],
+      [
+        ["안정성", "서비스 가용성, 장애 대응 체계, 백업/복구 기능", "SLA, 백업 주기, 복구 목표 시간"],
+        ["보안성", "계정 권한, 네트워크 통제, 로그 관리, 보안 인증", "MFA, 접근 제어, 감사 로그, 데이터 보호 정책"],
+        ["비용 효율성", "동일 사양 기준 월 사용료, 트래픽/스토리지 과금, 약정 할인", "월 예상 비용, 초기 구축비, 운영 관리비"],
+        ["운영 편의성", "관리 콘솔, 모니터링, 기술 지원, 국내 대응 체계", "운영 담당자 숙련도, 지원 채널, 장애 접수 방식"],
+        ["확장성", "서버 증설, 관리형 서비스 연계, 향후 시스템 확장 가능성", "추가 서비스 연동 계획, 이관 가능성"],
+      ],
+    ));
+    blocks.push(groupwareBlank(1));
+
+    groupwarePushParagraph(blocks, "2.4 사업자별 비교 검토", { indent: 4, bold: true });
     blocks.push(groupwareMatrixTable(
       ["구분", ...providers],
       buildCloudProviderComparisonRows(providers),
     ));
     blocks.push(groupwareBlank(1));
 
-    groupwarePushParagraph(blocks, "2.4 종합 검토 의견", { indent: 4, bold: true });
-    for (const line of buildCloudReviewLines(providers, draftText)) {
+    groupwarePushParagraph(blocks, "2.5 종합 검토 의견", { indent: 4, bold: true });
+    for (const line of buildCloudReviewLines(providers)) {
       groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
     }
 
-    groupwarePushParagraph(blocks, "2.5 예산 및 일정", { indent: 4, bold: true });
+    groupwarePushParagraph(blocks, "2.6 예산 및 일정", { indent: 4, bold: true });
     for (const line of [
       "예상 비용: 확인 필요. 최종 비용은 서버 사양, 스토리지 용량, 네트워크 사용량, 백업 보관 기간 및 운영 지원 범위 확정 후 산정 예정입니다.",
       "비용 검토 방식: 동일 사양 기준 월 예상 비용, 초기 구축 비용, 운영/관리 비용, 약정 할인 여부를 비교하여 산출하겠습니다.",
@@ -2096,7 +2109,7 @@
       groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
     }
 
-    groupwarePushParagraph(blocks, "2.6 리스크 및 관리 방안", { indent: 4, bold: true });
+    groupwarePushParagraph(blocks, "2.7 리스크 및 관리 방안", { indent: 4, bold: true });
     blocks.push(groupwareMatrixTable(
       ["리스크 항목", "검토 내용", "관리 방안"],
       [
@@ -2108,7 +2121,7 @@
     ));
     blocks.push(groupwareBlank(1));
 
-    groupwarePushParagraph(blocks, "2.7 요청 사항", { indent: 4, bold: true });
+    groupwarePushParagraph(blocks, "2.8 요청 사항", { indent: 4, bold: true });
     for (const line of [
       "상기 비교 검토 기준에 따라 클라우드 서버 도입 검토를 진행할 수 있도록 승인 요청드립니다.",
       "승인 후 각 사업자별 동일 기준 견적, 보안 검토 자료, 운영 구성안을 확보하여 최종 선정안을 별도 보고하겠습니다.",
@@ -2117,16 +2130,56 @@
     }
 
     appendApprovalClosing(blocks, { ...context, subject: "클라우드 서버 도입 비교 검토" });
-    return `<div data-ds-one-groupware-body="approval-v79" data-ds-one-template="cloud-server-comparison">${blocks.join("")}</div>`;
+    return `<div data-ds-one-groupware-body="approval-v80" data-ds-one-template="cloud-server-comparison">${blocks.join("")}</div>`;
   }
 
   function appendApprovalClosing(blocks, context) {
-    groupwarePushParagraph(blocks, "3. 마지막 문단", { bold: true });
-    blocks.push(groupwareParagraph(`- 상기와 같이 ${context.subject} 건을 진행하고자 하오니 검토 후 승인하여 주시기 바랍니다.  -끝-  (첨부물이 있는 '-끝-' 표시는 아래 예시 참고바랍니다)`, { indent: 4 }));
+    const closing = inferApprovalClosing(context);
+    groupwarePushParagraph(blocks, `3. ${closing.heading}`, { bold: true });
+    closing.lines.forEach((line, index) => {
+      blocks.push(groupwareParagraph(`- ${line}`, { indent: 4 }));
+      if (index < closing.lines.length - 1) blocks.push(groupwareBlank(1));
+    });
     blocks.push(groupwareBlank(3));
     blocks.push(groupwareParagraph("첨  부. OOO 1부.  -끝-  (첨부물이 1가지인 경우)", { indent: 11 }));
     blocks.push(groupwareParagraph("첨  부. 1. OOO 1부", { indent: 11 }));
     blocks.push(groupwareParagraph("2. XXX 1부.  -끝-  (첨부물이 2가지 이상인 경우)(본 예시는 삭제 후 작성 바랍니다)", { indent: 22 }));
+  }
+
+  function inferApprovalClosing(context) {
+    if (context.category === "cloud_server") {
+      return {
+        heading: "향후 계획",
+        lines: [
+          "승인 후 내부 시스템 요구사항, 예상 사용량, 보안 기준 및 운영 담당 범위를 정리하여 사업자별 동일 조건 견적을 요청하겠습니다.",
+          "견적 및 기술 검토 결과를 기준으로 PoC 필요 여부를 판단하고, 최종 사업자 선정안과 세부 도입 계획은 별도 보고 후 진행하겠습니다.  -끝-  (첨부물이 있는 '-끝-' 표시는 아래 예시 참고바랍니다)",
+        ],
+      };
+    }
+    if (context.category === "it_asset" || context.category === "software" || context.isPurchase) {
+      return {
+        heading: "향후 계획",
+        lines: [
+          "승인 후 세부 사양, 견적, 납기 및 비용 처리 기준을 최종 확인하여 구매/진행 절차를 추진하겠습니다.",
+          `진행 과정에서 변경 사항이 발생할 경우 관련 부서와 협의 후 보고하고, 필요한 증빙 자료는 보완하겠습니다.  -끝-  (첨부물이 있는 '-끝-' 표시는 아래 예시 참고바랍니다)`,
+        ],
+      };
+    }
+    if (context.category === "business") {
+      return {
+        heading: "향후 계획",
+        lines: [
+          "승인 후 세부 일정과 담당 역할을 확정하고, 관련 부서와 협의하여 계획된 업무를 차질 없이 진행하겠습니다.",
+          "진행 결과 및 후속 조치가 필요한 사항은 별도 정리하여 보고하겠습니다.  -끝-  (첨부물이 있는 '-끝-' 표시는 아래 예시 참고바랍니다)",
+        ],
+      };
+    }
+    return {
+      heading: "기타사항",
+      lines: [
+        `상기와 같이 ${context.subject} 건을 검토 요청드리며, 세부 내용은 승인 후 관련 기준에 따라 보완 및 진행하겠습니다.  -끝-  (첨부물이 있는 '-끝-' 표시는 아래 예시 참고바랍니다)`,
+      ],
+    };
   }
 
   function inferApprovalContext(message) {
