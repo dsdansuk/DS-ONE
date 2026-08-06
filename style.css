@@ -653,7 +653,7 @@
       line-height: 1.2;
       background: #e9edf2;
       border-radius: 999px;
-      letter-spacing: -0.01em;
+      letter-spacing: 0;
       white-space: nowrap;
     }
 
@@ -1410,7 +1410,7 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 
   .hero h1 {
     font-size: clamp(38px, 4.25dvh, 52px);
-    letter-spacing: -0.025em;
+    letter-spacing: 0;
   }
 
   .prompt-card {
@@ -1455,5 +1455,112 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 @media (max-width: 1100px) {
   .product-mode-menu {
     left: -72px;
+  }
+}
+
+/* v82: enterprise open polish
+   Keep the composer and quick-action row on one shared visual width,
+   so laptop and monitor layouts keep the same center line and density. */
+:root {
+  --home-content-max-width: 1100px;
+}
+
+.home-fit {
+  --home-primary-width: min(var(--home-content-max-width), 100%);
+  width: min(100%, 1220px);
+  margin-inline: auto;
+}
+
+.hero,
+.prompt-card,
+.action-grid {
+  width: var(--home-primary-width);
+  margin-inline: auto;
+}
+
+.prompt-card {
+  border-radius: 15px;
+}
+
+.action-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.action-card {
+  min-height: clamp(100px, 11.2dvh, 114px);
+  padding: 15px 16px;
+}
+
+.card-desc {
+  min-height: 0;
+  line-height: 1.42;
+}
+
+.product-mode-menu {
+  width: 304px;
+  border-radius: 16px;
+}
+
+.product-mode-menu button {
+  grid-template-columns: 32px minmax(0, 1fr);
+  padding: 11px 52px 11px 12px;
+  border-radius: 12px;
+}
+
+.product-mode-menu button[aria-checked="true"]::after {
+  content: "\2713";
+  right: 14px;
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+  font-size: 12px;
+}
+
+.product-mode-menu-copy {
+  gap: 3px;
+}
+
+.product-mode-menu .product-mode-menu-copy > span {
+  overflow: hidden;
+  line-height: 1.32;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 1440px) and (min-height: 760px) {
+  .home-fit {
+    --home-primary-width: min(var(--home-content-max-width), 100%);
+    width: min(100%, 1220px);
+  }
+
+  .prompt-card,
+  .action-grid {
+    width: var(--home-primary-width);
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1180px) {
+  .home-fit {
+    --home-primary-width: min(940px, 100%);
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .action-grid {
+    grid-template-columns: 1fr;
   }
 }

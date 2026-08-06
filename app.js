@@ -103,7 +103,7 @@
       shortLabel: "업무 AI",
       switchIcon: "i-star",
       title: "무엇을 도와드릴까요?",
-      subtitle: "업무에 필요한 다양한 작업을 AI가 빠르고 정확하게 도와드립니다.",
+      subtitle: "업무에 필요한 작업을 빠르고 정확하게 도와드립니다.",
       placeholder: "메시지를 입력하세요.   (예: 회의록 요약해줘)",
       disclaimer: "AI 답변은 참고용입니다. 중요한 업무에는 근거와 원문을 확인해 주세요.",
       attachEnabled: true,
@@ -121,17 +121,17 @@
       shortLabel: "사내 지식",
       switchIcon: "i-book",
       title: "사내 업무, 무엇이 궁금하신가요?",
-      subtitle: "사내 규정, 업무 절차 및 담당 부서를 빠르게 찾아드립니다.",
-      placeholder: "사내 규정, 업무 절차, 담당 부서를 질문하세요.   (예: 출장비 정산 기준 알려줘)",
+      subtitle: "규정, 절차, 담당 부서를 빠르게 확인합니다.",
+      placeholder: "사내 규정, 절차, 담당 부서를 질문하세요.   (예: 출장비 정산 기준 알려줘)",
       disclaimer: "사내 지식 답변은 SideTalk 지식베이스 기준입니다. 중요한 업무에는 담당 부서와 원문을 확인해 주세요.",
       attachEnabled: false,
       cards: [
-        { iconClass: "knowledge", iconText: "규", title: "규정·기준", desc: "제도, 기준, 예외<br>적용 여부 확인", task: "knowledge_policy", attach: false, template: "아래 사내 규정 또는 기준을 지식베이스 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "신", title: "신청·결재", desc: "신청서, 결재선,<br>처리 절차 확인", task: "knowledge_request", attach: false, disabled: true, disabledLabel: "준비 중", disabledReason: "신청·결재 기능은 현재 준비 중입니다.", template: "아래 신청 또는 결재 절차를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "담", title: "담당 부서", desc: "문의처, 담당 기준,<br>연락 부서 확인", task: "knowledge_owner", attach: false, template: "아래 업무의 담당 부서 또는 문의처를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "시", title: "시스템·권한", desc: "그룹웨어, ERP, ECM<br>계정·권한 확인", task: "knowledge_system_access", attach: false, template: "아래 시스템, 계정 또는 권한 관련 문의를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "보", title: "보안·개인정보", desc: "파일 공유, 개인정보,<br>보안 기준 확인", task: "knowledge_security", attach: false, template: "아래 보안, 개인정보 또는 파일 처리 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "휴", title: "근태·복리후생", desc: "휴가, 근태, 복지<br>운영 기준 확인", task: "knowledge_welfare", attach: false, template: "아래 근태, 휴가 또는 복리후생 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "규", title: "규정·기준", desc: "제도와 기준 확인", task: "knowledge_policy", attach: false, template: "아래 사내 규정 또는 기준을 지식베이스 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "신", title: "신청·결재", desc: "절차와 결재선 확인", task: "knowledge_request", attach: false, disabled: true, disabledLabel: "준비 중", disabledReason: "신청·결재 기능은 현재 준비 중입니다.", template: "아래 신청 또는 결재 절차를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "담", title: "담당 부서", desc: "문의처와 담당자 확인", task: "knowledge_owner", attach: false, template: "아래 업무의 담당 부서 또는 문의처를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "시", title: "시스템·권한", desc: "계정과 권한 확인", task: "knowledge_system_access", attach: false, template: "아래 시스템, 계정 또는 권한 관련 문의를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "보", title: "보안·개인정보", desc: "보안 기준 확인", task: "knowledge_security", attach: false, template: "아래 보안, 개인정보 또는 파일 처리 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "휴", title: "근태·복리후생", desc: "휴가와 복지 기준", task: "knowledge_welfare", attach: false, template: "아래 근태, 휴가 또는 복리후생 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
       ],
     },
   };
@@ -250,7 +250,7 @@
         <span class="ds-one-btn-open" aria-hidden="true">↗</span>
       </button>
       <style>
-        #dsOneOpenButton{position:relative;width:108px;height:108px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:10px 8px;border:0;border-radius:22px;color:#fff;background:linear-gradient(145deg,#8ea7ff 0%,#6f87f7 54%,#5f7ff1 100%);box-shadow:0 12px 24px rgba(40,76,190,.24),inset 0 1px 0 rgba(255,255,255,.28);cursor:pointer;overflow:hidden;font-family:Pretendard,'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}#dsOneOpenButton:before{content:"";position:absolute;inset:-38px auto auto -42px;width:110px;height:110px;border-radius:999px;background:rgba(255,255,255,.14)}#dsOneOpenButton:hover{transform:translateY(-1px);filter:saturate(1.05);box-shadow:0 14px 28px rgba(40,76,190,.3),inset 0 1px 0 rgba(255,255,255,.32)}#dsOneOpenButton:active{transform:translateY(0)}.ds-one-btn-icon{position:relative;z-index:1;width:34px;height:34px;display:grid;place-items:center}.ds-one-btn-icon svg{width:34px;height:34px;display:block}.ds-one-btn-text{position:relative;z-index:1;display:grid;gap:0;text-align:center;line-height:1.04;text-shadow:0 2px 7px rgba(22,43,120,.18)}.ds-one-btn-text strong{font-size:16px;font-weight:900;letter-spacing:-.02em}.ds-one-btn-text em{font-style:normal;font-size:13px;font-weight:850;letter-spacing:-.03em}.ds-one-btn-open{position:absolute;right:8px;top:7px;z-index:1;font-size:13px;font-weight:900;opacity:.9}.ds-one-fallback{position:absolute;inset:0;display:grid;place-items:center;padding:10px;text-align:center;color:#fff;font-size:12px;font-weight:800;text-decoration:none;background:linear-gradient(145deg,#2f6fed,#7da8ff);border-radius:22px}
+        #dsOneOpenButton{position:relative;width:108px;height:108px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:10px 8px;border:0;border-radius:22px;color:#fff;background:linear-gradient(145deg,#8ea7ff 0%,#6f87f7 54%,#5f7ff1 100%);box-shadow:0 12px 24px rgba(40,76,190,.24),inset 0 1px 0 rgba(255,255,255,.28);cursor:pointer;overflow:hidden;font-family:Pretendard,'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}#dsOneOpenButton:before{content:"";position:absolute;inset:-38px auto auto -42px;width:110px;height:110px;border-radius:999px;background:rgba(255,255,255,.14)}#dsOneOpenButton:hover{transform:translateY(-1px);filter:saturate(1.05);box-shadow:0 14px 28px rgba(40,76,190,.3),inset 0 1px 0 rgba(255,255,255,.32)}#dsOneOpenButton:active{transform:translateY(0)}.ds-one-btn-icon{position:relative;z-index:1;width:34px;height:34px;display:grid;place-items:center}.ds-one-btn-icon svg{width:34px;height:34px;display:block}.ds-one-btn-text{position:relative;z-index:1;display:grid;gap:0;text-align:center;line-height:1.04;text-shadow:0 2px 7px rgba(22,43,120,.18)}.ds-one-btn-text strong{font-size:16px;font-weight:900;letter-spacing:0}.ds-one-btn-text em{font-style:normal;font-size:13px;font-weight:850;letter-spacing:0}.ds-one-btn-open{position:absolute;right:8px;top:7px;z-index:1;font-size:13px;font-weight:900;opacity:.9}.ds-one-fallback{position:absolute;inset:0;display:grid;place-items:center;padding:10px;text-align:center;color:#fff;font-size:12px;font-weight:800;text-decoration:none;background:linear-gradient(145deg,#2f6fed,#7da8ff);border-radius:22px}
       </style>
     `;
 
@@ -343,7 +343,7 @@
         color: #fff;
         font-size: 11px;
         font-weight: 900;
-        letter-spacing: -0.02em;
+        letter-spacing: 0;
         border-radius: 10px;
         background: linear-gradient(145deg, #2f6fed, #80a7ff);
         box-shadow: 0 10px 24px rgba(47, 111, 237, 0.18);
@@ -398,7 +398,7 @@
         font-size: 17px;
         line-height: 1.45;
         font-weight: 900;
-        letter-spacing: -0.035em;
+        letter-spacing: 0;
         color: #121827;
       }
       .ds-msg-heading:first-child { margin-top: 0; }
@@ -563,9 +563,8 @@
       .ds-bot-copy-btn {
         min-width: max-content;
         height: 30px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+        display: grid;
+        place-items: center;
         gap: 6px;
         padding: 0 11px;
         color: #2f5fb6;
@@ -584,6 +583,7 @@
         height: 14px;
         display: block;
         flex: 0 0 auto;
+        margin: auto;
         fill: none;
         stroke: currentColor;
         stroke-width: 2;
@@ -917,7 +917,7 @@
         margin: 0;
         font-size: 20px;
         line-height: 1.25;
-        letter-spacing: -.04em;
+        letter-spacing: 0;
         font-weight: 900;
       }
       .ds-dialog-desc,
@@ -1085,7 +1085,7 @@
         text-overflow: ellipsis;
         font-size: 14px;
         font-weight: 900;
-        letter-spacing: -.02em;
+        letter-spacing: 0;
       }
       .ds-search-result-snippet {
         margin-top: 3px;
