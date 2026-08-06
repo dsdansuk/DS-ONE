@@ -563,8 +563,9 @@
       .ds-bot-copy-btn {
         min-width: max-content;
         height: 30px;
-        display: grid;
-        place-items: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         gap: 6px;
         padding: 0 11px;
         color: #2f5fb6;
@@ -583,7 +584,6 @@
         height: 14px;
         display: block;
         flex: 0 0 auto;
-        margin: auto;
         fill: none;
         stroke: currentColor;
         stroke-width: 2;
