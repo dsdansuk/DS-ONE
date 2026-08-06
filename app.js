@@ -1976,7 +1976,14 @@
 
   function groupwarePushParagraph(blocks, text, options = {}) {
     blocks.push(groupwareParagraph(text, options));
-    if (options.blankAfter !== false) blocks.push(groupwareBlank(1));
+    if (options.blankAfter === true) {
+      const blankLines = options.blankLines == null ? 1 : options.blankLines;
+      blocks.push(groupwareBlank(blankLines));
+    }
+  }
+
+  function groupwareSectionGap(blocks, count = 1) {
+    blocks.push(groupwareBlank(count));
   }
 
   function groupwareInfoTable(rows) {
@@ -2015,35 +2022,40 @@
 
     groupwarePushParagraph(blocks, "1. 기안 목적", { bold: true });
     groupwarePushParagraph(blocks, `- ${buildApprovalPurpose(context)}`, { indent: 4 });
+    groupwareSectionGap(blocks);
 
     groupwarePushParagraph(blocks, "2. 내용", { bold: true });
     groupwarePushParagraph(blocks, "2.1 추진 배경 및 필요성", { indent: 4, bold: true });
     for (const line of buildApprovalBackgroundLines(context)) {
       groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
     }
+    groupwareSectionGap(blocks);
 
     groupwarePushParagraph(blocks, "2.2 세부 내용", { indent: 4, bold: true });
     blocks.push(groupwareInfoTable(buildApprovalDetailRows(context)));
-    blocks.push(groupwareBlank(1));
+    groupwareSectionGap(blocks);
 
     groupwarePushParagraph(blocks, "2.3 검토 내용", { indent: 4, bold: true });
     for (const line of reviewLines) {
       groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
     }
+    groupwareSectionGap(blocks);
 
     groupwarePushParagraph(blocks, "2.4 예산 및 일정", { indent: 4, bold: true });
     for (const line of buildBudgetScheduleLines(context)) {
       groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
     }
+    groupwareSectionGap(blocks);
 
     groupwarePushParagraph(blocks, "2.5 진행 조건 및 후속 조치", { indent: 4, bold: true });
     for (const line of buildFollowUpLines(context)) {
       groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
     }
+    groupwareSectionGap(blocks);
 
     appendApprovalClosing(blocks, context);
 
-    return `<div data-ds-one-groupware-body="approval-v78">${blocks.join("")}</div>`;
+    return `<div data-ds-one-groupware-body="approval-v81">${blocks.join("")}</div>`;
   }
 
   function buildCloudServerApprovalBodyHtml(context, draftText) {
@@ -2053,6 +2065,7 @@
     groupwarePushParagraph(blocks, "1. 기안 목적", { bold: true });
     groupwarePushParagraph(blocks, "- 사내 주요 업무 시스템의 안정적 운영과 향후 사용량 증가에 대응하기 위해 클라우드 서버 도입 필요성을 검토하고자 합니다.", { indent: 4 });
     groupwarePushParagraph(blocks, `- 본 품의는 ${providers.join(", ")}를 동일 기준으로 비교하여 안정성, 보안성, 운영 편의성, 비용 효율성 및 확장성을 종합 검토한 뒤 최적의 도입 방향을 선정하기 위한 사전 승인 요청입니다.`, { indent: 4 });
+    groupwareSectionGap(blocks);
 
     groupwarePushParagraph(blocks, "2. 내용", { bold: true });
     groupwarePushParagraph(blocks, "2.1 추진 배경", { indent: 4, bold: true });
@@ -2063,6 +2076,7 @@
     ]) {
       groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
     }
+    groupwareSectionGap(blocks);
 
     groupwarePushParagraph(blocks, "2.2 검토 대상 및 기준", { indent: 4, bold: true });
     blocks.push(groupwareInfoTable([
@@ -2072,7 +2086,7 @@
       ["검토 범위", "서버 인스턴스, 네트워크, 스토리지, 백업, 모니터링, 접근 제어, 장애 대응 체계"],
       ["확정 방식", "비교 검토 후 PoC 또는 상세 견적 검토를 거쳐 최종 사업자 선정"],
     ]));
-    blocks.push(groupwareBlank(1));
+    groupwareSectionGap(blocks);
 
     groupwarePushParagraph(blocks, "2.3 평가 기준", { indent: 4, bold: true });
     blocks.push(groupwareMatrixTable(
@@ -2085,19 +2099,20 @@
         ["확장성", "서버 증설, 관리형 서비스 연계, 향후 시스템 확장 가능성", "추가 서비스 연동 계획, 이관 가능성"],
       ],
     ));
-    blocks.push(groupwareBlank(1));
+    groupwareSectionGap(blocks);
 
     groupwarePushParagraph(blocks, "2.4 사업자별 비교 검토", { indent: 4, bold: true });
     blocks.push(groupwareMatrixTable(
       ["구분", ...providers],
       buildCloudProviderComparisonRows(providers),
     ));
-    blocks.push(groupwareBlank(1));
+    groupwareSectionGap(blocks);
 
     groupwarePushParagraph(blocks, "2.5 종합 검토 의견", { indent: 4, bold: true });
     for (const line of buildCloudReviewLines(providers)) {
       groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
     }
+    groupwareSectionGap(blocks);
 
     groupwarePushParagraph(blocks, "2.6 예산 및 일정", { indent: 4, bold: true });
     for (const line of [
@@ -2108,6 +2123,7 @@
     ]) {
       groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
     }
+    groupwareSectionGap(blocks);
 
     groupwarePushParagraph(blocks, "2.7 리스크 및 관리 방안", { indent: 4, bold: true });
     blocks.push(groupwareMatrixTable(
@@ -2119,7 +2135,7 @@
         ["장애 대응", "서비스 장애 또는 구성 오류 시 업무 시스템 영향 가능", "백업, 스냅샷, 모니터링, 장애 대응 연락 체계 마련"],
       ],
     ));
-    blocks.push(groupwareBlank(1));
+    groupwareSectionGap(blocks);
 
     groupwarePushParagraph(blocks, "2.8 요청 사항", { indent: 4, bold: true });
     for (const line of [
@@ -2128,17 +2144,17 @@
     ]) {
       groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
     }
+    groupwareSectionGap(blocks);
 
     appendApprovalClosing(blocks, { ...context, subject: "클라우드 서버 도입 비교 검토" });
-    return `<div data-ds-one-groupware-body="approval-v80" data-ds-one-template="cloud-server-comparison">${blocks.join("")}</div>`;
+    return `<div data-ds-one-groupware-body="approval-v81" data-ds-one-template="cloud-server-comparison">${blocks.join("")}</div>`;
   }
 
   function appendApprovalClosing(blocks, context) {
     const closing = inferApprovalClosing(context);
     groupwarePushParagraph(blocks, `3. ${closing.heading}`, { bold: true });
-    closing.lines.forEach((line, index) => {
+    closing.lines.forEach((line) => {
       blocks.push(groupwareParagraph(`- ${line}`, { indent: 4 }));
-      if (index < closing.lines.length - 1) blocks.push(groupwareBlank(1));
     });
     blocks.push(groupwareBlank(3));
     blocks.push(groupwareParagraph("첨  부. OOO 1부.  -끝-  (첨부물이 1가지인 경우)", { indent: 11 }));
