@@ -2008,7 +2008,7 @@
       }, 1500);
       const finalTimer = setTimeout(() => {
         finish(latest);
-      }, 90000);
+      }, 45000);
       const onMessage = (event) => {
         if (event.source !== window) return;
         const data = event.data || {};
