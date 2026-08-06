@@ -1961,6 +1961,17 @@
     const title = deriveGroupwareApprovalTitle(message);
     const bodyHtml = textToGroupwareBodyHtml(draftText);
 
+    const extensionResult = await requestGroupwareApprovalViaExtension({
+      requestText: message,
+      title,
+      bodyHtml,
+      formId: "1176",
+      autoSave: true,
+    }).catch(() => null);
+    if (extensionResult?.ok || extensionResult?.status === "failed" || extensionResult?.status === "blocked") {
+      return { ...extensionResult, answer: formatGroupwareApprovalExtensionAnswer(extensionResult, title) };
+    }
+
     const res = await fetch(RPA_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
@@ -1976,6 +1987,79 @@
     const data = await readApiResponse(res);
     const completed = await pollGroupwareApprovalDraftStatus(data.jobId, activeToken).catch(() => null);
     return { ...data, answer: formatGroupwareApprovalDraftAnswer(completed || data, title) };
+  }
+
+  function requestGroupwareApprovalViaExtension(payload) {
+    return new Promise((resolve) => {
+      const requestId = `dsone-gw-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      let latest = null;
+      let extensionSeen = false;
+      const cleanup = () => {
+        window.removeEventListener("message", onMessage);
+        clearTimeout(initialTimer);
+        clearTimeout(finalTimer);
+      };
+      const finish = (result) => {
+        cleanup();
+        resolve(result || latest);
+      };
+      const initialTimer = setTimeout(() => {
+        if (!extensionSeen) finish(null);
+      }, 1500);
+      const finalTimer = setTimeout(() => {
+        finish(latest);
+      }, 45000);
+      const onMessage = (event) => {
+        if (event.source !== window) return;
+        const data = event.data || {};
+        if (data.source !== "DS_ONE_GROUPWARE_EXTENSION") return;
+        if (data.type === "DS_ONE_GROUPWARE_EXTENSION_READY") {
+          extensionSeen = true;
+          return;
+        }
+        if (data.requestId !== requestId) return;
+        extensionSeen = true;
+        latest = data;
+        if (data.type === "DS_ONE_GROUPWARE_DRAFT_ACK" && data.ok === false) finish(data);
+        if (data.type === "DS_ONE_GROUPWARE_DRAFT_RESULT") finish(data);
+      };
+      window.addEventListener("message", onMessage);
+      window.postMessage({
+        source: "DS_ONE_WEB",
+        type: "DS_ONE_GROUPWARE_DRAFT_REQUEST",
+        requestId,
+        payload,
+      }, window.location.origin);
+    });
+  }
+
+  function formatGroupwareApprovalExtensionAnswer(data, title) {
+    const status = String(data?.status || "").trim();
+    if (data?.ok && status === "succeeded") {
+      return [
+        "기안품의서가 현재 브라우저의 그룹웨어 탭에서 보관되었습니다.",
+        "",
+        `제목: ${title}`,
+        data.jobId ? `작업 ID: ${data.jobId}` : "",
+        "다음 단계: 그룹웨어 보관함에서 문서 내용을 확인한 뒤 상신하세요.",
+      ].filter(Boolean).join("\n");
+    }
+    if (data?.ok && (status === "opened" || status === "filled")) {
+      return [
+        status === "filled" ? "그룹웨어 탭에 기안품의서 제목과 본문을 입력했습니다." : "그룹웨어 탭을 열고 자동 입력/보관을 요청했습니다.",
+        "",
+        `제목: ${title}`,
+        data.jobId ? `작업 ID: ${data.jobId}` : "",
+        "그룹웨어 로그인 상태가 유지되어 있으면 자동으로 보관됩니다.",
+      ].filter(Boolean).join("\n");
+    }
+    return [
+      "Chrome Extension을 통한 그룹웨어 자동 보관에 실패했습니다.",
+      "",
+      `제목: ${title}`,
+      data?.message || "그룹웨어 로그인 상태, 확장 프로그램 권한, 양식 로딩 상태를 확인해 주세요.",
+      data?.jobId ? `작업 ID: ${data.jobId}` : "",
+    ].filter(Boolean).join("\n");
   }
 
   async function pollGroupwareApprovalDraftStatus(jobId, activeToken) {
