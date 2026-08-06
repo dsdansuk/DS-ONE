@@ -1922,15 +1922,23 @@
     return [
       message,
       "",
-      "위 요청을 그룹웨어 기안품의서 본문으로 바로 보관할 수 있게 작성해 주세요.",
-      "반드시 다음 항목을 포함하세요: 1. 기안 목적, 2. 구매/진행 개요, 3. 검토 내용, 4. 예산 및 일정, 5. 요청 사항, 6. 첨부.",
-      "노트북/비품/서비스 구매 요청이면 품목, 수량, 사용 목적, 필요 사유, 예산, 납기, 첨부 예정 자료를 구분하세요.",
+      "위 요청을 그룹웨어 기안품의서 본문으로 바로 상신 가능한 수준으로 작성해 주세요.",
+      "작성 품질 기준: 실제 유료 업무 솔루션 또는 전문 비서가 작성한 것처럼 문장이 자연스럽고, 검토 항목이 충분하며, 별도 수정 없이 내부 결재 문서로 사용할 수 있어야 합니다.",
+      "반드시 다음 흐름을 따르세요: 1. 기안 목적, 2. 내용, 3. 마지막 문단.",
+      "2. 내용에는 추진 배경, 세부 내용, 검토 내용, 예산 및 일정, 후속 조치가 자연스럽게 포함되어야 합니다.",
+      "노트북/비품/서비스/소프트웨어 구매 요청이면 품목, 수량, 사용 목적, 필요 사유, 예산, 납기, 첨부 예정 자료를 구분하세요.",
+      "클라우드 서버, 인프라, AWS/NCP/Azure 같은 사업자 비교 요청이면 사업자별 비교표, 평가 기준, 종합 검토 의견, 리스크 및 관리 방안, PoC/견적 검토 후속 조치를 포함하세요.",
       "요청에 없는 금액, 수량, 업체명, 결재라인, 일정은 임의로 만들지 말고 '확인 필요'로 표시하세요.",
-      "사용자에게 설명하는 안내 문장은 제외하고 문서 본문만 작성하세요.",
+      "표로 정리하면 더 명확한 내용은 표 형태로 구성하세요.",
+      "문단 사이에는 한 줄 공백이 들어가도록 작성하세요.",
+      "마지막은 반드시 '3. 마지막 문단'으로 끝내고, 마지막 문장 뒤에는 '-끝-' 표시와 첨부 예시 안내를 유지하세요.",
+      "사용자에게 설명하는 안내 문장, 마크다운 코드블록, 답변 제목은 제외하고 문서 본문만 작성하세요.",
     ].join("\n");
   }
 
   function deriveGroupwareApprovalTitle(message) {
+    if (isCloudServerApprovalRequest(message)) return "클라우드 서버 도입 비교 검토 품의";
+
     const cleaned = String(message || "")
       .replace(/\[[\s\S]*?\]/g, " ")
       .replace(/(기안\s*품의서|기안품의서|품의서|기안서|전자결재|결재\s*문서|결재문서)/g, " ")
@@ -1944,56 +1952,443 @@
     return title.slice(0, 80);
   }
 
+  const GROUPWARE_APPROVAL_P_STYLE = "color:rgb(0, 0, 0);line-height:1.5;font-family:맑은 고딕;font-size:10pt;margin-top:0px;margin-bottom:0px;";
+  const GROUPWARE_APPROVAL_SPAN_STYLE = "line-height:1.5;font-family:맑은 고딕;";
+  const GROUPWARE_TABLE_STYLE = "border-collapse:collapse;width:650px;margin:0 0 0 0;font-family:맑은 고딕;font-size:10pt;line-height:1.5;";
+  const GROUPWARE_TH_STYLE = "border:1px solid #666;background:#f2f5f8;padding:5px 7px;text-align:center;font-weight:bold;";
+  const GROUPWARE_TD_LABEL_STYLE = "border:1px solid #666;background:#fafafa;padding:5px 7px;text-align:center;width:120px;";
+  const GROUPWARE_TD_VALUE_STYLE = "border:1px solid #666;padding:5px 7px;text-align:left;";
+
+  function preserveGroupwareSpaces(value) {
+    return escapeHtml(value).replace(/\t/g, "    ").replace(/ {2,}/g, (spaces) => "&nbsp;".repeat(spaces.length));
+  }
+
+  function groupwareParagraph(text = "", options = {}) {
+    const indent = "&nbsp;".repeat(Number(options.indent || 0));
+    const bold = options.bold ? "font-weight:bold;" : "";
+    const body = text ? `${indent}${preserveGroupwareSpaces(text)}` : "<br />";
+    return `<p style="${GROUPWARE_APPROVAL_P_STYLE}"><span style="${GROUPWARE_APPROVAL_SPAN_STYLE}${bold}">${body}</span></p>`;
+  }
+
+  function groupwareBlank(count = 1) {
+    return Array.from({ length: Math.max(1, Number(count) || 1) }, () => groupwareParagraph("")).join("");
+  }
+
+  function groupwarePushParagraph(blocks, text, options = {}) {
+    blocks.push(groupwareParagraph(text, options));
+    if (options.blankAfter !== false) blocks.push(groupwareBlank(1));
+  }
+
+  function groupwareInfoTable(rows) {
+    const bodyRows = rows.map(([label, value]) => [
+      "<tr>",
+      `<td style="${GROUPWARE_TD_LABEL_STYLE}">${preserveGroupwareSpaces(label)}</td>`,
+      `<td style="${GROUPWARE_TD_VALUE_STYLE}">${preserveGroupwareSpaces(value)}</td>`,
+      "</tr>",
+    ].join(""));
+    return `<table style="${GROUPWARE_TABLE_STYLE}" cellspacing="0" cellpadding="0"><tbody>${bodyRows.join("")}</tbody></table>`;
+  }
+
+  function groupwareMatrixTable(headers, rows) {
+    const head = `<tr>${headers.map((header) => `<th style="${GROUPWARE_TH_STYLE}">${preserveGroupwareSpaces(header)}</th>`).join("")}</tr>`;
+    const body = rows.map((row) => `<tr>${row.map((value) => `<td style="${GROUPWARE_TD_VALUE_STYLE}">${preserveGroupwareSpaces(value)}</td>`).join("")}</tr>`);
+    return `<table style="${GROUPWARE_TABLE_STYLE}" cellspacing="0" cellpadding="0"><thead>${head}</thead><tbody>${body.join("")}</tbody></table>`;
+  }
+
   function textToGroupwareBodyHtml(text) {
     const lines = String(text || "")
       .replace(/\r/g, "")
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean);
-    if (!lines.length) return `<p>${escapeHtml("내용 확인 필요")}</p>`;
-    return lines.map((line) => `<p>${escapeHtml(line).replace(/  /g, "&nbsp; ")}</p>`).join("");
+    if (!lines.length) return groupwareParagraph("내용 확인 필요");
+    return lines.map((line) => groupwareParagraph(line)).join(groupwareBlank(1));
   }
 
   function buildGroupwareApprovalBodyHtml(message, draftText) {
-    const text = String(draftText || "").trim();
     const request = String(message || "").trim();
-    const item = inferApprovalItemName(request);
-    const purpose = request ? `${request.replace(/(기안\s*품의서|기안품의서|품의서|작성해줘|작성해\s*줘|써줘|해줘)/g, "").trim()} 건을 진행하기 위해 품의합니다.` : "업무 진행을 위해 품의합니다.";
-    const reviewText = text
-      ? text.replace(/\r/g, "").split("\n").map((line) => line.trim()).filter(Boolean).slice(0, 12)
-      : [];
-    const rows = [
-      ["1. 기안 목적", [`- ${purpose || "확인 필요"}`]],
-      ["2. 구매/진행 개요", [
-        `- 품목/내용: ${item}`,
-        "- 수량: 확인 필요",
-        "- 사용 부서/사용자: 확인 필요",
-        "- 필요 사유: 업무 수행에 필요한 장비/서비스 확보",
-      ]],
-      ["3. 검토 내용", reviewText.length ? reviewText.map((line) => `- ${line.replace(/^[-ㆍ•]\s*/, "")}`) : [
-        "- 요청 내용 기준으로 검토 필요",
-        "- 세부 사양, 업체, 단가, 예산 적정성 확인 필요",
-      ]],
-      ["4. 예산 및 일정", [
-        "- 예상 금액: 확인 필요",
-        "- 예산 과목/부서: 확인 필요",
-        "- 필요 시점/납기: 확인 필요",
-      ]],
-      ["5. 요청 사항", [
-        "- 상기 건에 대한 구매/진행 승인을 요청드립니다.",
-        "- 세부 금액 및 업체 선정 자료는 확인 후 보완 예정입니다.",
-      ]],
-      ["6. 첨부", inferApprovalAttachmentLines(request, item)],
+    const context = inferApprovalContext(request);
+    if (context.category === "cloud_server") return buildCloudServerApprovalBodyHtml(context, draftText);
+
+    const reviewLines = extractUsefulDraftLines(draftText, context);
+    const blocks = [];
+
+    groupwarePushParagraph(blocks, "1. 기안 목적", { bold: true });
+    groupwarePushParagraph(blocks, `- ${buildApprovalPurpose(context)}`, { indent: 4 });
+
+    groupwarePushParagraph(blocks, "2. 내용", { bold: true });
+    groupwarePushParagraph(blocks, "2.1 추진 배경 및 필요성", { indent: 4, bold: true });
+    for (const line of buildApprovalBackgroundLines(context)) {
+      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
+    }
+
+    groupwarePushParagraph(blocks, "2.2 세부 내용", { indent: 4, bold: true });
+    blocks.push(groupwareInfoTable(buildApprovalDetailRows(context)));
+    blocks.push(groupwareBlank(1));
+
+    groupwarePushParagraph(blocks, "2.3 검토 내용", { indent: 4, bold: true });
+    for (const line of reviewLines) {
+      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
+    }
+
+    groupwarePushParagraph(blocks, "2.4 예산 및 일정", { indent: 4, bold: true });
+    for (const line of buildBudgetScheduleLines(context)) {
+      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
+    }
+
+    groupwarePushParagraph(blocks, "2.5 진행 조건 및 후속 조치", { indent: 4, bold: true });
+    for (const line of buildFollowUpLines(context)) {
+      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
+    }
+
+    appendApprovalClosing(blocks, context);
+
+    return `<div data-ds-one-groupware-body="approval-v78">${blocks.join("")}</div>`;
+  }
+
+  function buildCloudServerApprovalBodyHtml(context, draftText) {
+    const providers = context.providers.length ? context.providers : ["AWS", "NCP", "MS Azure"];
+    const blocks = [];
+
+    groupwarePushParagraph(blocks, "1. 기안 목적", { bold: true });
+    groupwarePushParagraph(blocks, "- 사내 업무 시스템의 안정적 운영, 확장성 확보 및 인프라 운영 효율화를 위해 클라우드 서버 도입 필요성을 검토하고자 합니다.", { indent: 4 });
+    groupwarePushParagraph(blocks, `- 본 품의는 ${providers.join(", ")}를 대상으로 서비스 적합성, 보안/운영 요건, 비용 구조 및 향후 확장성을 비교하여 최적 도입안을 선정하기 위한 사전 검토 승인 요청입니다.`, { indent: 4 });
+
+    groupwarePushParagraph(blocks, "2. 내용", { bold: true });
+    groupwarePushParagraph(blocks, "2.1 추진 배경", { indent: 4, bold: true });
+    for (const line of [
+      "업무 시스템 사용량 증가와 서비스 연속성 요구가 높아짐에 따라, 기존 인프라 방식만으로는 탄력적인 증설, 장애 대응 및 운영 자동화에 한계가 발생할 수 있습니다.",
+      "클라우드 기반 서버 환경은 초기 투자 부담을 낮추고, 사용량 기반 확장, 백업/복구, 모니터링, 보안 정책 적용 측면에서 운영 유연성을 확보할 수 있습니다.",
+      "도입 전 주요 사업자별 장단점과 내부 운영 적합성을 비교하여 비용 집행의 타당성과 기술적 리스크를 사전에 검토할 필요가 있습니다.",
+    ]) {
+      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
+    }
+
+    groupwarePushParagraph(blocks, "2.2 검토 대상 및 기준", { indent: 4, bold: true });
+    blocks.push(groupwareInfoTable([
+      ["검토 대상", providers.join(", ")],
+      ["검토 목적", "사내 업무 시스템 운영에 적합한 클라우드 서버 사업자 및 도입 방향 선정"],
+      ["주요 기준", "안정성, 보안/컴플라이언스, 국내 리전/지원, 비용 구조, 운영 편의성, 확장성"],
+      ["검토 범위", "서버 인스턴스, 네트워크, 스토리지, 백업, 모니터링, 접근 제어, 장애 대응 체계"],
+      ["확정 방식", "비교 검토 후 PoC 또는 상세 견적 검토를 거쳐 최종 사업자 선정"],
+    ]));
+    blocks.push(groupwareBlank(1));
+
+    groupwarePushParagraph(blocks, "2.3 사업자별 비교 검토", { indent: 4, bold: true });
+    blocks.push(groupwareMatrixTable(
+      ["구분", ...providers],
+      buildCloudProviderComparisonRows(providers),
+    ));
+    blocks.push(groupwareBlank(1));
+
+    groupwarePushParagraph(blocks, "2.4 종합 검토 의견", { indent: 4, bold: true });
+    for (const line of buildCloudReviewLines(providers, draftText)) {
+      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
+    }
+
+    groupwarePushParagraph(blocks, "2.5 예산 및 일정", { indent: 4, bold: true });
+    for (const line of [
+      "예상 비용: 확인 필요. 최종 비용은 서버 사양, 스토리지 용량, 네트워크 사용량, 백업 보관 기간 및 운영 지원 범위 확정 후 산정 예정입니다.",
+      "비용 검토 방식: 동일 사양 기준 월 예상 비용, 초기 구축 비용, 운영/관리 비용, 약정 할인 여부를 비교하여 산출하겠습니다.",
+      "진행 일정: 1차 요구사항 정리 → 사업자별 견적 및 기술 검토 → 보안/운영 검토 → PoC 또는 최종 제안 비교 → 선정안 상신 순으로 진행 예정입니다.",
+      "예산 과목 및 집행 부서: 확인 필요.",
+    ]) {
+      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
+    }
+
+    groupwarePushParagraph(blocks, "2.6 리스크 및 관리 방안", { indent: 4, bold: true });
+    blocks.push(groupwareMatrixTable(
+      ["리스크 항목", "검토 내용", "관리 방안"],
+      [
+        ["비용 증가", "트래픽, 스토리지, 백업 정책에 따라 월 비용이 변동될 수 있음", "예산 상한, 알림 기준, 리소스 사용량 모니터링 체계 설정"],
+        ["보안 및 접근 제어", "계정 권한, 외부 접속, 데이터 보호 정책 미흡 시 보안 리스크 발생", "MFA, 최소 권한, 접속 로그, 네트워크 보안 그룹 기준 수립"],
+        ["운영 종속성", "특정 사업자 서비스에 의존할 경우 이전/확장 시 제약 발생 가능", "표준 아키텍처, 백업/이관 계획, 계약 조건 사전 검토"],
+        ["장애 대응", "서비스 장애 또는 구성 오류 시 업무 시스템 영향 가능", "백업, 스냅샷, 모니터링, 장애 대응 연락 체계 마련"],
+      ],
+    ));
+    blocks.push(groupwareBlank(1));
+
+    groupwarePushParagraph(blocks, "2.7 요청 사항", { indent: 4, bold: true });
+    for (const line of [
+      "상기 비교 검토 기준에 따라 클라우드 서버 도입 검토를 진행할 수 있도록 승인 요청드립니다.",
+      "승인 후 각 사업자별 동일 기준 견적, 보안 검토 자료, 운영 구성안을 확보하여 최종 선정안을 별도 보고하겠습니다.",
+    ]) {
+      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
+    }
+
+    appendApprovalClosing(blocks, { ...context, subject: "클라우드 서버 도입 비교 검토" });
+    return `<div data-ds-one-groupware-body="approval-v79" data-ds-one-template="cloud-server-comparison">${blocks.join("")}</div>`;
+  }
+
+  function appendApprovalClosing(blocks, context) {
+    groupwarePushParagraph(blocks, "3. 마지막 문단", { bold: true });
+    blocks.push(groupwareParagraph(`- 상기와 같이 ${context.subject} 건을 진행하고자 하오니 검토 후 승인하여 주시기 바랍니다.  -끝-  (첨부물이 있는 '-끝-' 표시는 아래 예시 참고바랍니다)`, { indent: 4 }));
+    blocks.push(groupwareBlank(3));
+    blocks.push(groupwareParagraph("첨  부. OOO 1부.  -끝-  (첨부물이 1가지인 경우)", { indent: 11 }));
+    blocks.push(groupwareParagraph("첨  부. 1. OOO 1부", { indent: 11 }));
+    blocks.push(groupwareParagraph("2. XXX 1부.  -끝-  (첨부물이 2가지 이상인 경우)(본 예시는 삭제 후 작성 바랍니다)", { indent: 22 }));
+  }
+
+  function inferApprovalContext(message) {
+    const cleanRequest = cleanApprovalRequest(message);
+    const item = inferApprovalItemName(message);
+    const quantity = extractApprovalQuantity(message);
+    const amount = extractApprovalAmount(message);
+    const schedule = extractApprovalSchedule(message);
+    const category = inferApprovalCategory(message, item);
+    const providers = extractCloudProviders(message);
+    const subject = cleanRequest || `${item} 진행`;
+    return {
+      original: message,
+      cleanRequest,
+      item,
+      quantity,
+      amount,
+      schedule,
+      category,
+      providers,
+      subject,
+      isPurchase: category === "purchase" || category === "it_asset" || category === "software" || category === "cloud_server",
+    };
+  }
+
+  function cleanApprovalRequest(message) {
+    return String(message || "")
+      .replace(/\[[\s\S]*?\]/g, " ")
+      .replace(/(기안\s*품의서|기안품의서|품의서|기안서|전자결재|결재\s*문서|결재문서)/g, " ")
+      .replace(/(작성해줘|작성해\s*줘|작성해\s*주세요|써줘|써\s*줘|생성해줘|만들어줘|보관해줘|저장해줘|해줘|해주세요)/g, " ")
+      .replace(/(에\s*대한|관련|대해서|으로|로)$/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function inferApprovalCategory(message, item) {
+    const text = `${message || ""} ${item || ""}`;
+    if (isCloudServerApprovalRequest(text)) return "cloud_server";
+    if (/노트북|laptop|랩톱|PC|컴퓨터|데스크탑|데스크톱|모니터|장비/i.test(text)) return "it_asset";
+    if (/소프트웨어|라이선스|라이센스|구독|SaaS/i.test(text)) return "software";
+    if (/구매|구입|도입|발주|계약|견적/.test(text)) return "purchase";
+    if (/출장|교육|회의|행사|프로젝트|용역|서비스/.test(text)) return "business";
+    return "general";
+  }
+
+  function isCloudServerApprovalRequest(message) {
+    const text = String(message || "");
+    return /(클라우드|cloud|서버|인프라|IaaS|iaas|AWS|NCP|Azure|애저)/i.test(text)
+      && /(도입|이전|구축|검토|비교|선정|서버)/.test(text);
+  }
+
+  function extractCloudProviders(message) {
+    const text = String(message || "");
+    const candidates = [
+      [/AWS|Amazon\s*Web\s*Services/i, "AWS"],
+      [/NCP|Naver\s*Cloud|네이버\s*클라우드|네이버클라우드/i, "NCP"],
+      [/MS\s*Azure|Microsoft\s*Azure|Azure|애저/i, "MS Azure"],
+      [/GCP|Google\s*Cloud|구글\s*클라우드|구글클라우드/i, "GCP"],
+      [/Oracle\s*Cloud|OCI/i, "Oracle Cloud"],
     ];
-    return rows.map(([heading, lines]) => [
-      `<p><strong>${escapeHtml(heading)}</strong></p>`,
-      ...lines.map((line) => `<p>${escapeHtml(line)}</p>`),
-      "<p>&nbsp;</p>",
-    ].join("")).join("");
+    const providers = [];
+    for (const [pattern, label] of candidates) {
+      if (pattern.test(text) && !providers.includes(label)) providers.push(label);
+    }
+    return providers;
+  }
+
+  function buildCloudProviderComparisonRows(providers) {
+    const profile = {
+      AWS: {
+        fit: "글로벌 서비스 범위와 레퍼런스가 넓어 확장성 높은 시스템에 유리",
+        operation: "서비스 선택지가 많아 아키텍처 설계 역량과 운영 표준 수립 필요",
+        security: "보안 기능과 인증 체계가 풍부하나 계정/권한/네트워크 정책 설계 필요",
+        cost: "사용량 기반 비용 최적화 여지가 크지만 리소스 관리 미흡 시 비용 증가 가능",
+        note: "글로벌 확장, 다양한 관리형 서비스 활용 시 우선 검토",
+      },
+      NCP: {
+        fit: "국내 리전, 국내 고객 지원, 한국어 운영 환경 측면에서 내부 운영 대응이 용이",
+        operation: "국내 업무 시스템 운영과 지원 커뮤니케이션에 강점",
+        security: "국내 보안/공공/기업 환경 대응 자료 확보가 비교적 용이",
+        cost: "국내 트래픽과 지원 조건 기준으로 견적 비교 필요",
+        note: "국내 중심 업무 시스템과 운영 대응 속도 중시 시 우선 검토",
+      },
+      "MS Azure": {
+        fit: "Microsoft 365, Entra ID, Windows Server 등 MS 생태계 연계에 강점",
+        operation: "기존 MS 계정/보안 정책과 연동 시 관리 효율 기대",
+        security: "ID 기반 접근 제어와 보안 관리 체계 연계가 용이",
+        cost: "라이선스 포함 여부와 약정 조건에 따라 총비용 차이 발생 가능",
+        note: "MS 기반 업무 환경, AD/계정 연동 요건이 큰 경우 우선 검토",
+      },
+      GCP: {
+        fit: "데이터 분석, AI/ML, 컨테이너 기반 워크로드에 강점",
+        operation: "클라우드 네이티브 운영 역량 확보 시 효과적",
+        security: "IAM 및 데이터 보안 기능 검토 필요",
+        cost: "데이터 처리/네트워크 사용량 기준 비용 검토 필요",
+        note: "분석/AI 연계 워크로드가 핵심일 때 검토",
+      },
+      "Oracle Cloud": {
+        fit: "Oracle DB 및 관련 업무 시스템 연계 시 비용/성능 검토 가치 있음",
+        operation: "DB 중심 워크로드 운영 조건 확인 필요",
+        security: "기업 보안 요건과 네트워크 구성 검토 필요",
+        cost: "DB 라이선스 및 약정 조건에 따른 비용 비교 필요",
+        note: "Oracle 기반 시스템 이전 또는 확장 시 검토",
+      },
+    };
+    const value = (provider, key) => profile[provider]?.[key] || "요구사항 기준 상세 검토 필요";
+    return [
+      ["적합성", ...providers.map((provider) => value(provider, "fit"))],
+      ["운영 편의성", ...providers.map((provider) => value(provider, "operation"))],
+      ["보안/권한 관리", ...providers.map((provider) => value(provider, "security"))],
+      ["비용 검토", ...providers.map((provider) => value(provider, "cost"))],
+      ["검토 의견", ...providers.map((provider) => value(provider, "note"))],
+    ];
+  }
+
+  function buildCloudReviewLines(providers, draftText) {
+    const generated = extractUsefulDraftLines(draftText, {
+      item: "클라우드 서버",
+      subject: "클라우드 서버 도입 비교 검토",
+      category: "cloud_server",
+      isPurchase: true,
+    }).filter((line) => !/확인 필요/.test(line)).slice(0, 2);
+    return [
+      ...generated,
+      `${providers.join(", ")}는 모두 클라우드 서버 운영이 가능하나, 내부 시스템의 위치, 보안 기준, 계정 연동 방식, 운영 인력 숙련도에 따라 적합도가 달라집니다.`,
+      "국내 업무 시스템 중심이면 국내 리전과 지원 체계가 강한 사업자를 우선 검토하고, 글로벌 확장 또는 다양한 관리형 서비스 활용이 중요하면 글로벌 사업자를 함께 비교하는 방식이 적절합니다.",
+      "최종 사업자 선정 전 동일 사양 기준 견적, 장애 대응 조건, 백업/복구 정책, 보안 설정 기준을 확보하여 총소유비용과 운영 리스크를 함께 비교해야 합니다.",
+    ].slice(0, 5);
+  }
+
+  function extractApprovalQuantity(message) {
+    const match = String(message || "").match(/(\d+(?:,\d+)?)\s*(대|개|식|건|명|부|EA|ea)/);
+    return match ? `${match[1]}${match[2]}` : "확인 필요";
+  }
+
+  function extractApprovalAmount(message) {
+    const match = String(message || "").match(/((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(억원|천만원|백만원|만원|천원|원)/);
+    return match ? `${match[1]}${match[2]}` : "확인 필요";
+  }
+
+  function extractApprovalSchedule(message) {
+    const match = String(message || "").match(/(\d{4}[.-]\d{1,2}[.-]\d{1,2}|\d{1,2}월\s*\d{1,2}일|\d{1,2}월\s*중|상반기|하반기|금주|내주|이번\s*달|다음\s*달|즉시|긴급)/);
+    return match ? match[1].replace(/\s+/g, " ") : "확인 필요";
+  }
+
+  function buildApprovalPurpose(context) {
+    if (context.category === "it_asset") {
+      return `${context.item} 확보를 통해 담당 업무 수행에 필요한 전산 환경을 안정적으로 마련하고, 업무 처리 지연 및 장비 사용 불편을 최소화하고자 품의합니다.`;
+    }
+    if (context.category === "software") {
+      return `${context.item} 도입을 통해 업무 수행에 필요한 사용 권한과 기능을 확보하고, 관련 업무의 처리 효율과 관리 체계를 개선하고자 품의합니다.`;
+    }
+    if (context.isPurchase) {
+      return `${context.subject}에 필요한 품목 및 조건을 검토한 결과, 원활한 업무 수행을 위해 구매/진행 승인이 필요하여 품의합니다.`;
+    }
+    return `${context.subject} 건의 필요성과 진행 내용을 검토한 결과, 원활한 업무 수행을 위해 내부 승인 절차를 진행하고자 품의합니다.`;
+  }
+
+  function buildApprovalBackgroundLines(context) {
+    if (context.category === "it_asset") {
+      return [
+        `${context.item}은 사용자의 일상 업무 처리, 문서 작성, 사내 시스템 접속 및 협업 업무 수행에 필요한 기본 업무 장비입니다.`,
+        "업무 연속성과 처리 효율을 확보하기 위해 사용 목적, 지급 대상, 예산 및 납기 조건을 사전에 정리한 후 구매 절차를 진행할 필요가 있습니다.",
+      ];
+    }
+    if (context.category === "software") {
+      return [
+        `${context.item}은 업무 수행에 필요한 기능 제공, 사용 권한 관리, 자료 처리 효율 향상을 위해 검토가 필요한 항목입니다.`,
+        "도입 전 사용 범위, 라이선스 조건, 예산 적정성, 보안 및 계약 조건을 함께 확인할 필요가 있습니다.",
+      ];
+    }
+    if (context.isPurchase) {
+      return [
+        `${context.subject} 진행을 위해 품목, 수량, 예산, 납기 및 첨부 자료를 기준으로 구매 필요성을 검토했습니다.`,
+        "구매 진행 전 세부 조건을 확인하여 비용 집행의 적정성과 업무 필요성을 함께 확보하고자 합니다.",
+      ];
+    }
+    return [
+      `${context.subject}의 원활한 진행을 위해 추진 배경, 필요성, 예상 일정 및 후속 조치를 사전에 정리했습니다.`,
+      "관련 부서와 이해관계자가 동일한 기준으로 검토할 수 있도록 핵심 내용을 문서화하고자 합니다.",
+    ];
+  }
+
+  function buildApprovalDetailRows(context) {
+    const rows = [
+      ["구분", context.isPurchase ? "구매/진행 요청" : "업무 진행 요청"],
+      ["품목/내용", context.item],
+      ["수량/범위", context.quantity],
+      ["사용 목적", buildUsagePurpose(context)],
+      ["예상 금액", context.amount],
+      ["필요 시점", context.schedule],
+      ["첨부 예정", inferApprovalAttachmentSummary(context)],
+    ];
+    return rows;
+  }
+
+  function buildUsagePurpose(context) {
+    if (context.category === "it_asset") return "업무용 문서 작성, 사내 시스템 접속, 협업 및 일상 업무 수행";
+    if (context.category === "software") return "업무 처리 효율 향상, 기능 사용 권한 확보 및 관련 산출물 관리";
+    if (context.isPurchase) return "업무 수행에 필요한 품목 확보 및 관련 업무 진행";
+    return "업무 진행에 필요한 내부 승인 및 실행 기준 확보";
+  }
+
+  function extractUsefulDraftLines(draftText, context) {
+    const lines = String(draftText || "")
+      .replace(/\r/g, "")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => line.replace(/^[-*ㆍ•]\s*/, "").replace(/^\d+(\.\d+)*\s*/, "").trim())
+      .filter((line) => line.length >= 8)
+      .filter((line) => !/^(결론|분석 결과|상세 설명|기준 및 근거|파일|표 복사|확인 필요)$/i.test(line))
+      .filter((line) => !/```|^\|/.test(line))
+      .slice(0, 4);
+
+    const fallback = [
+      `${context.item}의 업무 필요성, 사용 범위, 예산 적정성 및 납기 조건을 기준으로 진행 여부를 검토할 필요가 있습니다.`,
+      "구매 또는 진행 전 견적서, 비교 자료, 세부 사양 등 증빙 자료를 확인하여 집행 근거를 보완합니다.",
+      "승인 후에는 자산 등록, 지급 이력 관리, 비용 처리 등 후속 절차가 누락되지 않도록 관리합니다.",
+    ];
+    return [...lines, ...fallback].slice(0, 5);
+  }
+
+  function buildBudgetScheduleLines(context) {
+    return [
+      `예상 금액: ${context.amount}`,
+      `필요 시점/납기: ${context.schedule}`,
+      "예산 과목 및 비용 처리 부서: 확인 필요",
+      "최종 집행 금액은 견적서 및 내부 구매 절차 확인 후 확정 예정입니다.",
+    ];
+  }
+
+  function buildFollowUpLines(context) {
+    if (context.category === "it_asset") {
+      return [
+        "승인 후 구매 절차를 진행하고, 입고 완료 시 자산 등록 및 지급 이력을 관리하겠습니다.",
+        "세부 사양, 견적서, 비교견적서 등 증빙 자료는 확인 후 첨부 또는 보완하겠습니다.",
+      ];
+    }
+    if (context.category === "software") {
+      return [
+        "승인 후 라이선스 조건, 사용 기간, 계정 발급 및 보안 검토 사항을 확인하겠습니다.",
+        "계약 또는 결제 진행 전 견적서와 사용 범위를 재확인하여 비용 집행 근거를 보완하겠습니다.",
+      ];
+    }
+    return [
+      "승인 후 관련 부서와 세부 일정 및 실행 조건을 확정하여 진행하겠습니다.",
+      "필요 증빙 및 참고 자료는 확인 후 첨부 또는 보완하겠습니다.",
+    ];
+  }
+
+  function inferApprovalAttachmentSummary(context) {
+    if (context.category === "cloud_server") return "사업자별 견적서, 비교 검토표, 구성도, 보안 검토 자료";
+    if (context.category === "it_asset") return "견적서, 비교견적서, 제품 사양서 또는 구성 내역";
+    if (context.category === "software") return "견적서, 라이선스 조건, 서비스/계약 조건 자료";
+    if (context.isPurchase) return "견적서, 비교견적서, 세부 산출 내역";
+    return "관련 계획서, 참고 자료, 필요 증빙";
   }
 
   function inferApprovalItemName(message) {
     const text = String(message || "");
+    if (isCloudServerApprovalRequest(text)) return "클라우드 서버";
     if (/노트북|laptop|랩톱/i.test(text)) return "노트북";
     if (/PC|컴퓨터|데스크탑|데스크톱/i.test(text)) return "PC/전산장비";
     if (/모니터/i.test(text)) return "모니터";
