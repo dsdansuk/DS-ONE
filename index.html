@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DS ONE 업무 AI Agent 홈</title>
-  <link rel="stylesheet" href="style.css?v=20260806_v83_composer_ratio_chip_close">
+  <link rel="stylesheet" href="style.css?v=20260807_v84_product_mode_menu_icons">
 </head>
 <body>
   <svg class="sr-only" aria-hidden="true">
@@ -44,7 +44,23 @@
           <div class="product-mode-menu" id="productModeMenu" role="menu" hidden>
             <button type="button" role="menuitemradio" aria-checked="true" data-feature-mode="agent">
               <span class="product-mode-menu-icon product-mode-menu-icon-agent" aria-hidden="true">
-                <svg class="icon" aria-hidden="true"><use href="#i-star"></use></svg>
+                <svg class="product-mode-menu-svg" viewBox="0 0 512 512" fill="none" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="agentMenuBg" x1="80" y1="64" x2="432" y2="448" gradientUnits="userSpaceOnUse">
+                      <stop offset="0" stop-color="#F4F9FF"></stop>
+                      <stop offset="1" stop-color="#E6F1FF"></stop>
+                    </linearGradient>
+                    <linearGradient id="agentMenuStroke" x1="146" y1="146" x2="374" y2="354" gradientUnits="userSpaceOnUse">
+                      <stop offset="0" stop-color="#3478F6"></stop>
+                      <stop offset="1" stop-color="#2458D9"></stop>
+                    </linearGradient>
+                  </defs>
+                  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#agentMenuBg)" stroke="#D9E9FF" stroke-width="2"></rect>
+                  <path d="M209 184V158C209 143.64 220.64 132 235 132H277C291.36 132 303 143.64 303 158V184" stroke="url(#agentMenuStroke)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <rect x="132" y="184" width="248" height="174" rx="24" stroke="url(#agentMenuStroke)" stroke-width="18"></rect>
+                  <path d="M140 248L230 278M282 278L372 248" stroke="url(#agentMenuStroke)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <rect x="238" y="262" width="36" height="36" rx="8" fill="url(#agentMenuBg)" stroke="url(#agentMenuStroke)" stroke-width="14"></rect>
+                </svg>
               </span>
               <span class="product-mode-menu-copy">
                 <strong>업무 AI Agent</strong>
@@ -53,7 +69,25 @@
             </button>
             <button type="button" role="menuitemradio" aria-checked="false" data-feature-mode="knowledge">
               <span class="product-mode-menu-icon product-mode-menu-icon-knowledge" aria-hidden="true">
-                <svg class="icon" aria-hidden="true"><use href="#i-book"></use></svg>
+                <svg class="product-mode-menu-svg" viewBox="0 0 512 512" fill="none" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="knowledgeMenuBg" x1="72" y1="64" x2="438" y2="448" gradientUnits="userSpaceOnUse">
+                      <stop offset="0" stop-color="#F2FCF8"></stop>
+                      <stop offset="1" stop-color="#E1F8EF"></stop>
+                    </linearGradient>
+                    <linearGradient id="knowledgeMenuStroke" x1="135" y1="150" x2="400" y2="370" gradientUnits="userSpaceOnUse">
+                      <stop offset="0" stop-color="#20AA82"></stop>
+                      <stop offset="1" stop-color="#08754F"></stop>
+                    </linearGradient>
+                  </defs>
+                  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#knowledgeMenuBg)" stroke="#D2F0E4" stroke-width="2"></rect>
+                  <path d="M139 174C177 161 216 160 256 184V344C222 322 185 318 146 326C136 328 128 321 128 311V190C128 182 132 177 139 174Z" stroke="url(#knowledgeMenuStroke)" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M256 184C288 162 325 158 366 170C376 173 383 181 383 191V248" stroke="url(#knowledgeMenuStroke)" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M256 184V344" stroke="url(#knowledgeMenuStroke)" stroke-width="17" stroke-linecap="round"></path>
+                  <path d="M256 344C277 331 295 324 315 321" stroke="url(#knowledgeMenuStroke)" stroke-width="17" stroke-linecap="round"></path>
+                  <circle cx="344" cy="278" r="57" fill="url(#knowledgeMenuBg)" stroke="url(#knowledgeMenuStroke)" stroke-width="17"></circle>
+                  <path d="M385 319L423 357" stroke="url(#knowledgeMenuStroke)" stroke-width="18" stroke-linecap="round"></path>
+                </svg>
               </span>
               <span class="product-mode-menu-copy">
                 <strong>사내 지식 문의</strong>
