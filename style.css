@@ -1596,3 +1596,36 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
     padding: 16px 17px;
   }
 }
+
+/* v89: 1920px monitor presence
+   v88 only targeted 1181-1599 CSS px, so a 1920px desktop monitor kept the
+   previous 1100px home width. This block makes the change visible on desktop
+   monitors while keeping an upper cap for ultrawide/4K displays. */
+@media (min-width: 1600px) and (min-height: 760px) {
+  .home-fit {
+    --home-primary-width: min(100%, clamp(1120px, 74%, 1180px));
+  }
+
+  .hero {
+    margin-bottom: clamp(18px, 2.45dvh, 28px);
+  }
+
+  .hero h1 {
+    font-size: clamp(42px, 4.65dvh, 48px);
+  }
+
+  .hero p {
+    font-size: clamp(16px, 1.9dvh, 18px);
+  }
+
+  .prompt-card {
+    min-height: clamp(146px, 15.4dvh, 164px);
+    margin-bottom: clamp(22px, 3.35dvh, 36px);
+  }
+
+  .action-card {
+    min-height: clamp(108px, 11.7dvh, 120px);
+    padding: 16px 17px;
+  }
+}
+
