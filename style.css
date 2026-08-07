@@ -1233,8 +1233,8 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 }
 
 .product-mode-icon .icon {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   flex: 0 0 16px;
   stroke-width: 2.2;
 }
