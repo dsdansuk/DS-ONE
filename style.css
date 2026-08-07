@@ -1357,26 +1357,28 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 }
 
 .product-mode-menu-icon {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  flex: 0 0 32px;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  border-radius: 9px;
+  color: #fff;
+  box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.08);
 }
 
-.product-mode-menu-icon-agent,
+.product-mode-menu-icon .icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  stroke-width: 2.2;
+}
+
+.product-mode-menu-icon-agent {
+  background: linear-gradient(145deg, #2f6fed, #7da8ff);
+}
+
 .product-mode-menu-icon-knowledge {
-  background: transparent;
-}
-
-.product-mode-menu-svg {
-  display: block;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
+  background: linear-gradient(145deg, #0f9f79, #53d2b1);
 }
 
 .product-mode-menu-copy {

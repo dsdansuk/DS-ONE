@@ -101,7 +101,7 @@
     agent: {
       label: "업무 AI Agent",
       shortLabel: "업무 AI",
-      switchIcon: "i-star",
+      switchIcon: "i-agent-briefcase",
       title: "무엇을 도와드릴까요?",
       subtitle: "업무에 필요한 작업을 빠르고 정확하게 도와드립니다.",
       placeholder: "메시지를 입력하세요.   (예: 회의록 요약해줘)",
@@ -119,7 +119,7 @@
     knowledge: {
       label: "사내 지식 문의",
       shortLabel: "사내 지식",
-      switchIcon: "i-book",
+      switchIcon: "i-knowledge-search",
       title: "사내 업무, 무엇이 궁금하신가요?",
       subtitle: "규정, 절차, 담당 부서를 빠르게 확인합니다.",
       placeholder: "사내 규정, 절차, 담당 부서를 질문하세요.   (예: 출장비 정산 기준 알려줘)",
@@ -1363,7 +1363,7 @@
     icon.classList.add(`product-mode-icon-${nextMode}`);
     icon.dataset.featureModeIcon = nextMode;
     const use = icon.querySelector("use");
-    if (use) use.setAttribute("href", `#${profile.switchIcon || "i-star"}`);
+    if (use) use.setAttribute("href", `#${profile.switchIcon || "i-agent-briefcase"}`);
   }
 
   function resetConversationForFeatureSwitch() {
