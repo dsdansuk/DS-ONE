@@ -2059,3 +2059,213 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   }
 }
 
+/* v105: enterprise quick-action rail
+   One shared container, no individual heavy cards.
+   Agent uses 5 actions; knowledge keeps 6.
+   Designed to avoid a vaporware PPT slot while preserving a premium DS ONE feel. */
+.home-fit {
+  --quick-action-gap: clamp(12px, 1.2vw, 18px);
+  --quick-action-item-width: clamp(98px, 8.9vw, 114px);
+  --quick-action-item-height: clamp(70px, 7.5dvh, 84px);
+}
+
+.action-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: var(--quick-action-gap);
+  width: fit-content;
+  max-width: min(100%, 860px);
+  margin-inline: auto;
+  padding: clamp(12px, 1.1vw, 16px) clamp(16px, 1.4vw, 22px);
+  background: rgba(255, 255, 255, 0.44);
+  border: 1px solid rgba(197, 210, 227, 0.52);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(54, 72, 105, 0.05);
+  backdrop-filter: blur(4px);
+}
+
+.action-card {
+  position: relative;
+  flex: 0 0 var(--quick-action-item-width);
+  width: var(--quick-action-item-width);
+  min-width: 0;
+  height: var(--quick-action-item-height);
+  min-height: 0;
+  padding: 8px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  box-shadow: none;
+  transform: none;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.action-card:hover {
+  background: rgba(255, 255, 255, 0.80);
+  box-shadow: 0 4px 12px rgba(59, 83, 125, 0.07);
+  transform: translateY(-1px);
+}
+
+.action-card:focus-visible {
+  outline: 2px solid rgba(90, 138, 255, 0.28);
+  outline-offset: 2px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.action-card:disabled,
+.action-card.is-disabled,
+.action-card:disabled:hover,
+.action-card.is-disabled:hover {
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.card-head {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.card-title {
+  width: 100%;
+  color: #202838;
+  font-size: clamp(14px, 0.95vw, 15px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.016em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-desc {
+  display: none !important;
+}
+
+.action-card .card-mode-icon-agent {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+}
+
+.action-card .card-mode-icon-agent > svg,
+.action-card .card-mode-icon-agent .quick-action-svg {
+  width: 32px;
+  height: 32px;
+}
+
+.action-card .card-mode-icon-knowledge {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 8px;
+}
+
+.card-status {
+  top: 6px;
+  right: 10px;
+  padding: 2px 6px;
+  font-size: 9px;
+  line-height: 1.2;
+  color: #7c6b56;
+  background: rgba(245, 238, 230, 0.96);
+  border: 1px solid rgba(218, 204, 190, 0.78);
+  border-radius: 999px;
+}
+
+.action-card:disabled .card-title,
+.action-card.is-disabled .card-title {
+  color: #8d96a3;
+}
+
+.action-card:disabled .card-mode-icon-agent,
+.action-card.is-disabled .card-mode-icon-agent,
+.action-card:disabled .card-mode-icon-knowledge,
+.action-card.is-disabled .card-mode-icon-knowledge {
+  opacity: 0.5;
+}
+
+@media (min-width: 1500px) {
+  .home-fit {
+    --quick-action-item-width: clamp(102px, 7.8vw, 116px);
+    --quick-action-item-height: clamp(72px, 7.4dvh, 86px);
+  }
+
+  .action-grid {
+    max-width: 900px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .home-fit {
+    --quick-action-gap: 12px;
+    --quick-action-item-width: clamp(90px, 14vw, 108px);
+    --quick-action-item-height: clamp(68px, 8.5dvh, 80px);
+  }
+
+  .action-grid {
+    max-width: min(100%, 760px);
+    padding-inline: 14px;
+  }
+
+  .action-card .card-mode-icon-agent {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+  }
+
+  .action-card .card-mode-icon-agent > svg,
+  .action-card .card-mode-icon-agent .quick-action-svg {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+@media (max-width: 840px) {
+  .action-grid {
+    max-width: min(100%, 600px);
+  }
+
+  .action-card {
+    flex-basis: calc(33.333% - 8px);
+    width: calc(33.333% - 8px);
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 620px) {
+  .action-grid {
+    max-width: min(100%, 420px);
+    gap: 10px;
+  }
+
+  .action-card {
+    flex-basis: calc(50% - 5px);
+    width: calc(50% - 5px);
+    min-width: 0;
+  }
+}
+
+@media (max-width: 430px) {
+  .action-card {
+    flex-basis: 100%;
+    width: 100%;
+  }
+}
+
