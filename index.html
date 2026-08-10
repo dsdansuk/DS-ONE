@@ -384,22 +384,26 @@
                       height="100%"
                       preserveAspectRatio="xMidYMid meet"
                       aria-hidden="true"
-                      color="#ffffff"
-                      fill="none">
-                    <g
-                      stroke="currentColor"
-                      stroke-width="42"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      shape-rendering="geometricPrecision">
-
-                      <rect x="64" y="64" width="384" height="384" rx="12" ry="12"/>
-
-                      <path d="M192 64V448"/>
-                      <path d="M320 64V448"/>
-
-                      <path d="M64 192H448"/>
-                      <path d="M64 320H448"/>
+                      color="#ffffff">
+                    <g>
+                      <path
+                        fill="currentColor"
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        shape-rendering="geometricPrecision"
+                        d="M64 64
+                          H176
+                          L256 190
+                          L336 64
+                          H448
+                          L320 256
+                          L448 448
+                          H336
+                          L256 322
+                          L176 448
+                          H64
+                          L192 256
+                          Z"/>
                     </g>
                   </svg>
                 </span>
