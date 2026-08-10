@@ -119,7 +119,7 @@
     .brand-divider {
       width: 1px;
       height: 25px;
-      background: var(--line);
+      background: #D7DEE8;
     }
 
     .product-name {
