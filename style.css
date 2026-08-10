@@ -119,7 +119,7 @@
     .brand-divider {
       width: 1px;
       height: 25px;
-      background: #D7DEE8;
+      background: var(--line);
     }
 
     .product-name {
@@ -1484,6 +1484,10 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 
 .home-fit {
   --home-primary-width: min(100%, clamp(var(--home-content-min-width), var(--home-content-fluid-width), var(--home-content-max-width)));
+  /* One responsive card-height token is shared by every home mode.
+     This prevents Knowledge cards from growing independently when their copy wraps. */
+  --action-card-height: clamp(106px, 11.2dvh, 116px);
+  --action-card-padding: 15px 16px;
   width: 100%;
   margin-inline: auto;
 }
@@ -1501,11 +1505,15 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 
 .action-grid {
   grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: stretch;
 }
 
 .action-card {
-  min-height: clamp(100px, 11.2dvh, 114px);
-  padding: 15px 16px;
+  /* Exact per-viewport height, not a global 100px lock.
+     Agent / Knowledge always resolve from the same token at the same viewport. */
+  height: var(--action-card-height);
+  min-height: 0;
+  padding: var(--action-card-padding);
 }
 
 .card-desc {
@@ -1588,6 +1596,8 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 @media (min-width: 1181px) and (max-width: 1599px) and (min-height: 700px) {
   .home-fit {
     --home-primary-width: min(100%, clamp(960px, 78%, 1020px));
+    --action-card-height: clamp(106px, 11.8dvh, 118px);
+    --action-card-padding: 16px 17px;
   }
 
   .hero {
@@ -1606,10 +1616,6 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
     min-height: clamp(138px, 15.4dvh, 160px);
   }
 
-  .action-card {
-    min-height: clamp(104px, 11.8dvh, 118px);
-    padding: 16px 17px;
-  }
 }
 
 /* v89: 1920px monitor presence
@@ -1619,6 +1625,8 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 @media (min-width: 1600px) and (min-height: 760px) {
   .home-fit {
     --home-primary-width: min(100%, clamp(1120px, 74%, 1180px));
+    --action-card-height: clamp(110px, 11.7dvh, 120px);
+    --action-card-padding: 16px 17px;
   }
 
   .hero {
@@ -1638,9 +1646,5 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
     margin-bottom: clamp(22px, 3.35dvh, 36px);
   }
 
-  .action-card {
-    min-height: clamp(108px, 11.7dvh, 120px);
-    padding: 16px 17px;
-  }
 }
 
