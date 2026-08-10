@@ -666,7 +666,7 @@
     .card-head {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 9px;
       width: 100%;
       min-width: 0;
       box-sizing: border-box;
@@ -1497,7 +1497,11 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
      100px is the compact notebook floor; larger viewports can still scale up.
      Knowledge titles are kept to one line so copy cannot force a taller card. */
   --action-card-height: clamp(100px, 11.2dvh, 116px);
-  --action-card-padding: 15px 16px;
+  /* Keep quick-action cards at a readable compact width on large monitors.
+     The composer can grow wider, while the action row stops at six 160px cards
+     plus five 12px gaps (= 1020px max). On notebooks this cap is not reached. */
+  --action-grid-max-width: 1020px;
+  --action-card-padding: 15px;
   width: 100%;
   margin-inline: auto;
 }
@@ -1516,6 +1520,10 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 .action-grid {
   grid-template-columns: repeat(6, minmax(0, 1fr));
   align-items: stretch;
+  /* Do not stretch six quick actions to the full composer width on desktop.
+     Equal-width cards remain centered and compact, reducing empty right space
+     inside each card while preserving the full-width composer above. */
+  width: min(var(--home-primary-width), var(--action-grid-max-width));
 }
 
 .action-card {
@@ -1568,12 +1576,12 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
     width: 100%;
   }
 
-  .prompt-card,
-  .action-grid {
+  .prompt-card {
     width: var(--home-primary-width);
   }
 
   .action-grid {
+    width: min(var(--home-primary-width), var(--action-grid-max-width));
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
@@ -1607,7 +1615,7 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   .home-fit {
     --home-primary-width: min(100%, clamp(960px, 78%, 1020px));
     --action-card-height: clamp(100px, 11.8dvh, 118px);
-    --action-card-padding: 16px 17px;
+    --action-card-padding: 15px;
   }
 
   .hero {
@@ -1636,7 +1644,7 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   .home-fit {
     --home-primary-width: min(100%, clamp(1120px, 74%, 1180px));
     --action-card-height: clamp(110px, 11.7dvh, 120px);
-    --action-card-padding: 16px 17px;
+    --action-card-padding: 15px;
   }
 
   .hero {
