@@ -738,6 +738,15 @@
       font-weight: 800;
     }
 
+    /* Knowledge card labels stay on one line so both product modes can share
+       the same compact responsive card-height token without copy-driven growth. */
+    .is-knowledge-feature .action-card .card-title {
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .card-desc {
       display: block;
       width: 100%;
@@ -1485,8 +1494,9 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 .home-fit {
   --home-primary-width: min(100%, clamp(var(--home-content-min-width), var(--home-content-fluid-width), var(--home-content-max-width)));
   /* One responsive card-height token is shared by every home mode.
-     This prevents Knowledge cards from growing independently when their copy wraps. */
-  --action-card-height: clamp(106px, 11.2dvh, 116px);
+     100px is the compact notebook floor; larger viewports can still scale up.
+     Knowledge titles are kept to one line so copy cannot force a taller card. */
+  --action-card-height: clamp(100px, 11.2dvh, 116px);
   --action-card-padding: 15px 16px;
   width: 100%;
   margin-inline: auto;
@@ -1509,7 +1519,7 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 }
 
 .action-card {
-  /* Exact per-viewport height, not a global 100px lock.
+  /* Shared per-viewport height, not a global 100px lock.
      Agent / Knowledge always resolve from the same token at the same viewport. */
   height: var(--action-card-height);
   min-height: 0;
@@ -1596,7 +1606,7 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 @media (min-width: 1181px) and (max-width: 1599px) and (min-height: 700px) {
   .home-fit {
     --home-primary-width: min(100%, clamp(960px, 78%, 1020px));
-    --action-card-height: clamp(106px, 11.8dvh, 118px);
+    --action-card-height: clamp(100px, 11.8dvh, 118px);
     --action-card-padding: 16px 17px;
   }
 
