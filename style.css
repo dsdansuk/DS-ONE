@@ -745,7 +745,7 @@
       min-height: 32px;
       margin: 0;
       box-sizing: border-box;
-      color: #4f596a;
+      color: #667085;
       font-size: clamp(12px, 1.3dvh, 14px);
       line-height: 1.48;
       white-space: normal;
@@ -1265,8 +1265,8 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   stroke: currentColor;
   stroke-width: 2.2;
   fill: none;
-  /* Laptop-width visual tuning: pull the chevron slightly toward the label. */
-  margin-left: -2px;
+  /* Keep the chevron visually grouped with the active product label. */
+  margin-left: -3px;
   margin-right: 2px;
   transition: transform 160ms ease;
 }
