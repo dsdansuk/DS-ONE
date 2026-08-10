@@ -2315,3 +2315,184 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   }
 }
 
+/* v108: final proportion and sidebar polish
+   Goal: preserve the v107 premium rail, give the five actions more presence,
+   and reduce the visual density of Recent Work without changing behavior. */
+
+/* Quick Action Rail: ~10–15% more presence than v107, but still secondary to composer. */
+.action-grid {
+  width: min(760px, calc(100% - 32px));
+  max-width: 760px;
+  padding: 11px 16px;
+  gap: 12px;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.27);
+  border-color: rgba(197, 210, 227, 0.30);
+  box-shadow: 0 5px 16px rgba(54, 72, 105, 0.024);
+  backdrop-filter: blur(3px);
+}
+
+.action-card {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: clamp(72px, 7.6dvh, 84px);
+  padding: 8px 8px;
+}
+
+.action-card:hover {
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 4px 12px rgba(59, 83, 125, 0.055);
+}
+
+.action-card .card-mode-icon-agent {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+}
+
+.action-card .card-mode-icon-agent > svg,
+.action-card .card-mode-icon-agent .quick-action-svg {
+  width: 34px;
+  height: 34px;
+}
+
+.action-card .card-mode-icon-knowledge {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+}
+
+.card-title {
+  font-size: clamp(14px, 0.9vw, 15px);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+
+/* Recent Work: quieter, tighter and more enterprise-like. */
+.recent-work {
+  margin-top: 18px;
+  gap: 6px;
+}
+
+.sidebar-section-title {
+  padding-inline: 16px;
+  color: #828b9a;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.recent-list {
+  gap: 1px;
+  padding-right: 2px;
+}
+
+.recent-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.recent-item {
+  min-height: 40px;
+  gap: 2px;
+  padding: 6px 16px;
+  border-radius: 9px;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.recent-item:hover {
+  color: #245fc7;
+  background: rgba(238, 245, 255, 0.78);
+  transform: none;
+}
+
+.recent-item-title {
+  font-size: 13.5px;
+  font-weight: 750;
+  line-height: 1.18;
+}
+
+.recent-item-meta {
+  color: #8a93a1;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+@media (min-width: 1600px) and (min-height: 760px) {
+  .action-grid {
+    width: min(800px, calc(100% - 48px));
+    max-width: 800px;
+    padding-inline: 18px;
+    gap: 14px;
+  }
+
+  .action-card {
+    height: clamp(74px, 7.4dvh, 86px);
+  }
+}
+
+@media (max-width: 1100px) and (min-width: 841px) {
+  .action-grid {
+    width: min(720px, calc(100% - 28px));
+    max-width: 720px;
+    gap: 10px;
+    padding-inline: 13px;
+  }
+
+  .action-card {
+    height: clamp(68px, 8.2dvh, 80px);
+    padding-inline: 5px;
+  }
+
+  .action-card .card-mode-icon-agent {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+
+  .action-card .card-mode-icon-agent > svg,
+  .action-card .card-mode-icon-agent .quick-action-svg {
+    width: 32px;
+    height: 32px;
+  }
+
+  .action-card .card-mode-icon-knowledge {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+  }
+}
+
+/* Only genuinely compact/split windows wrap. */
+@media (max-width: 840px) {
+  .action-grid {
+    width: min(100%, 600px);
+    max-width: 600px;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .action-card {
+    flex: 1 1 calc(33.333% - 10px);
+    width: calc(33.333% - 10px);
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 620px) {
+  .action-card {
+    flex-basis: calc(50% - 5px);
+    width: calc(50% - 5px);
+    min-width: 0;
+  }
+}
+
+@media (max-width: 430px) {
+  .action-card {
+    flex-basis: 100%;
+    width: 100%;
+  }
+}
+
