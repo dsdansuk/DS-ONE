@@ -96,6 +96,9 @@
       display: block;
       object-fit: contain;
       flex: 0 0 30px;
+      /* Keep the existing 16px brand rhythm for the divider/switcher,
+         but tighten only the logo -> DS ONE spacing to 6px. */
+      margin-right: -10px;
     }
 
     .brand-mark {
@@ -1250,6 +1253,9 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   stroke: currentColor;
   stroke-width: 2.2;
   fill: none;
+  /* Laptop-width visual tuning: pull the chevron slightly toward the label. */
+  margin-left: -2px;
+  margin-right: 2px;
   transition: transform 160ms ease;
 }
 
