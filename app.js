@@ -129,12 +129,12 @@
       disclaimer: "사내 지식 답변은 SideTalk 지식베이스 기준입니다. 중요한 업무에는 담당 부서와 원문을 확인해 주세요.",
       attachEnabled: false,
       cards: [
-        { iconClass: "knowledge", iconText: "규", title: "규정·기준", desc: "제도와 기준 확인", task: "knowledge_policy", attach: false, template: "아래 사내 규정 또는 기준을 지식베이스 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "신", title: "신청·결재", desc: "절차와 결재선 확인", task: "knowledge_request", attach: false, disabled: true, disabledLabel: "준비 중", disabledReason: "신청·결재 기능은 현재 준비 중입니다.", template: "아래 신청 또는 결재 절차를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "담", title: "담당 부서", desc: "문의처와 담당자 확인", task: "knowledge_owner", attach: false, template: "아래 업무의 담당 부서 또는 문의처를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "시", title: "시스템·권한", desc: "계정과 권한 확인", task: "knowledge_system_access", attach: false, template: "아래 시스템, 계정 또는 권한 관련 문의를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "보", title: "보안·개인정보", desc: "보안 기준 확인", task: "knowledge_security", attach: false, template: "아래 보안, 개인정보 또는 파일 처리 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "휴", title: "근태·복리후생", desc: "휴가와 복지 기준", task: "knowledge_welfare", attach: false, template: "아래 근태, 휴가 또는 복리후생 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "규", title: "규정·기준", desc: "사내 규정과 업무 기준 확인", task: "knowledge_policy", attach: false, template: "아래 사내 규정 또는 기준을 지식베이스 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "담", title: "담당 부서", desc: "업무별 담당 부서와 문의처 확인", task: "knowledge_owner", attach: false, template: "아래 업무의 담당 부서 또는 문의처를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "시", title: "시스템·권한", desc: "시스템 이용 및 권한 기준 확인", task: "knowledge_system_access", attach: false, template: "아래 시스템, 계정 또는 권한 관련 문의를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "보", title: "보안·개인정보", desc: "보안·개인정보 처리 기준 확인", task: "knowledge_security", attach: false, template: "아래 보안, 개인정보 또는 파일 처리 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "휴", title: "근태·복리후생", desc: "근태·휴가·복리후생 기준 확인", task: "knowledge_welfare", attach: false, template: "아래 근태, 휴가 또는 복리후생 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconText: "신", title: "신청·결재", desc: "신청 절차와 결재 기준 확인", task: "knowledge_request", attach: false, disabled: true, disabledLabel: "준비 중", disabledReason: "신청·결재 기능은 현재 준비 중입니다.", template: "아래 신청 또는 결재 절차를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
       ],
     },
   };
