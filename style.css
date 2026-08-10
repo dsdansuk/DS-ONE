@@ -1690,3 +1690,168 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 .card-desc {
   text-align: center;
 }
+
+
+/* v103: approved quick-action tiles
+   Matches the approved DS ONE concept: icon above title, no persistent helper copy,
+   soft enterprise tile, and the quick-action row aligned to the composer width. */
+.home-fit {
+  --action-card-height: clamp(104px, 13.4dvh, 118px);
+}
+
+.action-grid {
+  width: var(--home-primary-width);
+  gap: clamp(12px, 1.05vw, 18px);
+  align-items: stretch;
+}
+
+.action-card {
+  height: var(--action-card-height);
+  min-height: 0;
+  padding: 12px 10px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #dce3ed;
+  border-radius: 12px;
+  box-shadow: 0 7px 20px rgba(37, 48, 77, 0.035);
+  transform: none;
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.action-card:hover {
+  background: #fff;
+  border-color: #c8d9fb;
+  box-shadow: 0 10px 22px rgba(47, 111, 237, 0.085);
+  transform: translateY(-1px);
+}
+
+.action-card:disabled,
+.action-card.is-disabled,
+.action-card:disabled:hover,
+.action-card.is-disabled:hover {
+  background: rgba(248, 249, 251, 0.9);
+  border-color: #e3e8ef;
+  box-shadow: none;
+  transform: none;
+}
+
+.card-head {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(9px, 1.15dvh, 12px);
+}
+
+.card-title {
+  max-width: 100%;
+  overflow: hidden;
+  color: #202838;
+  font-size: clamp(14px, 1.5dvh, 16px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-desc {
+  display: none !important;
+}
+
+/* Agent marks are standalone SVGs in the approved visual system. */
+.action-card .card-mode-icon-agent {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  color: inherit;
+  background: transparent !important;
+  border-radius: 0;
+  box-shadow: none;
+  filter: none;
+}
+
+.action-card .card-mode-icon-agent > svg,
+.action-card .card-mode-icon-agent .quick-action-svg {
+  width: 36px;
+  height: 36px;
+  display: block;
+  overflow: visible;
+}
+
+/* Knowledge keeps its temporary green letter marks until dedicated SVGs are supplied. */
+.action-card .card-mode-icon-knowledge {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 8px;
+  font-size: 13px;
+  box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.07);
+}
+
+.card-status {
+  top: 8px;
+  right: 8px;
+  padding: 3px 7px;
+  font-size: 10px;
+  background: #edf0f4;
+}
+
+.action-card:disabled .card-title,
+.action-card.is-disabled .card-title {
+  color: #7c8592;
+}
+
+.action-card:disabled .card-mode-icon-agent,
+.action-card.is-disabled .card-mode-icon-agent {
+  opacity: 0.64;
+  filter: none;
+}
+
+@media (min-width: 1181px) and (max-width: 1599px) and (min-height: 700px) {
+  .home-fit {
+    --action-card-height: clamp(104px, 13.2dvh, 118px);
+  }
+  .action-grid {
+    width: var(--home-primary-width);
+    gap: clamp(12px, 1vw, 16px);
+  }
+}
+
+@media (min-width: 1600px) and (min-height: 760px) {
+  .home-fit {
+    --action-card-height: clamp(116px, 13.2dvh, 126px);
+  }
+  .action-grid {
+    width: var(--home-primary-width);
+    gap: clamp(14px, 1vw, 18px);
+  }
+}
+
+@media (max-height: 770px) and (min-width: 1181px) {
+  .home-fit {
+    --action-card-height: 102px;
+  }
+  .action-grid {
+    gap: 12px;
+  }
+  .action-card .card-mode-icon-agent {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+  .action-card .card-mode-icon-agent > svg,
+  .action-card .card-mode-icon-agent .quick-action-svg {
+    width: 32px;
+    height: 32px;
+  }
+}

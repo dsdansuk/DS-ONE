@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DS ONE 업무 AI Agent 홈</title>
-  <link rel="stylesheet" href="style.css?v=20260810_v102_v100_centered_actions">
+  <link rel="stylesheet" href="style.css?v=20260810_v103_approved_quick_tiles">
 </head>
 <body>
   <svg class="sr-only" aria-hidden="true">
@@ -193,577 +193,88 @@
             </div>
           </section>
 
-          <section class="action-grid" aria-label="빠른 작업">
-            <button class="action-card" type="button">
-              <span class="card-head">
-                <span class="app-icon doc card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent" aria-hidden="true">
-                  <svg xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 512 512"
-                      width="100%"
-                      height="100%"
-                      preserveAspectRatio="xMidYMid meet"
-                      aria-hidden="true"
-                      color="#ffffff"
-                      fill="none">
-                    <g
-                      stroke="currentColor"
-                      stroke-width="42"
-                      stroke-linecap="round"
-                      stroke-linejoin="round">
-
-                      <!-- 문서 외곽 -->
-                      <path d="M238 106H108C84 106 64 126 64 150V404C64 428 84 448 108 448H340C364 448 384 428 384 404V264"/>
-
-                      <!-- 연필 외곽 -->
-                      <path d="M183 289L196 223L371 48C390 29 421 29 440 48C459 67 459 98 440 117L265 292L183 310Z"/>
-
-                      <!-- 연필 캡 구분선 -->
-                      <path d="M366 53L435 122"/>
-                    </g>
-                  </svg>
-                </span>
-                <span class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" aria-hidden="true" hidden>규</span>
-                <span class="card-title">문서 작성</span>
-              </span>
-              <span class="card-desc">기획서, 보고서, 메일 초안 작성 등</span>
-            </button>
-
-            <button class="action-card" type="button">
-              <span class="card-head">
-                <span class="app-icon summary card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent" aria-hidden="true">
-                  <svg xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 512 512"
-                      width="100%"
-                      height="100%"
-                      preserveAspectRatio="xMidYMid meet"
-                      aria-hidden="true"
-                      color="#ffffff">
-
-                    <!-- 밑줄: 좌우 64px, 아래 64px 여백 -->
-                    <rect
-                      x="64"
-                      y="415.5"
-                      width="384"
-                      height="32.5"
-                      fill="currentColor"
-                    />
-
-                    <!-- 형광펜 본체: 원본 비율 유지 -->
-                    <g transform="matrix(
-                      0.855233853 0
-                      0 0.855233853
-                      37.487750557 37.487750557
-                    )">
-                      <path
-                        fill="currentColor"
-                        fill-rule="evenodd"
-                        clip-rule="evenodd"
-                        shape-rendering="geometricPrecision"
-                        d="
-                          M338 31
-                          L332 37
-                          L319 48
-                          L293 70
-                          L229 124
-                          L145 194
-                          L125 211
-                          L119 216
-                          L117 220
-                          L116 225
-                          L114 235
-                          L110 259
-                          L109 264
-                          L108 267
-                          L68 307
-                          L68 406
-                          L167 406
-                          L208 365
-                          L213 364
-                          L223 362
-                          L252 357
-                          L256 356
-                          L259 353
-                          L264 347
-                          L281 327
-                          L319 282
-                          L384 205
-                          L421 160
-                          L438 141
-                          L443 134
-                          L340 31
-                          Z
-
-                          M126 304
-                          L169 347
-                          L169 349
-                          L161 356
-                          L152 366
-                          L150 367
-                          L106 366
-                          L106 324
-                          Z
-
-                          M259 149
-                          L324 215
-                          L322 218
-                          L316 224
-                          L305 237
-                          L295 250
-                          L257 295
-                          L246 308
-                          L240 315
-                          L234 321
-                          L230 322
-                          L220 324
-                          L210 326
-                          L204 327
-                          L147 270
-                          L147 267
-                          L148 266
-                          L149 257
-                          L150 256
-                          L151 247
-                          L152 242
-                          L153 239
-                          L158 234
-                          L165 229
-                          L171 223
-                          L184 213
-                          L216 186
-                          L235 169
-                          L248 158
-                          L254 153
-                          L255 153
-                          Z
-
-                          M337 83
-                          L390 137
-                          L387 141
-                          L381 148
-                          L371 160
-                          L360 173
-                          L354 180
-                          L349 184
-                          L289 124
-                          L293 120
-                          L299 115
-                          L306 110
-                          L325 93
-                          L332 88
-                          Z
-                        "
-                      />
-                    </g>
-                  </svg>
-                </span>
-                <span class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" aria-hidden="true" hidden>담</span>
-                <span class="card-title">문서 요약</span>
-              </span>
-              <span class="card-desc">긴 문서나 회의 내용을 핵심만 요약</span>
-            </button>
-
-            <button class="action-card" type="button">
-              <span class="card-head">
-                <span class="app-icon translate card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent" aria-hidden="true">
-                  <svg class="icon-translate" viewBox="0 0 512 512" aria-hidden="true">
-                    <path fill="currentColor" fill-rule="evenodd" d="M 166 42 L 163 43 L 161 44 L 159 45 L 156 47 L 154 49 L 154 50 L 151 53 L 150 55 L 149 58 L 148 85 L 80 85 L 77 86 L 75 87 L 73 88 L 67 94 L 65 97 L 64 100 L 63 104 L 63 108 L 64 113 L 65 115 L 66 117 L 68 120 L 71 123 L 74 125 L 76 126 L 78 127 L 83 128 L 231 129 L 230 133 L 227 145 L 223 157 L 221 162 L 218 169 L 211 183 L 208 188 L 200 200 L 197 204 L 192 210 L 185 217 L 182 214 L 177 208 L 165 192 L 159 183 L 154 175 L 146 159 L 144 156 L 142 154 L 141 154 L 138 151 L 136 150 L 133 149 L 122 149 L 119 150 L 117 151 L 114 154 L 113 154 L 111 156 L 109 159 L 108 161 L 107 163 L 106 166 L 106 174 L 107 177 L 108 180 L 111 186 L 119 200 L 123 206 L 131 218 L 136 225 L 147 238 L 148 243 L 146 243 L 141 246 L 129 250 L 125 251 L 121 252 L 116 253 L 110 254 L 102 255 L 83 255 L 78 256 L 76 257 L 74 258 L 71 260 L 68 263 L 66 266 L 65 268 L 64 270 L 63 275 L 63 279 L 64 283 L 65 286 L 67 289 L 73 295 L 75 296 L 77 297 L 80 298 L 103 298 L 113 297 L 119 296 L 125 295 L 130 294 L 142 291 L 154 287 L 159 285 L 166 282 L 170 280 L 176 277 L 178 275 L 181 274 L 186 278 L 191 283 L 196 287 L 208 296 L 217 302 L 222 305 L 227 308 L 236 313 L 238 314 L 240 315 L 249 319 L 253 319 L 254 320 L 257 320 L 258 319 L 262 319 L 268 316 L 273 311 L 275 308 L 276 305 L 277 302 L 277 294 L 276 291 L 275 289 L 274 287 L 272 284 L 270 282 L 269 282 L 266 279 L 264 278 L 262 277 L 258 276 L 254 274 L 247 270 L 242 267 L 230 259 L 222 253 L 216 247 L 220 243 L 220 242 L 227 235 L 231 230 L 234 226 L 237 222 L 243 213 L 246 208 L 249 203 L 252 197 L 257 187 L 260 180 L 262 175 L 265 167 L 266 164 L 267 161 L 271 147 L 273 138 L 274 133 L 275 128 L 276 121 L 276 111 L 275 107 L 273 102 L 271 99 L 268 95 L 265 92 L 262 90 L 259 88 L 257 87 L 254 86 L 251 85 L 192 84 L 192 62 L 191 57 L 188 51 L 183 46 L 180 44 L 177 43 L 174 42 Z M 334 231 L 331 232 L 328 233 L 326 234 L 324 235 L 321 237 L 316 242 L 313 246 L 312 248 L 311 250 L 307 260 L 299 280 L 283 320 L 235 440 L 234 444 L 234 452 L 235 455 L 236 457 L 237 459 L 244 466 L 246 467 L 248 468 L 252 469 L 259 469 L 263 468 L 265 467 L 267 466 L 274 459 L 275 457 L 276 455 L 280 445 L 294 408 L 295 406 L 385 405 L 387 407 L 388 409 L 390 414 L 394 426 L 404 451 L 406 456 L 407 458 L 410 461 L 410 462 L 412 464 L 415 466 L 417 467 L 419 468 L 422 469 L 430 469 L 433 468 L 436 467 L 439 465 L 444 460 L 447 454 L 447 450 L 448 449 L 448 446 L 447 445 L 447 441 L 445 436 L 441 426 L 433 406 L 417 366 L 371 251 L 368 245 L 364 240 L 359 236 L 356 234 L 351 232 L 347 231 Z M 341 293 L 343 297 L 345 302 L 349 312 L 368 359 L 367 362 L 313 361 L 314 358 L 317 351 L 323 336 L 338 298 Z"/>
-                  </svg>
-                </span>
-                <span class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" aria-hidden="true" hidden>시</span>
-                <span class="card-title">문서 번역</span>
-              </span>
-              <span class="card-desc">다국어 문서를 자연스럽게 번역</span>
-            </button>
-
-            <button class="action-card" type="button">
-              <span class="card-head">
-                <span class="app-icon excel card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent" aria-hidden="true">
-                  <svg xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 512 512"
-                      width="100%"
-                      height="100%"
-                      preserveAspectRatio="xMidYMid meet"
-                      aria-hidden="true"
-                      color="#ffffff">
-                    <g>
-                      <path
-                        fill="currentColor"
-                        fill-rule="evenodd"
-                        clip-rule="evenodd"
-                        shape-rendering="geometricPrecision"
-                        d="M64 64
-                          H176
-                          L256 190
-                          L336 64
-                          H448
-                          L320 256
-                          L448 448
-                          H336
-                          L256 322
-                          L176 448
-                          H64
-                          L192 256
-                          Z"/>
-                    </g>
-                  </svg>
-                </span>
-                <span class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" aria-hidden="true" hidden>보</span>
-                <span class="card-title">엑셀 분석</span>
-              </span>
-              <span class="card-desc">데이터 분석 및 시각화, 인사이트 도출</span>
-            </button>
-
-            <button class="action-card" type="button">
-              <span class="card-head">
-                <span class="app-icon file card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent" aria-hidden="true">
-                  <span class="app-icon pdf">
-                    <svg
-                      class="icon-pdf"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 512 512"
-                      width="100%"
-                      height="100%"
-                      preserveAspectRatio="xMidYMid meet"
-                      aria-hidden="true"
-                      color="#ffffff"
-                    >
-                      <path
-                        fill="currentColor"
-                        fill-rule="evenodd"
-                        clip-rule="evenodd"
-                        shape-rendering="geometricPrecision"
-                        d="M256 35
-                          L205 35
-                          L196 49
-                          L196 95
-                          L214 194
-                          L160 309
-                          L125 371
-                          L117 368
-                          L110 369
-                          L77 387
-                          L45 416
-                          L31 434
-                          L30 471
-                          L34 475
-                          L83 475
-                          L88 472
-                          L131 429
-                          L167 369
-                          L195 358
-                          L258 343
-                          L331 330
-                          L371 348
-                          L433 366
-                          L464 367
-                          L481 359
-                          L481 307
-                          L472 300
-                          L452 293
-                          L425 289
-                          L385 290
-                          L342 296
-                          L314 275
-                          L279 235
-                          L261 203
-                          L252 180
-                          L259 135
-                          L258 105
-                          L254 100
-                          L245 100
-                          L238 122
-                          L234 107
-                          L232 58
-                          L235 51
-                          L241 60
-                          L248 90
-                          L251 93
-                          L258 93
-                          L263 87
-                          L265 48
-                          Z
-
-                          M106 399
-                          L107 400
-                          L105 402
-                          L105 403
-                          L102 406
-                          L102 407
-                          L100 409
-                          L100 410
-                          L98 412
-                          L98 413
-                          L96 415
-                          L96 416
-                          L93 419
-                          L93 420
-                          L89 424
-                          L89 425
-                          L85 429
-                          L85 430
-                          L81 434
-                          L81 435
-                          L72 444
-                          L71 444
-                          L67 448
-                          L66 448
-                          L64 450
-                          L63 450
-                          L62 451
-                          L61 450
-                          L61 449
-                          L62 448
-                          L62 447
-                          L64 445
-                          L64 444
-                          L65 443
-                          L65 442
-                          L67 440
-                          L67 439
-                          L69 437
-                          L69 436
-                          L71 434
-                          L71 433
-                          L74 430
-                          L74 429
-                          L77 426
-                          L77 425
-                          L83 419
-                          L83 418
-                          L90 411
-                          L91 411
-                          L95 407
-                          L96 407
-                          L100 403
-                          L101 403
-                          L105 399
-                          Z
-
-                          M405 323
-                          L406 322
-                          L432 322
-                          L433 323
-                          L444 323
-                          L445 324
-                          L451 324
-                          L452 325
-                          L457 325
-                          L458 326
-                          L460 326
-                          L461 327
-                          L463 327
-                          L464 328
-                          L466 328
-                          L467 329
-                          L468 329
-                          L469 330
-                          L470 330
-                          L471 331
-                          L471 334
-                          L470 335
-                          L468 335
-                          L467 336
-                          L449 336
-                          L448 335
-                          L443 335
-                          L442 334
-                          L438 334
-                          L437 333
-                          L432 333
-                          L431 332
-                          L428 332
-                          L427 331
-                          L425 331
-                          L424 330
-                          L423 330
-                          L422 329
-                          L420 329
-                          L419 328
-                          L417 328
-                          L416 327
-                          L414 327
-                          L413 326
-                          L412 326
-                          L411 325
-                          L409 325
-                          L408 324
-                          L406 324
-                          Z
-
-                          M235 236
-                          L236 237
-                          L237 240
-                          L239 242
-                          L239 243
-                          L243 248
-                          L243 249
-                          L246 252
-                          L246 253
-                          L248 255
-                          L248 256
-                          L251 259
-                          L251 260
-                          L254 263
-                          L254 264
-                          L257 267
-                          L257 268
-                          L261 272
-                          L261 273
-                          L285 297
-                          L285 298
-                          L287 300
-                          L288 300
-                          L293 305
-                          L292 306
-                          L289 306
-                          L288 307
-                          L281 307
-                          L280 308
-                          L277 308
-                          L276 309
-                          L273 309
-                          L272 310
-                          L269 310
-                          L268 311
-                          L265 311
-                          L264 312
-                          L262 312
-                          L261 313
-                          L258 313
-                          L257 314
-                          L254 314
-                          L253 315
-                          L250 315
-                          L249 316
-                          L247 316
-                          L246 317
-                          L244 317
-                          L243 318
-                          L240 318
-                          L239 319
-                          L237 319
-                          L236 320
-                          L234 320
-                          L233 321
-                          L231 321
-                          L230 322
-                          L228 322
-                          L227 323
-                          L225 323
-                          L224 324
-                          L222 324
-                          L221 325
-                          L219 325
-                          L218 326
-                          L216 326
-                          L215 327
-                          L213 327
-                          L212 328
-                          L210 328
-                          L209 329
-                          L207 329
-                          L206 330
-                          L204 330
-                          L203 331
-                          L201 331
-                          L200 332
-                          L198 332
-                          L197 333
-                          L193 333
-                          L192 334
-                          L190 334
-                          L189 335
-                          L188 335
-                          L187 334
-                          L188 333
-                          L189 330
-                          L191 328
-                          L191 327
-                          L192 326
-                          L192 325
-                          L193 324
-                          L193 323
-                          L194 322
-                          L194 321
-                          L195 320
-                          L196 317
-                          L198 315
-                          L198 314
-                          L199 313
-                          L199 312
-                          L200 311
-                          L200 310
-                          L202 307
-                          L202 305
-                          L203 304
-                          L203 303
-                          L205 301
-                          L205 300
-                          L206 299
-                          L206 298
-                          L207 297
-                          L207 296
-                          L208 295
-                          L208 294
-                          L209 293
-                          L209 292
-                          L210 291
-                          L210 290
-                          L211 289
-                          L211 288
-                          L212 287
-                          L212 286
-                          L213 285
-                          L214 282
-                          L216 280
-                          L216 278
-                          L217 277
-                          L217 276
-                          L218 275
-                          L218 274
-                          L219 273
-                          L219 272
-                          L220 271
-                          L220 270
-                          L222 267
-                          L222 265
-                          L223 264
-                          L223 263
-                          L225 260
-                          L225 258
-                          L226 257
-                          L226 256
-                          L228 253
-                          L228 250
-                          L229 249
-                          L229 248
-                          L231 245
-                          L231 243
-                          L232 242
-                          L232 241
-                          L233 240
-                          L233 239
-                          Z"
-                      />
-                    </svg>
-                  </span>
-                </span>
-                <span class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" aria-hidden="true" hidden>휴</span>
-                <span class="card-title">PDF 분석</span>
-              </span>
-              <span class="card-desc">파일을 업로드하고 질문하기</span>
-            </button>
-
-            <button class="action-card is-disabled" type="button" disabled aria-disabled="true" title="PPT 생성 기능은 현재 준비 중입니다.">
-              <span class="card-status" aria-hidden="true">준비 중</span>
-              <span class="card-head">
-                <span class="app-icon report card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent" aria-hidden="true">▥</span>
-                <span class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" aria-hidden="true" hidden>신</span>
-                <span class="card-title">PPT 생성</span>
-              </span>
-              <span class="card-desc">보고서 구조화 및 핵심 내용 정리</span>
-            </button>
-          </section>
+          <section aria-label="빠른 작업" class="action-grid">
+<button class="action-card" type="button">
+<span class="card-head">
+<span aria-hidden="true" class="app-icon doc card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent"><svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+<g fill="none" stroke="#2F7CF6" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.6">
+<path d="M18.2 7H10.6A4.6 4.6 0 0 0 6 11.6v14.8A4.6 4.6 0 0 0 10.6 31h14.8a4.6 4.6 0 0 0 4.6-4.6v-8.1"></path>
+<path d="M17.1 21.7l1.2-5.4 8.6-8.6a2.8 2.8 0 0 1 4 4l-8.6 8.6-5.2 1.4Z"></path>
+<path d="m26.2 8.5 3.3 3.3"></path>
+</g>
+</svg></span>
+<span aria-hidden="true" class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" hidden="">규</span>
+<span class="card-title">문서 작성</span>
+</span>
+<span class="card-desc">기획서, 보고서, 메일 초안 작성 등</span>
+</button>
+<button class="action-card" type="button">
+<span class="card-head">
+<span aria-hidden="true" class="app-icon summary card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent"><svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+<g fill="none" stroke="#7A4EE7" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.15">
+<path d="M11 6.5h11.3l6.2 6.2v15.1A3.7 3.7 0 0 1 24.8 31H11a3.7 3.7 0 0 1-3.7-3.7V10.2A3.7 3.7 0 0 1 11 6.5Z"></path>
+<path d="M22.1 6.8v6.3h6.1"></path>
+<path d="M7.3 13.1H5.5A2.5 2.5 0 0 0 3 15.6v10.8A2.5 2.5 0 0 0 5.5 29h2" opacity=".86"></path>
+<path d="M13 21h8.6M13 25h10.2"></path>
+</g>
+</svg></span>
+<span aria-hidden="true" class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" hidden="">담</span>
+<span class="card-title">문서 요약</span>
+</span>
+<span class="card-desc">긴 문서나 회의 내용을 핵심만 요약</span>
+</button>
+<button class="action-card" type="button">
+<span class="card-head">
+<span aria-hidden="true" class="app-icon translate card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent"><svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+<g fill="none" stroke="#2BB88D" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.9">
+<rect height="18" rx="4.1" width="20" x="4.7" y="6.2"></rect>
+<rect fill="#fff" height="18" rx="4.1" width="19.3" x="12" y="12"></rect>
+<path d="m9.6 18.7 3.2-7 3.1 7M10.8 16h4"></path>
+<path d="M13 9.6v3M11.5 11.1h3"></path>
+<path d="M18.2 20.1h8.2M22.3 17.8v8.1M19.8 22.1c1.3 1.5 3.1 2.6 5.3 3.2M25.5 20.2c-.9 2.5-2.7 4.5-5.2 5.7"></path>
+</g>
+</svg></span>
+<span aria-hidden="true" class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" hidden="">시</span>
+<span class="card-title">문서 번역</span>
+</span>
+<span class="card-desc">다국어 문서를 자연스럽게 번역</span>
+</button>
+<button class="action-card" type="button">
+<span class="card-head">
+<span aria-hidden="true" class="app-icon excel card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent"><svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+<rect fill="#17A85B" height="27" rx="7.2" width="27" x="4.5" y="4.5"></rect>
+<path d="m11.8 10.8 12.4 14.4M24.2 10.8 11.8 25.2" fill="none" stroke="#fff" stroke-linecap="round" stroke-width="4.4"></path>
+</svg></span>
+<span aria-hidden="true" class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" hidden="">보</span>
+<span class="card-title">엑셀 분석</span>
+</span>
+<span class="card-desc">데이터 분석 및 시각화, 인사이트 도출</span>
+</button>
+<button class="action-card" type="button">
+<span class="card-head">
+<span aria-hidden="true" class="app-icon file card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent"><svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+<rect fill="#F20D18" height="27" rx="7.2" width="27" x="4.5" y="4.5"></rect>
+<path d="M18.2 9.4c-.5 4.5-1.8 9.1-4.1 13.2-2.7 4.8-5.5 7.3-7 6.6-1.1-.5-.5-2.7 1.5-4.1 2.8-2 7.7-2.8 12.1-2.8 4.5 0 7.6.8 8.2 2.2.5 1.2-1.1 2-2.6 1.5-3.5-1.1-7.3-5.3-9.1-9.1-1.7-3.6-1.8-6.9-.5-7.8.6-.4 1.2-.2 1.5.3Z" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.95"></path>
+</svg></span>
+<span aria-hidden="true" class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" hidden="">휴</span>
+<span class="card-title">PDF 분석</span>
+</span>
+<span class="card-desc">파일을 업로드하고 질문하기</span>
+</button>
+<button aria-disabled="true" class="action-card is-disabled" disabled="" title="PPT 생성 기능은 현재 준비 중입니다." type="button">
+<span aria-hidden="true" class="card-status">준비 중</span>
+<span class="card-head">
+<span aria-hidden="true" class="app-icon report card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent"><svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+<rect fill="#DCCDBD" height="27" rx="7.2" width="27" x="4.5" y="4.5"></rect>
+<rect fill="#fff" height="16" rx="1.8" width="17.4" x="9.3" y="10"></rect>
+<path d="M13 14.3v7.4M16.4 14.3v7.4M19.8 14.3v7.4M23.2 14.3v7.4" stroke="#D9C6B2" stroke-linecap="round" stroke-width="1.8"></path>
+</svg></span>
+<span aria-hidden="true" class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" hidden="">신</span>
+<span class="card-title">PPT 생성</span>
+</span>
+<span class="card-desc">보고서 구조화 및 핵심 내용 정리</span>
+</button>
+</section>
 
           <section class="lower-grid" aria-label="최근 작업과 사용 가이드" hidden>
             <article class="panel">
