@@ -2269,3 +2269,49 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   }
 }
 
+/* v107: final visual refinement for the shared quick-action rail.
+   Lighter shell + slightly stronger icons. Both Agent and Knowledge use the same tone. */
+.action-grid {
+  background: rgba(255, 255, 255, 0.34);
+  border-color: rgba(197, 210, 227, 0.38);
+  box-shadow: 0 6px 20px rgba(54, 72, 105, 0.035);
+}
+
+.action-card .card-mode-icon-agent {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+}
+
+.action-card .card-mode-icon-agent > svg,
+.action-card .card-mode-icon-agent .quick-action-svg {
+  width: 34px;
+  height: 34px;
+}
+
+.action-card .card-mode-icon-knowledge {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+}
+
+@media (max-width: 1024px) {
+  .action-card .card-mode-icon-agent {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+
+  .action-card .card-mode-icon-agent > svg,
+  .action-card .card-mode-icon-agent .quick-action-svg {
+    width: 32px;
+    height: 32px;
+  }
+
+  .action-card .card-mode-icon-knowledge {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+  }
+}
+
