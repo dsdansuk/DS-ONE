@@ -755,12 +755,16 @@
       margin: 0;
       box-sizing: border-box;
       color: #667085;
-      font-size: clamp(12px, 1.3dvh, 14px);
-      line-height: 1.48;
+      /* Compact supporting copy: keep Korean words intact, but do not
+         rebalance lines artificially. `pretty` can move a word down even
+         when the previous line still has usable room inside narrow cards. */
+      font-size: clamp(12px, 1.2dvh, 13px);
+      line-height: 1.44;
+      letter-spacing: -0.012em;
       white-space: normal;
       word-break: keep-all;
       overflow-wrap: break-word;
-      text-wrap: pretty;
+      text-wrap: wrap;
     }
 
     .arrow {
@@ -1501,7 +1505,7 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
      Narrow layouts use the full primary width; laptop/monitor breakpoints trim only
      a small total amount so the row stays visually secondary without looking tiny. */
   --action-grid-inline-trim: 0px;
-  --action-card-padding: 15px;
+  --action-card-padding: 14px 13px;
   width: 100%;
   margin-inline: auto;
 }
@@ -1615,7 +1619,7 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
     --home-primary-width: min(100%, clamp(960px, 78%, 1020px));
     --action-grid-inline-trim: clamp(32px, 3vw, 50px);
     --action-card-height: clamp(100px, 11.8dvh, 118px);
-    --action-card-padding: 15px;
+    --action-card-padding: 14px 13px;
   }
 
   .hero {
@@ -1645,7 +1649,7 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
     --home-primary-width: min(100%, clamp(1120px, 74%, 1180px));
     --action-grid-inline-trim: clamp(48px, 3vw, 56px);
     --action-card-height: clamp(110px, 11.7dvh, 120px);
-    --action-card-padding: 15px;
+    --action-card-padding: 14px 13px;
   }
 
   .hero {
