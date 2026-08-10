@@ -1855,3 +1855,207 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
     height: 32px;
   }
 }
+
+/* v104: lightweight borderless quick-action menu
+   Keep six actions on one row for normal notebook/desktop widths.
+   The large visible cards are removed; the full invisible hit area remains.
+   Hover/focus reveals only a subtle enterprise tile, avoiding tooltip fatigue. */
+.home-fit {
+  --action-card-height: clamp(70px, 7.6dvh, 78px);
+}
+
+.action-grid {
+  width: fit-content;
+  max-width: min(100%, 900px);
+  margin-inline: auto;
+  grid-template-columns: repeat(6, minmax(110px, 126px));
+  justify-content: center;
+  align-items: stretch;
+  gap: clamp(10px, 1.05vw, 18px);
+}
+
+.action-card {
+  width: 100%;
+  height: var(--action-card-height);
+  min-height: 0;
+  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  box-shadow: none;
+  transform: none;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.action-card:hover {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(122, 148, 188, 0.20);
+  box-shadow: 0 7px 18px rgba(37, 48, 77, 0.045);
+  transform: translateY(-1px);
+}
+
+.action-card:disabled,
+.action-card.is-disabled,
+.action-card:disabled:hover,
+.action-card.is-disabled:hover {
+  cursor: not-allowed;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.card-head {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.card-title {
+  max-width: 100%;
+  color: #202838;
+  font-size: clamp(13.5px, 1.35dvh, 15px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.card-desc {
+  display: none !important;
+}
+
+.action-card .card-mode-icon-agent {
+  width: 31px;
+  height: 31px;
+  flex: 0 0 31px;
+  display: grid;
+  place-items: center;
+}
+
+.action-card .card-mode-icon-agent > svg,
+.action-card .card-mode-icon-agent .quick-action-svg {
+  width: 31px;
+  height: 31px;
+}
+
+.action-card .card-mode-icon-knowledge {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 8px;
+}
+
+.card-status {
+  top: 2px;
+  right: 5px;
+  padding: 2px 6px;
+  font-size: 9px;
+  line-height: 1.2;
+  background: rgba(237, 240, 244, 0.92);
+}
+
+.action-card:disabled .card-title,
+.action-card.is-disabled .card-title {
+  color: #8a929e;
+}
+
+.action-card:disabled .card-mode-icon-agent,
+.action-card.is-disabled .card-mode-icon-agent,
+.action-card:disabled .card-mode-icon-knowledge,
+.action-card.is-disabled .card-mode-icon-knowledge {
+  opacity: 0.52;
+}
+
+/* Normal notebook/desktop: keep all six quick actions on one line.
+   This intentionally overrides the older 1180px 3-column rule. */
+@media (min-width: 901px) {
+  .action-grid {
+    grid-template-columns: repeat(6, minmax(110px, 126px));
+  }
+}
+
+@media (min-width: 1600px) and (min-height: 760px) {
+  .home-fit {
+    --action-card-height: clamp(72px, 7.4dvh, 80px);
+  }
+
+  .action-grid {
+    max-width: 920px;
+    grid-template-columns: repeat(6, minmax(116px, 128px));
+    gap: clamp(12px, 1vw, 20px);
+  }
+
+  .action-card .card-mode-icon-agent {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+
+  .action-card .card-mode-icon-agent > svg,
+  .action-card .card-mode-icon-agent .quick-action-svg {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* Split-window / compact layouts only: wrap into fewer columns. */
+@media (max-width: 900px) {
+  .action-grid {
+    width: min(100%, 620px);
+    max-width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+@media (max-width: 620px) {
+  .action-grid {
+    width: min(100%, 420px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .action-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 770px) and (min-width: 901px) {
+  .home-fit {
+    --action-card-height: 68px;
+  }
+
+  .action-grid {
+    gap: 10px;
+  }
+
+  .action-card .card-mode-icon-agent {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+  }
+
+  .action-card .card-mode-icon-agent > svg,
+  .action-card .card-mode-icon-agent .quick-action-svg {
+    width: 28px;
+    height: 28px;
+  }
+}
+
