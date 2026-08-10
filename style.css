@@ -96,9 +96,6 @@
       display: block;
       object-fit: contain;
       flex: 0 0 30px;
-      /* Keep the existing 16px brand rhythm for the divider/switcher,
-         but tighten only the logo -> DS ONE spacing to 6px. */
-      margin-right: -10px;
     }
 
     .brand-mark {
@@ -593,8 +590,9 @@
       min-width: 0;
       min-height: clamp(96px, 11.4dvh, 116px);
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       align-content: center;
-      justify-content: start;
+      justify-content: stretch;
       gap: clamp(7px, 0.8dvh, 10px);
       padding: 16px;
       color: inherit;
@@ -665,6 +663,9 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
     }
 
     .app-icon {
@@ -734,12 +735,19 @@
     }
 
     .card-desc {
+      display: block;
+      width: 100%;
+      min-width: 0;
       min-height: 32px;
       margin: 0;
+      box-sizing: border-box;
       color: #4f596a;
       font-size: clamp(12px, 1.3dvh, 14px);
       line-height: 1.48;
+      white-space: normal;
       word-break: keep-all;
+      overflow-wrap: break-word;
+      text-wrap: pretty;
     }
 
     .arrow {
@@ -1253,9 +1261,6 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   stroke: currentColor;
   stroke-width: 2.2;
   fill: none;
-  /* Laptop-width visual tuning: pull the chevron slightly toward the label. */
-  margin-left: -2px;
-  margin-right: 2px;
   transition: transform 160ms ease;
 }
 
