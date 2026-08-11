@@ -8,21 +8,21 @@
   --qa-ink-strong: #0b1d3f;
   --qa-muted: #536078;
   --qa-rail-bg: rgba(255, 255, 255, 0.64);
-  --qa-rail-border: rgba(174, 190, 212, 0.58);
-  --qa-divider: rgba(142, 158, 181, 0.26);
+  --qa-rail-border: rgba(174, 190, 212, 0.54);
+  --qa-divider: rgba(142, 158, 181, 0.19);
   --qa-hover-bg: rgba(239, 245, 255, 0.78);
   --qa-focus: rgba(47, 111, 237, 0.34);
 }
 
 .prompt-card {
-  margin-bottom: clamp(18px, 2.4dvh, 24px);
+  margin-bottom: clamp(13px, 1.8dvh, 18px);
 }
 
 .action-grid {
   width: min(760px, calc(100% - 36px));
   max-width: 760px;
   margin: 0 auto clamp(18px, 2.6dvh, 28px);
-  padding: 10px 12px;
+  padding: 8px 12px;
   display: flex;
   flex-wrap: nowrap;
   align-items: stretch;
@@ -41,7 +41,7 @@
   width: auto;
   min-width: 0;
   max-width: none;
-  height: clamp(70px, 7.2dvh, 78px);
+  height: clamp(66px, 6.8dvh, 74px);
   min-height: 0;
   padding: 8px 10px;
   display: flex;
@@ -68,7 +68,7 @@
   left: -1px;
   top: 50%;
   width: 1px;
-  height: 40px;
+  height: 34px;
   transform: translateY(-50%);
   background: var(--qa-divider);
   pointer-events: none;
@@ -112,7 +112,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 6px;
 }
 
 .card-title {
@@ -159,12 +159,16 @@
 }
 
 .action-card .app-icon.summary {
-  --qa-icon-scale: 1.06;
+  --qa-icon-scale: 1.08;
+}
+
+.action-card .app-icon.doc {
+  --qa-icon-scale: 0.97;
 }
 
 .action-card .app-icon.file {
-  --qa-icon-scale: 1.12;
-  --qa-icon-shift-x: 0.2px;
+  --qa-icon-scale: 1.1;
+  --qa-icon-shift-x: 0.1px;
 }
 
 .action-card .card-mode-icon-knowledge {
@@ -250,11 +254,11 @@
   .action-grid {
     width: min(780px, calc(100% - 48px));
     max-width: 780px;
-    padding-inline: 14px;
+    padding: 8px 14px;
   }
 
   .action-card {
-    height: clamp(72px, 7.1dvh, 80px);
+    height: clamp(68px, 6.8dvh, 76px);
   }
 
   .action-card .card-mode-icon-agent,
@@ -279,7 +283,7 @@
   }
 
   .action-card + .action-card::before {
-    height: 36px;
+    height: 32px;
   }
 
   .action-card .card-mode-icon-agent,
