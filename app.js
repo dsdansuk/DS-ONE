@@ -36,6 +36,8 @@
   const REMOTE_SESSION_LIST_LIMIT = Math.max(MAX_RECENT_WORK, 20);
   const RPA_TASK = "rpa_run";
   const RPA_ACCESS_REFRESH_MS = 3 * 60 * 1000;
+  const RPA_ACCESS_CACHE_KEY = STORAGE.rpaAccessCacheKey || "ds_one_rpa_access_cache_v1";
+  const RPA_ACCESS_CACHE_TTL_MS = Number(STORAGE.rpaAccessCacheTtlMs || 6 * 60 * 60 * 1000);
 
   const ALLOWED_EXTENSIONS = (FILE_POLICY.allowedExtensions || ["txt", "md", "csv", "json", "docx", "xlsx", "pdf"])
     .map((value) => String(value || "").toLowerCase().replace(/^\./, ""))
@@ -69,6 +71,7 @@
   let sessionRefreshPromise = null;
   let rpaAccessPromise = null;
   let rpaPanelRefreshTimer = 0;
+  let rpaWorkspaceSeq = 0;
   const CHAT_SEARCH_DEBOUNCE_MS = 420;
   const rpaAccessState = {
     checked: false,
@@ -162,6 +165,7 @@
     } else {
       restoreCachedIdentity();
     }
+    hydrateRpaAccessCache();
 
     if (isEmbeddedInIframe()) {
       showIframeLauncher(tokenProfile || getCachedIdentity());
@@ -175,13 +179,14 @@
     createRuntimeAgentWorkspace();
     initializeFeatureSwitcher();
     bindUiEvents();
+    void refreshRpaAccess({ force: true, silent: true });
     migrateLegacyRecentWorkByFeature();
     migrateAnonymousRecentWorkToCurrentUser();
     renderRecentWorkList();
     authBootstrapPromise = bootstrapProfile();
     authBootstrapPromise.finally(() => {
       scheduleRemoteRecentRefresh(120);
-      void refreshRpaAccess({ silent: true });
+      void refreshRpaAccess({ force: true, silent: true });
     });
     normalizeHomeComposerLayout();
     resizeTextarea(state.agentMessageInput);
@@ -1505,6 +1510,59 @@
     if (!rpaAccessState.authorized) item.setAttribute("aria-checked", "false");
   }
 
+  function getRpaAccessIdentityKey() {
+    const empNo = String(currentEmpNo || "").trim();
+    const loginId = String(currentLoginId || "").trim();
+    if (!empNo && !loginId) return "";
+    return `emp:${empNo}|login:${loginId}`;
+  }
+
+  function hydrateRpaAccessCache() {
+    const identityKey = getRpaAccessIdentityKey();
+    if (!identityKey) return;
+    try {
+      const raw = localStorage.getItem(RPA_ACCESS_CACHE_KEY);
+      if (!raw) return;
+      const cached = JSON.parse(raw);
+      const savedAt = Number(cached.savedAt || 0);
+      if (cached.identityKey !== identityKey || Date.now() - savedAt > RPA_ACCESS_CACHE_TTL_MS) {
+        localStorage.removeItem(RPA_ACCESS_CACHE_KEY);
+        return;
+      }
+      if (cached.authorized !== true) return;
+      rpaAccessState.authorized = true;
+      rpaAccessState.error = "";
+      syncRpaMenuVisibility();
+    } catch {}
+  }
+
+  function persistRpaAccessCache() {
+    const identityKey = getRpaAccessIdentityKey();
+    if (!identityKey) return;
+    try {
+      if (!rpaAccessState.authorized) {
+        localStorage.removeItem(RPA_ACCESS_CACHE_KEY);
+        return;
+      }
+      localStorage.setItem(RPA_ACCESS_CACHE_KEY, JSON.stringify({
+        identityKey,
+        authorized: true,
+        savedAt: Date.now(),
+      }));
+    } catch {}
+  }
+
+  function cancelRpaWorkspace() {
+    rpaWorkspaceSeq += 1;
+    window.clearTimeout(rpaPanelRefreshTimer);
+    rpaPanelRefreshTimer = 0;
+  }
+
+  function isCurrentRpaWorkspace(seq) {
+    if (seq && seq !== rpaWorkspaceSeq) return false;
+    return rpaProductActive && currentTask === RPA_TASK && currentMode === "doc";
+  }
+
   function setRpaProductModeActive(active) {
     rpaProductActive = active === true;
     const item = state.rpaMenuButton || ensureRpaMenuItem();
@@ -1577,10 +1635,13 @@
   function applyFeatureMode(mode, options = {}) {
     const nextMode = normalizeFeatureMode(mode);
     const prevMode = currentFeature;
+    const wasRpaWorkspace = rpaProductActive || currentTask === RPA_TASK;
+    if (wasRpaWorkspace) cancelRpaWorkspace();
     if (rpaProductActive) setRpaProductModeActive(false);
     currentFeature = nextMode;
     const featureChanged = prevMode !== nextMode;
-    if (featureChanged) {
+    const shouldResetWorkspace = featureChanged || wasRpaWorkspace;
+    if (shouldResetWorkspace) {
       currentTask = "";
       setFileInputAcceptForTask("");
     }
@@ -1603,12 +1664,12 @@
       renderFileChips();
       if (!options.silent) showToast("사내 지식 문의는 첨부 파일 없이 지식베이스 기준으로 답변합니다.");
     }
-    if (featureChanged && options.resetConversation !== false) {
+    if (shouldResetWorkspace && options.resetConversation !== false) {
       resetConversationForFeatureSwitch();
-    } else if (featureChanged) {
+    } else if (shouldResetWorkspace) {
       renderRecentWorkList();
     }
-    if (!options.silent && featureChanged) {
+    if (!options.silent && shouldResetWorkspace) {
       showToast(`${profile.label} 모드로 전환했습니다.`);
     }
   }
@@ -2008,6 +2069,11 @@
   }
 
   function setMode(mode) {
+    if (mode !== "doc" && (rpaProductActive || currentTask === RPA_TASK)) {
+      cancelRpaWorkspace();
+      setRpaProductModeActive(false);
+      currentTask = "";
+    }
     currentMode = mode;
     const isDocMode = mode === "doc";
 
@@ -2068,6 +2134,8 @@
 
   function startNewConversation(options = {}) {
     const { showToast: shouldShowToast = false } = options || {};
+    cancelRpaWorkspace();
+    setRpaProductModeActive(false);
     closeRecentContextMenu();
     activeConversationId = "";
     activeConversationHighlightQuery = "";
@@ -2355,12 +2423,14 @@
         rpaAccessState.checked = true;
         rpaAccessState.error = "";
         rpaAccessState.lastLoadedAt = Date.now();
+        persistRpaAccessCache();
       } catch (error) {
         rpaAccessState.releases = [];
         rpaAccessState.jobs = [];
         rpaAccessState.authorized = false;
         rpaAccessState.checked = true;
         rpaAccessState.error = getErrorMessage(error);
+        persistRpaAccessCache();
         if (!options.silent) showToast("RPA 권한 또는 목록을 확인하지 못했습니다.");
       } finally {
         rpaAccessState.loading = false;
@@ -2443,17 +2513,22 @@
   }
 
   async function openRpaWorkspace() {
+    const workspaceSeq = ++rpaWorkspaceSeq;
+    setRpaProductModeActive(true);
+    currentTask = RPA_TASK;
     selectedFiles = [];
     renderFileChips();
     clearMessages();
     addMessage("user", "RPA 실행");
     setMode("doc");
-    renderRpaPanel({ loading: true });
+    renderRpaPanel({ loading: true, workspaceSeq });
     await refreshRpaAccess({ force: true, silent: false });
-    renderRpaPanel();
+    if (!isCurrentRpaWorkspace(workspaceSeq)) return;
+    renderRpaPanel({ workspaceSeq });
   }
 
   function renderRpaPanel(options = {}) {
+    if (!isCurrentRpaWorkspace(options.workspaceSeq)) return;
     if (!state.agentBody) return;
     state.agentBody.querySelector("[data-rpa-panel-row]")?.remove();
 
@@ -2591,13 +2666,18 @@
   }
 
   async function handleRpaPanelRefresh(button) {
+    const workspaceSeq = rpaWorkspaceSeq;
+    if (!isCurrentRpaWorkspace(workspaceSeq)) return;
     if (button) button.disabled = true;
-    renderRpaPanel({ loading: true });
+    renderRpaPanel({ loading: true, workspaceSeq });
     await refreshRpaAccess({ force: true, silent: false });
-    renderRpaPanel();
+    if (!isCurrentRpaWorkspace(workspaceSeq)) return;
+    renderRpaPanel({ workspaceSeq });
   }
 
   async function handleRpaRun(button) {
+    const workspaceSeq = rpaWorkspaceSeq;
+    if (!isCurrentRpaWorkspace(workspaceSeq)) return;
     const releaseKey = String(button?.dataset?.rpaReleaseKey || "").trim();
     const folderId = String(button?.dataset?.rpaFolderId || "").trim();
     if (!releaseKey || !folderId) {
@@ -2611,14 +2691,15 @@
       rpaAccessState.jobs = normalizeRpaJobs(data.jobs);
       rpaAccessState.lastLoadedAt = Date.now();
       showToast("RPA 실행 요청이 접수되었습니다.");
-      renderRpaPanel({ notice: "RPA 실행 요청이 접수되었습니다. 진행 상태는 새로고침으로 확인할 수 있습니다." });
+      if (!isCurrentRpaWorkspace(workspaceSeq)) return;
+      renderRpaPanel({ notice: "RPA 실행 요청이 접수되었습니다. 진행 상태는 새로고침으로 확인할 수 있습니다.", workspaceSeq });
       window.clearTimeout(rpaPanelRefreshTimer);
       rpaPanelRefreshTimer = window.setTimeout(() => {
-        void handleRpaPanelRefresh();
+        if (isCurrentRpaWorkspace(workspaceSeq)) void handleRpaPanelRefresh();
       }, 2500);
     } catch (error) {
       showToast("RPA 실행 요청에 실패했습니다.");
-      renderRpaPanel({ error: getErrorMessage(error) });
+      if (isCurrentRpaWorkspace(workspaceSeq)) renderRpaPanel({ error: getErrorMessage(error), workspaceSeq });
     }
   }
 
@@ -4453,6 +4534,7 @@
         currentLoginId = data.loginId || data.login_id || currentLoginId;
         currentEmpNo = data.empNo || data.emp_no || data.rpaAuthEmpNo || currentEmpNo;
         persistLastIdentity(data);
+        hydrateRpaAccessCache();
         migrateAnonymousRecentWorkToCurrentUser();
         applyHeaderProfile(data);
         renderRecentWorkList();
