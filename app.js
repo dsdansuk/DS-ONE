@@ -1416,9 +1416,15 @@
         card.hidden = true;
         card.disabled = true;
         card.dataset.featureDisabled = "true";
+        card.dataset.recommended = "false";
+        card.classList.remove("is-selected");
+        card.removeAttribute("aria-label");
+        card.removeAttribute("aria-pressed");
         return;
       }
       const isDisabled = item.disabled === true;
+      const plainDesc = getPlainCardDescription(item.desc);
+      const selected = Boolean(currentTask && item.task && currentTask === item.task);
       card.hidden = false;
       card.disabled = isDisabled;
       card.dataset.featureDisabled = isDisabled ? "true" : "false";
@@ -1426,9 +1432,15 @@
       card.dataset.featureTemplate = item.template || "";
       card.dataset.featureAttach = item.attach ? "true" : "false";
       card.dataset.featureMode = currentFeature;
+      card.dataset.recommended = !isDisabled && index === 0 ? "true" : "false";
       card.classList.toggle("is-disabled", isDisabled);
+      card.classList.toggle("is-selected", selected);
       card.setAttribute("aria-disabled", isDisabled ? "true" : "false");
-      card.title = isDisabled ? (item.disabledReason || `${item.title || "해당"} 기능은 현재 준비 중입니다.`) : "";
+      card.setAttribute("aria-pressed", selected ? "true" : "false");
+      card.setAttribute("aria-label", buildActionCardLabel(item, plainDesc));
+      card.title = isDisabled
+        ? (item.disabledReason || `${item.title || "해당"} 기능은 현재 준비 중입니다.`)
+        : [item.title, plainDesc].filter(Boolean).join(" - ");
       const title = card.querySelector(".card-title");
       const desc = card.querySelector(".card-desc");
       let status = card.querySelector(".card-status");
@@ -1444,6 +1456,37 @@
       if (title) title.textContent = item.title || "업무 요청";
       if (desc) desc.innerHTML = item.desc || "";
     });
+    syncActionGridSelectionState(cards);
+  }
+
+  function getPlainCardDescription(value) {
+    const node = document.createElement("span");
+    node.innerHTML = String(value || "").replace(/<br\s*\/?>/gi, " ");
+    return (node.textContent || "").replace(/\s+/g, " ").trim();
+  }
+
+  function buildActionCardLabel(item, plainDesc) {
+    const actionHint = item.attach
+      ? "파일 선택창을 열고 분석 요청 양식을 입력합니다."
+      : "입력창에 요청 양식을 입력합니다.";
+    return [item.title || "업무 요청", plainDesc, actionHint].filter(Boolean).join(". ");
+  }
+
+  function setSelectedActionCard(selectedCard) {
+    const cards = state.actionCards && state.actionCards.length ? state.actionCards : Array.from(document.querySelectorAll(".action-card"));
+    state.actionCards = cards;
+    cards.forEach((card) => {
+      const selected = card === selectedCard;
+      card.classList.toggle("is-selected", selected);
+      card.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
+    syncActionGridSelectionState(cards);
+  }
+
+  function syncActionGridSelectionState(cards = []) {
+    const grid = document.querySelector(".action-grid");
+    if (!grid) return;
+    grid.classList.toggle("has-selection", cards.some((card) => card.classList.contains("is-selected")));
   }
 
   function syncActionCardIconVisibility(card, mode) {
@@ -1547,6 +1590,7 @@
           showToast("선택한 분석 기능에 맞지 않는 기존 첨부 파일을 제거했습니다.");
         }
         if (meta.template) setHomeInput(meta.template);
+        setSelectedActionCard(card);
         if (meta.attach) state.fileInput?.click();
       });
     });

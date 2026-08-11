@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DS ONE 업무 AI Agent 홈</title>
-  <link rel="stylesheet" href="style.css?v=20260810_v109_executive_monochrome_rail">
+  <link rel="stylesheet" href="style.css?v=20260811_v110_base">
+  <link rel="stylesheet" href="quick-actions.css?v=20260811_v110_production_rail">
 </head>
 <body>
   <svg class="sr-only" aria-hidden="true">
@@ -67,7 +68,18 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="brand" aria-label="DS ONE 업무 AI Agent">
-        <img src="./DS_ONE_logo.png" alt="" class="brand-logo"/>
+        <svg class="brand-logo brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="dsOneMarkGradient" x1="5" y1="6" x2="27" y2="26" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#5fb5ff"/>
+              <stop offset="0.55" stop-color="#2f6fed"/>
+              <stop offset="1" stop-color="#1b4ed8"/>
+            </linearGradient>
+          </defs>
+          <path fill="url(#dsOneMarkGradient)" d="M16 2.5 28 9.2v13.6l-12 6.7-12-6.7V9.2L16 2.5Z"/>
+          <path fill="#fff" d="M16 8.5 22.7 12v8L16 23.5 9.3 20v-8L16 8.5Z"/>
+          <path fill="#2f6fed" d="M16 11.4 20 13.5v5L16 20.6l-4-2.1v-5l4-2.1Z"/>
+        </svg>
         <div class="brand-name">DS ONE</div>
         <div class="brand-divider"></div>
         <div class="product-switch" id="productSwitch">
@@ -129,14 +141,6 @@
             <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
             <span>채팅 검색</span>
           </button>
-          <!-- <button class="menu-item" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-template"></use></svg>
-            <span>템플릿</span>
-          </button>
-          <button class="menu-item" type="button">
-            <img class="icon" src="./ai-tool.png">
-            <span>AI 도구</span>
-          </button> -->
         </nav>
 
         <section class="recent-work" aria-labelledby="recent-work-title">
@@ -502,6 +506,6 @@
     resizePromptTextarea();
     fitHomeToViewport();
   </script>
-  <script src="app.js?v=20260810_v107_no_pending_ui"></script>
+  <script src="app.js?v=20260811_v110_production_rail"></script>
 </body>
 </html>
