@@ -36,16 +36,6 @@
   const REMOTE_SESSION_LIST_LIMIT = Math.max(MAX_RECENT_WORK, 20);
   const RPA_TASK = "rpa_run";
   const RPA_ACCESS_REFRESH_MS = 3 * 60 * 1000;
-  const RPA_ACTION_ICON_SVG = `
-    <svg class="quick-action-svg executive-action-icon rpa-action-icon" aria-hidden="true" focusable="false" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-      <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15">
-        <rect x="5.5" y="6.2" width="21" height="19.6" rx="4"></rect>
-        <path d="M11 19.8h4.4l2.4-7.6 3.2 7.6h2"></path>
-        <circle cx="11" cy="19.8" r="1.8"></circle>
-        <circle cx="21" cy="19.8" r="1.8"></circle>
-        <path d="m18.2 10.7 3.2 1.9-3.2 1.9z"></path>
-      </g>
-    </svg>`;
 
   const ALLOWED_EXTENSIONS = (FILE_POLICY.allowedExtensions || ["txt", "md", "csv", "json", "docx", "xlsx", "pdf"])
     .map((value) => String(value || "").toLowerCase().replace(/^\./, ""))
@@ -63,6 +53,7 @@
   let currentEmpNo = "";
   let currentMode = "home";
   let currentFeature = "agent";
+  let rpaProductActive = false;
   let activeConversationId = "";
   let recentContextMenu = null;
   let recentRemoteRefreshTimer = 0;
@@ -116,6 +107,7 @@
     productModeIcon: null,
     productModeLabel: null,
     productModeMenu: null,
+    rpaMenuButton: null,
     heroTitle: null,
     heroSubtitle: null,
     promptCard: null,
@@ -158,17 +150,6 @@
         { iconClass: "knowledge", iconText: "휴", title: "복리후생", desc: "근태·휴가·복리후생 기준 확인", task: "knowledge_welfare", attach: false, template: "아래 근태, 휴가 또는 복리후생 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
       ],
     },
-  };
-
-  const RPA_ACTION_CARD = {
-    iconClass: "rpa-run",
-    iconText: "RPA",
-    iconSvg: RPA_ACTION_ICON_SVG,
-    title: "RPA 실행",
-    desc: "권한이 있는 자동화 업무 실행",
-    task: RPA_TASK,
-    attach: false,
-    template: "",
   };
 
   function init() {
@@ -1412,6 +1393,7 @@
     state.productModeIcon = document.getElementById("productModeIcon");
     state.productModeLabel = document.getElementById("productModeLabel");
     state.productModeMenu = document.getElementById("productModeMenu");
+    state.rpaMenuButton = document.querySelector("[data-rpa-menu-action]");
     state.heroTitle = document.querySelector("#home-title, .hero-title, .hero h1");
     state.heroSubtitle = document.querySelector(".hero-copy p, .hero-subtitle, .hero p");
     state.promptCard = document.querySelector(".prompt-card");
@@ -1492,6 +1474,57 @@
     applyFeatureMode(currentFeature, { persist: false, silent: true });
   }
 
+  function ensureRpaMenuItem(menu = state.productModeMenu) {
+    if (!menu) return null;
+    let item = menu.querySelector("[data-rpa-menu-action]");
+    if (item) return item;
+    item = document.createElement("button");
+    item.type = "button";
+    item.setAttribute("role", "menuitemradio");
+    item.setAttribute("aria-checked", "false");
+    item.setAttribute("data-rpa-menu-action", "true");
+    item.hidden = true;
+    item.innerHTML = `
+      <span class="product-mode-menu-icon product-mode-menu-icon-rpa" aria-hidden="true">
+        <svg class="icon" aria-hidden="true"><use href="#i-rpa-run"></use></svg>
+      </span>
+      <span class="product-mode-menu-copy">
+        <strong>RPA 실행</strong>
+        <span>권한 있는 자동화 업무 실행</span>
+      </span>`;
+    menu.appendChild(item);
+    return item;
+  }
+
+  function syncRpaMenuVisibility() {
+    const item = state.rpaMenuButton || ensureRpaMenuItem();
+    if (!item) return;
+    state.rpaMenuButton = item;
+    item.hidden = !rpaAccessState.authorized;
+    item.setAttribute("aria-disabled", rpaAccessState.authorized ? "false" : "true");
+    if (!rpaAccessState.authorized) item.setAttribute("aria-checked", "false");
+  }
+
+  function setRpaProductModeActive(active) {
+    rpaProductActive = active === true;
+    const item = state.rpaMenuButton || ensureRpaMenuItem();
+    if (item) item.setAttribute("aria-checked", rpaProductActive ? "true" : "false");
+    state.productModeMenu?.querySelectorAll("button[data-feature-mode]").forEach((button) => {
+      if (rpaProductActive) button.setAttribute("aria-checked", "false");
+    });
+    if (!rpaProductActive) return;
+    if (state.productModeLabel) state.productModeLabel.textContent = "RPA 실행";
+    if (state.productModeButton) state.productModeButton.setAttribute("aria-label", "RPA 실행 선택됨");
+    const icon = state.productModeIcon || document.getElementById("productModeIcon");
+    if (!icon) return;
+    state.productModeIcon = icon;
+    icon.classList.remove("product-mode-icon-agent", "product-mode-icon-knowledge", "product-mode-icon-rpa");
+    icon.classList.add("product-mode-icon-rpa");
+    icon.dataset.featureModeIcon = "rpa";
+    const use = icon.querySelector("use");
+    if (use) use.setAttribute("href", "#i-rpa-run");
+  }
+
   function bindFeatureSwitcherEvents() {
     const button = state.productModeButton || document.getElementById("productModeButton");
     const menu = state.productModeMenu || document.getElementById("productModeMenu");
@@ -1500,6 +1533,8 @@
     if (!state.productSwitch) state.productSwitch = document.getElementById("productSwitch");
     if (!state.productModeIcon) state.productModeIcon = document.getElementById("productModeIcon");
     if (!state.productModeLabel) state.productModeLabel = document.getElementById("productModeLabel");
+    if (!state.rpaMenuButton) state.rpaMenuButton = ensureRpaMenuItem(menu);
+    syncRpaMenuVisibility();
     if (!button || !menu || button.dataset.bound === "true") return;
     button.dataset.bound = "true";
     button.addEventListener("click", (event) => {
@@ -1508,15 +1543,28 @@
       const open = menu.hidden;
       menu.hidden = !open;
       button.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) void refreshRpaAccess({ silent: true });
     });
     menu.querySelectorAll("button[data-feature-mode]").forEach((item) => {
       item.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
+        setRpaProductModeActive(false);
         applyFeatureMode(item.getAttribute("data-feature-mode") || "agent", { persist: true });
         menu.hidden = true;
         button.setAttribute("aria-expanded", "false");
       });
+    });
+    state.rpaMenuButton?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!rpaAccessState.authorized) return;
+      menu.hidden = true;
+      button.setAttribute("aria-expanded", "false");
+      setRpaProductModeActive(true);
+      currentTask = RPA_TASK;
+      setFileInputAcceptForTask("");
+      void openRpaWorkspace();
     });
   }
 
@@ -1529,6 +1577,7 @@
   function applyFeatureMode(mode, options = {}) {
     const nextMode = normalizeFeatureMode(mode);
     const prevMode = currentFeature;
+    if (rpaProductActive) setRpaProductModeActive(false);
     currentFeature = nextMode;
     const featureChanged = prevMode !== nextMode;
     if (featureChanged) {
@@ -1569,7 +1618,7 @@
     if (!icon) return;
     state.productModeIcon = icon;
     const nextMode = normalizeFeatureMode(mode);
-    icon.classList.remove("product-mode-icon-agent", "product-mode-icon-knowledge");
+    icon.classList.remove("product-mode-icon-agent", "product-mode-icon-knowledge", "product-mode-icon-rpa");
     icon.classList.add(`product-mode-icon-${nextMode}`);
     icon.dataset.featureModeIcon = nextMode;
     const use = icon.querySelector("use");
@@ -1670,7 +1719,6 @@
 
   function getVisibleFeatureCards(profile) {
     const cards = Array.isArray(profile?.cards) ? [...profile.cards] : [];
-    if (currentFeature === "knowledge" && rpaAccessState.authorized) cards.push(RPA_ACTION_CARD);
     return cards;
   }
 
@@ -2317,6 +2365,7 @@
       } finally {
         rpaAccessState.loading = false;
         rpaAccessPromise = null;
+        syncRpaMenuVisibility();
         updateActionCardsForFeature();
       }
       return rpaAccessState;
