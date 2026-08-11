@@ -34,8 +34,20 @@
   const AUTO_TITLE_MAX_INITIAL_MESSAGES = 2;
   const REMOTE_SESSION_REFRESH_DEBOUNCE_MS = 700;
   const REMOTE_SESSION_LIST_LIMIT = Math.max(MAX_RECENT_WORK, 20);
+  const RPA_TASK = "rpa_run";
+  const RPA_ACCESS_REFRESH_MS = 3 * 60 * 1000;
+  const RPA_ACTION_ICON_SVG = `
+    <svg class="quick-action-svg executive-action-icon rpa-action-icon" aria-hidden="true" focusable="false" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+      <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15">
+        <rect x="5.5" y="6.2" width="21" height="19.6" rx="4"></rect>
+        <path d="M11 19.8h4.4l2.4-7.6 3.2 7.6h2"></path>
+        <circle cx="11" cy="19.8" r="1.8"></circle>
+        <circle cx="21" cy="19.8" r="1.8"></circle>
+        <path d="m18.2 10.7 3.2 1.9-3.2 1.9z"></path>
+      </g>
+    </svg>`;
 
-  const ALLOWED_EXTENSIONS = (FILE_POLICY.allowedExtensions || ["txt", "md", "csv", "json", "docx", "xlsx", "pptx", "pdf"])
+  const ALLOWED_EXTENSIONS = (FILE_POLICY.allowedExtensions || ["txt", "md", "csv", "json", "docx", "xlsx", "pdf"])
     .map((value) => String(value || "").toLowerCase().replace(/^\./, ""))
     .filter(Boolean);
   const BLOCKED_EXTENSIONS = new Set((FILE_POLICY.blockedExtensions || ["exe", "dll", "msi", "bat", "cmd", "com", "scr", "ps1", "vbs", "js", "mjs", "jar", "sh", "php", "asp", "aspx", "jsp", "html", "htm", "xml", "doc", "xls", "ppt", "docm", "xlsm", "pptm", "hwp", "hwpx", "zip", "7z", "rar", "tar", "gz"])
@@ -64,7 +76,18 @@
   let activeConversationHighlightQuery = "";
   let authBootstrapPromise = null;
   let sessionRefreshPromise = null;
+  let rpaAccessPromise = null;
+  let rpaPanelRefreshTimer = 0;
   const CHAT_SEARCH_DEBOUNCE_MS = 420;
+  const rpaAccessState = {
+    checked: false,
+    loading: false,
+    authorized: false,
+    releases: [],
+    jobs: [],
+    lastLoadedAt: 0,
+    error: "",
+  };
 
   const state = {
     homePanel: null,
@@ -137,6 +160,17 @@
     },
   };
 
+  const RPA_ACTION_CARD = {
+    iconClass: "rpa-run",
+    iconText: "RPA",
+    iconSvg: RPA_ACTION_ICON_SVG,
+    title: "RPA 실행",
+    desc: "권한이 있는 자동화 업무 실행",
+    task: RPA_TASK,
+    attach: false,
+    template: "",
+  };
+
   function init() {
     sessionToken = readSsoSessionToken();
     const tokenProfile = decodeSessionTokenPayload(sessionToken);
@@ -164,7 +198,10 @@
     migrateAnonymousRecentWorkToCurrentUser();
     renderRecentWorkList();
     authBootstrapPromise = bootstrapProfile();
-    authBootstrapPromise.finally(() => scheduleRemoteRecentRefresh(120));
+    authBootstrapPromise.finally(() => {
+      scheduleRemoteRecentRefresh(120);
+      void refreshRpaAccess({ silent: true });
+    });
     normalizeHomeComposerLayout();
     resizeTextarea(state.agentMessageInput);
   }
@@ -859,6 +896,178 @@
         color: #e11d48;
       }
 
+      .ds-rpa-avatar {
+        font-size: 9px;
+        letter-spacing: 0;
+      }
+      .ds-rpa-panel {
+        width: min(820px, 100%);
+        padding: 18px;
+        color: #172033;
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid rgba(184, 199, 220, 0.64);
+        border-radius: 16px;
+        box-shadow: 0 14px 34px rgba(44, 62, 95, 0.07);
+        backdrop-filter: blur(8px);
+      }
+      .ds-rpa-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+      .ds-rpa-head h2 {
+        margin: 0 0 4px;
+        font-size: 18px;
+        line-height: 1.35;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+      .ds-rpa-head p {
+        margin: 0;
+        color: #667085;
+        font-size: 13px;
+        line-height: 1.5;
+        font-weight: 650;
+      }
+      .ds-rpa-refresh,
+      .ds-rpa-run {
+        min-height: 34px;
+        padding: 0 13px;
+        border: 1px solid rgba(55, 88, 145, 0.22);
+        border-radius: 9px;
+        color: #10264f;
+        background: #fff;
+        font-size: 13px;
+        font-weight: 850;
+        letter-spacing: 0;
+        cursor: pointer;
+      }
+      .ds-rpa-refresh:hover,
+      .ds-rpa-run:hover {
+        border-color: rgba(47, 111, 237, 0.38);
+        background: #f3f7ff;
+      }
+      .ds-rpa-refresh:disabled,
+      .ds-rpa-run:disabled {
+        cursor: not-allowed;
+        color: #8792a4;
+        background: #f4f6f9;
+      }
+      .ds-rpa-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .ds-rpa-metric {
+        min-width: 0;
+        padding: 10px 12px;
+        border: 1px solid rgba(210, 219, 232, 0.82);
+        border-radius: 12px;
+        background: rgba(248, 251, 255, 0.86);
+      }
+      .ds-rpa-metric strong {
+        display: block;
+        color: #10264f;
+        font-size: 16px;
+        line-height: 1.2;
+        font-weight: 900;
+      }
+      .ds-rpa-metric span {
+        display: block;
+        margin-top: 3px;
+        color: #69758a;
+        font-size: 12px;
+        line-height: 1.35;
+        font-weight: 750;
+      }
+      .ds-rpa-list {
+        display: grid;
+        gap: 8px;
+      }
+      .ds-rpa-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 14px;
+        padding: 12px;
+        border: 1px solid rgba(210, 219, 232, 0.84);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.92);
+      }
+      .ds-rpa-item.is-active-job {
+        background: rgba(245, 248, 255, 0.94);
+      }
+      .ds-rpa-item-copy {
+        min-width: 0;
+        display: grid;
+        gap: 4px;
+      }
+      .ds-rpa-item-copy strong {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #172033;
+        font-size: 14px;
+        line-height: 1.35;
+        font-weight: 900;
+      }
+      .ds-rpa-item-copy span,
+      .ds-rpa-item-copy p {
+        margin: 0;
+        color: #69758a;
+        font-size: 12px;
+        line-height: 1.45;
+        font-weight: 650;
+      }
+      .ds-rpa-empty,
+      .ds-rpa-notice {
+        padding: 13px 14px;
+        color: #526071;
+        font-size: 13px;
+        line-height: 1.55;
+        font-weight: 750;
+        border: 1px dashed rgba(190, 203, 222, 0.88);
+        border-radius: 12px;
+        background: rgba(248, 251, 255, 0.78);
+      }
+      .ds-rpa-notice {
+        margin-bottom: 10px;
+        border-style: solid;
+      }
+      .ds-rpa-notice.is-success {
+        color: #17624d;
+        border-color: rgba(65, 180, 136, 0.3);
+        background: rgba(237, 250, 245, 0.82);
+      }
+      .ds-rpa-notice.is-error {
+        color: #a23b3b;
+        border-color: rgba(226, 112, 112, 0.32);
+        background: rgba(255, 245, 245, 0.86);
+      }
+      .action-card .app-icon.rpa-run {
+        display: grid;
+        place-items: center;
+        color: currentColor;
+        background: transparent;
+        box-shadow: none;
+      }
+      .action-card .app-icon.rpa-run > svg {
+        width: 29px;
+        height: 29px;
+        display: block;
+      }
+      @media (max-width: 720px) {
+        .ds-rpa-panel { padding: 14px; }
+        .ds-rpa-head { align-items: stretch; flex-direction: column; }
+        .ds-rpa-metrics { grid-template-columns: 1fr; }
+        .ds-rpa-item { grid-template-columns: 1fr; align-items: stretch; }
+        .ds-rpa-run { width: 100%; }
+      }
+
       .ds-toast {
         position: fixed;
         left: 50%;
@@ -1227,7 +1436,7 @@
       input.type = "file";
       input.multiple = true;
       input.hidden = true;
-      input.accept = ".txt,.md,.csv,.json,.docx,.xlsx,.pptx,.pdf";
+      input.accept = ".txt,.md,.csv,.json,.docx,.xlsx,.pdf";
       document.body.appendChild(input);
       state.fileInput = input;
     }
@@ -1407,11 +1616,11 @@
   }
 
   function updateActionCardsForFeature() {
-    const cards = state.actionCards && state.actionCards.length ? state.actionCards : Array.from(document.querySelectorAll(".action-card"));
-    state.actionCards = cards;
     const profile = getCurrentFeatureProfile();
+    const items = getVisibleFeatureCards(profile);
+    const cards = ensureActionCardCapacity(items.length);
     cards.forEach((card, index) => {
-      const item = profile.cards[index];
+      const item = items[index];
       if (!item) {
         card.hidden = true;
         card.disabled = true;
@@ -1453,9 +1662,65 @@
       status.textContent = item.disabledLabel || "준비 중";
       status.hidden = !isDisabled;
       syncActionCardIconVisibility(card, currentFeature);
+      syncActionCardVisual(card, item, currentFeature);
       if (title) title.textContent = item.title || "업무 요청";
       if (desc) desc.innerHTML = item.desc || "";
     });
+  }
+
+  function getVisibleFeatureCards(profile) {
+    const cards = Array.isArray(profile?.cards) ? [...profile.cards] : [];
+    if (currentFeature === "knowledge" && rpaAccessState.authorized) cards.push(RPA_ACTION_CARD);
+    return cards;
+  }
+
+  function ensureActionCardCapacity(requiredCount) {
+    const grid = document.querySelector(".action-grid");
+    let cards = state.actionCards && state.actionCards.length ? state.actionCards : Array.from(document.querySelectorAll(".action-card"));
+    if (!grid) {
+      state.actionCards = cards;
+      return cards;
+    }
+    while (cards.length < requiredCount) {
+      const source = cards[0];
+      const card = source ? source.cloneNode(true) : createActionCardElement();
+      card.hidden = true;
+      card.disabled = true;
+      card.classList.remove("is-selected", "is-disabled");
+      card.removeAttribute("aria-label");
+      card.removeAttribute("aria-pressed");
+      card.removeAttribute("title");
+      card.dataset.boundActionCard = "";
+      grid.appendChild(card);
+      bindActionCard(card);
+      cards.push(card);
+    }
+    state.actionCards = cards;
+    return cards;
+  }
+
+  function createActionCardElement() {
+    const card = document.createElement("button");
+    card.className = "action-card";
+    card.type = "button";
+    card.innerHTML = `
+      <span class="card-head">
+        <span aria-hidden="true" class="app-icon doc card-mode-icon card-mode-icon-agent" data-card-icon-mode="agent"></span>
+        <span aria-hidden="true" class="app-icon knowledge card-mode-icon card-mode-icon-knowledge" data-card-icon-mode="knowledge" hidden></span>
+        <span class="card-title"></span>
+      </span>
+      <span class="card-desc"></span>`;
+    return card;
+  }
+
+  function syncActionCardVisual(card, item, mode) {
+    if (mode !== "knowledge") return;
+    const icon = card.querySelector(".card-mode-icon-knowledge");
+    if (!icon) return;
+    icon.className = `app-icon ${item.iconClass || "knowledge"} card-mode-icon card-mode-icon-knowledge`;
+    icon.dataset.cardIconMode = "knowledge";
+    if (item.iconSvg) icon.innerHTML = item.iconSvg;
+    else icon.textContent = item.iconText || "";
   }
 
   function getPlainCardDescription(value) {
@@ -1465,6 +1730,9 @@
   }
 
   function buildActionCardLabel(item, plainDesc) {
+    if (item?.task === RPA_TASK) {
+      return [item.title || "RPA 실행", plainDesc, "권한이 있는 자동화 업무 목록을 열고 실행합니다."].filter(Boolean).join(". ");
+    }
     const actionHint = item.attach
       ? "파일 선택창을 열고 분석 요청 양식을 입력합니다."
       : "입력창에 요청 양식을 입력합니다.";
@@ -1552,6 +1820,33 @@
     return value.includes("knowledge") || value.includes("policy") || value.includes("procedure") || value.includes("kb") || value.includes("ai-api") || value.includes("sidetalk") || value.includes("사내");
   }
 
+  function bindActionCard(card) {
+    if (!card || card.dataset.boundActionCard === "true") return;
+    card.dataset.boundActionCard = "true";
+    card.addEventListener("click", () => handleActionCardClick(card));
+  }
+
+  function handleActionCardClick(card) {
+    if (card.disabled || card.dataset.featureDisabled === "true") return;
+    const meta = getCardTemplate(card);
+    currentTask = meta.task;
+    setFileInputAcceptForTask(currentTask);
+    if (currentTask === RPA_TASK) {
+      setSelectedActionCard(card);
+      void openRpaWorkspace();
+      return;
+    }
+    const incompatibleSelection = validateSelectedFileCombination();
+    if (incompatibleSelection && selectedFiles.length) {
+      selectedFiles = [];
+      renderFileChips();
+      showToast("?좏깮??遺꾩꽍 湲곕뒫??留욎? ?딅뒗 湲곗〈 泥⑤? ?뚯씪???쒓굅?덉뒿?덈떎.");
+    }
+    if (meta.template) setHomeInput(meta.template);
+    setSelectedActionCard(card);
+    if (meta.attach) state.fileInput?.click();
+  }
+
   function bindUiEvents() {
     bindFeatureSwitcherEvents();
     document.querySelectorAll(".menu-item").forEach((button) => {
@@ -1608,6 +1903,16 @@
     state.docBackBtn?.addEventListener("click", () => setMode("home"));
     state.agentNewChatBtn?.addEventListener("click", startNewConversation);
     state.agentBody?.addEventListener("click", (event) => {
+      const rpaRefresh = event.target.closest("[data-rpa-refresh]");
+      if (rpaRefresh) {
+        void handleRpaPanelRefresh(rpaRefresh);
+        return;
+      }
+      const rpaRun = event.target.closest("[data-rpa-release-key]");
+      if (rpaRun) {
+        void handleRpaRun(rpaRun);
+        return;
+      }
       const button = event.target.closest(".ds-agent-suggestion-btn");
       if (!button) return;
       setAgentInput(button.getAttribute("data-template") || "");
@@ -1651,7 +1956,6 @@
     if (title.includes("문서 번역")) return { task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" };
     if (title.includes("엑셀 분석")) return { task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요." };
     if (title.includes("PDF 분석")) return { task: "pdf_analysis", attach: true, template: "첨부한 PDF를 원문 근거와 페이지를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" };
-    if (title.includes("PPT 생성")) return { task: "report_summary", attach: false, template: "아래 내용을 보고용으로 정리해 주세요. 형식은 결론, 핵심 내용, 이슈/리스크, 다음 조치로 작성해 주세요.\n\n[정리할 내용]\n" };
     return { task: "", attach: false, template: "" };
   }
 
@@ -1857,8 +2161,6 @@
         ? await requestKnowledgeAnswer(userText, history)
         : selectedFiles.length
           ? await requestFileAnalysis(userText, history)
-          : isGroupwareApprovalDraftRequest(userText, task)
-            ? await requestGroupwareApprovalDraft(userText, history)
           : await requestAgentAnswer(userText, history);
       thinking.remove();
       const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
@@ -1963,730 +2265,6 @@
     return readApiResponse(res);
   }
 
-  function isGroupwareApprovalDraftRequest(message, task) {
-    if (currentFeature !== "agent" || selectedFiles.length) return false;
-    const text = String(message || "").replace(/\s+/g, " ").trim();
-    if (!text) return false;
-    const normalizedTask = normalizeTask(task);
-    const documentIntent = /(기안\s*품의서|기안품의서|품의서|기안서|전자결재|결재\s*문서|결재문서)/.test(text);
-    const writeIntent = /(작성|써줘|써\s*줘|생성|만들|초안|보관|저장|상신\s*준비|상신준비)/.test(text);
-    return documentIntent && (writeIntent || normalizedTask === "document_draft");
-  }
-
-  function buildGroupwareDraftPrompt(message) {
-    return [
-      message,
-      "",
-      "위 요청을 그룹웨어 기안품의서 본문으로 바로 상신 가능한 수준으로 작성해 주세요.",
-      "작성 품질 기준: 실제 유료 업무 솔루션 또는 전문 비서가 작성한 것처럼 문장이 자연스럽고, 검토 항목이 충분하며, 별도 수정 없이 내부 결재 문서로 사용할 수 있어야 합니다.",
-      "반드시 다음 흐름을 따르세요: 1. 기안 목적, 2. 내용, 3. 마지막 문단.",
-      "2. 내용에는 추진 배경, 세부 내용, 검토 내용, 예산 및 일정, 후속 조치가 자연스럽게 포함되어야 합니다.",
-      "노트북/비품/서비스/소프트웨어 구매 요청이면 품목, 수량, 사용 목적, 필요 사유, 예산, 납기, 첨부 예정 자료를 구분하세요.",
-      "클라우드 서버, 인프라, AWS/NCP/Azure 같은 사업자 비교 요청이면 사업자별 비교표, 평가 기준, 종합 검토 의견, 리스크 및 관리 방안, PoC/견적 검토 후속 조치를 포함하세요.",
-      "요청에 없는 금액, 수량, 업체명, 결재라인, 일정은 임의로 만들지 말고 '확인 필요'로 표시하세요.",
-      "표로 정리하면 더 명확한 내용은 표 형태로 구성하세요.",
-      "문단 사이에는 한 줄 공백이 들어가도록 작성하세요.",
-      "마지막은 반드시 '3. 마지막 문단'으로 끝내고, 마지막 문장 뒤에는 '-끝-' 표시와 첨부 예시 안내를 유지하세요.",
-      "사용자에게 설명하는 안내 문장, 마크다운 코드블록, 답변 제목은 제외하고 문서 본문만 작성하세요.",
-    ].join("\n");
-  }
-
-  function deriveGroupwareApprovalTitle(message) {
-    if (isCloudServerApprovalRequest(message)) return "클라우드 서버 도입 비교 검토 품의";
-
-    const cleaned = String(message || "")
-      .replace(/\[[\s\S]*?\]/g, " ")
-      .replace(/(기안\s*품의서|기안품의서|품의서|기안서|전자결재|결재\s*문서|결재문서)/g, " ")
-      .replace(/(작성해줘|작성해\s*줘|작성해\s*주세요|써줘|써\s*줘|생성해줘|만들어줘|보관해줘|저장해줘|해줘|해주세요)/g, " ")
-      .replace(/(에\s*대한|관련|대해서|으로|로)$/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    const base = cleaned || "업무 요청";
-    if (/노트북|laptop|랩톱/i.test(base) && /구매|구입|도입/.test(base)) return "노트북 구매 품의";
-    const title = /기안|품의/.test(base) ? base : `${base} 품의`;
-    return title.slice(0, 80);
-  }
-
-  const GROUPWARE_APPROVAL_P_STYLE = "color:rgb(0, 0, 0);line-height:1.5;font-family:맑은 고딕;font-size:10pt;margin-top:0px;margin-bottom:0px;";
-  const GROUPWARE_APPROVAL_SPAN_STYLE = "line-height:1.5;font-family:맑은 고딕;";
-  const GROUPWARE_TABLE_STYLE = "border-collapse:collapse;width:650px;margin:0 0 0 0;font-family:맑은 고딕;font-size:10pt;line-height:1.5;";
-  const GROUPWARE_TH_STYLE = "border:1px solid #666;background:#f2f5f8;padding:5px 7px;text-align:center;font-weight:bold;";
-  const GROUPWARE_TD_LABEL_STYLE = "border:1px solid #666;background:#fafafa;padding:5px 7px;text-align:center;width:120px;";
-  const GROUPWARE_TD_VALUE_STYLE = "border:1px solid #666;padding:5px 7px;text-align:left;";
-
-  function preserveGroupwareSpaces(value) {
-    return escapeHtml(value).replace(/\t/g, "    ").replace(/ {2,}/g, (spaces) => "&nbsp;".repeat(spaces.length));
-  }
-
-  function groupwareParagraph(text = "", options = {}) {
-    const indent = "&nbsp;".repeat(Number(options.indent || 0));
-    const bold = options.bold ? "font-weight:bold;" : "";
-    const body = text ? `${indent}${preserveGroupwareSpaces(text)}` : "&nbsp;";
-    return `<p style="${GROUPWARE_APPROVAL_P_STYLE}"><span style="${GROUPWARE_APPROVAL_SPAN_STYLE}${bold}">${body}</span></p>`;
-  }
-
-  function groupwareBlank(count = 1) {
-    return Array.from({ length: Math.max(1, Number(count) || 1) }, () => groupwareParagraph("")).join("");
-  }
-
-  function groupwarePushParagraph(blocks, text, options = {}) {
-    blocks.push(groupwareParagraph(text, options));
-    if (options.blankAfter === true) {
-      const blankLines = options.blankLines == null ? 1 : options.blankLines;
-      blocks.push(groupwareBlank(blankLines));
-    }
-  }
-
-  function groupwareSectionGap(blocks, count = 1) {
-    blocks.push(groupwareBlank(count));
-  }
-
-  function groupwareInfoTable(rows) {
-    const bodyRows = rows.map(([label, value]) => [
-      "<tr>",
-      `<td style="${GROUPWARE_TD_LABEL_STYLE}">${preserveGroupwareSpaces(label)}</td>`,
-      `<td style="${GROUPWARE_TD_VALUE_STYLE}">${preserveGroupwareSpaces(value)}</td>`,
-      "</tr>",
-    ].join(""));
-    return `<table style="${GROUPWARE_TABLE_STYLE}" cellspacing="0" cellpadding="0"><tbody>${bodyRows.join("")}</tbody></table>`;
-  }
-
-  function groupwareMatrixTable(headers, rows) {
-    const head = `<tr>${headers.map((header) => `<th style="${GROUPWARE_TH_STYLE}">${preserveGroupwareSpaces(header)}</th>`).join("")}</tr>`;
-    const body = rows.map((row) => `<tr>${row.map((value) => `<td style="${GROUPWARE_TD_VALUE_STYLE}">${preserveGroupwareSpaces(value)}</td>`).join("")}</tr>`);
-    return `<table style="${GROUPWARE_TABLE_STYLE}" cellspacing="0" cellpadding="0"><thead>${head}</thead><tbody>${body.join("")}</tbody></table>`;
-  }
-
-  function textToGroupwareBodyHtml(text) {
-    const lines = String(text || "")
-      .replace(/\r/g, "")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-    if (!lines.length) return groupwareParagraph("내용 확인 필요");
-    return lines.map((line) => groupwareParagraph(line)).join(groupwareBlank(1));
-  }
-
-  function buildGroupwareApprovalBodyHtml(message, draftText) {
-    const request = String(message || "").trim();
-    const context = inferApprovalContext(request);
-    if (context.category === "cloud_server") return buildCloudServerApprovalBodyHtml(context, draftText);
-
-    const reviewLines = extractUsefulDraftLines(draftText, context);
-    const blocks = [];
-
-    groupwarePushParagraph(blocks, "1. 기안 목적", { bold: true });
-    groupwarePushParagraph(blocks, `- ${buildApprovalPurpose(context)}`, { indent: 4 });
-    groupwareSectionGap(blocks);
-
-    groupwarePushParagraph(blocks, "2. 내용", { bold: true });
-    groupwarePushParagraph(blocks, "2.1 추진 배경 및 필요성", { indent: 4, bold: true });
-    for (const line of buildApprovalBackgroundLines(context)) {
-      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
-    }
-    groupwareSectionGap(blocks);
-
-    groupwarePushParagraph(blocks, "2.2 세부 내용", { indent: 4, bold: true });
-    blocks.push(groupwareInfoTable(buildApprovalDetailRows(context)));
-    groupwareSectionGap(blocks);
-
-    groupwarePushParagraph(blocks, "2.3 검토 내용", { indent: 4, bold: true });
-    for (const line of reviewLines) {
-      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
-    }
-    groupwareSectionGap(blocks);
-
-    groupwarePushParagraph(blocks, "2.4 예산 및 일정", { indent: 4, bold: true });
-    for (const line of buildBudgetScheduleLines(context)) {
-      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
-    }
-    groupwareSectionGap(blocks);
-
-    groupwarePushParagraph(blocks, "2.5 진행 조건 및 후속 조치", { indent: 4, bold: true });
-    for (const line of buildFollowUpLines(context)) {
-      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
-    }
-    groupwareSectionGap(blocks);
-
-    appendApprovalClosing(blocks, context);
-
-    return `<div data-ds-one-groupware-body="approval-v81">${blocks.join("")}</div>`;
-  }
-
-  function buildCloudServerApprovalBodyHtml(context, draftText) {
-    const providers = context.providers.length ? context.providers : ["AWS", "NCP", "MS Azure"];
-    const blocks = [];
-
-    groupwarePushParagraph(blocks, "1. 기안 목적", { bold: true });
-    groupwarePushParagraph(blocks, "- 사내 주요 업무 시스템의 안정적 운영과 향후 사용량 증가에 대응하기 위해 클라우드 서버 도입 필요성을 검토하고자 합니다.", { indent: 4 });
-    groupwarePushParagraph(blocks, `- 본 품의는 ${providers.join(", ")}를 동일 기준으로 비교하여 안정성, 보안성, 운영 편의성, 비용 효율성 및 확장성을 종합 검토한 뒤 최적의 도입 방향을 선정하기 위한 사전 승인 요청입니다.`, { indent: 4 });
-    groupwareSectionGap(blocks);
-
-    groupwarePushParagraph(blocks, "2. 내용", { bold: true });
-    groupwarePushParagraph(blocks, "2.1 추진 배경", { indent: 4, bold: true });
-    for (const line of [
-      "업무 시스템의 사용량 증가, 장애 대응 요구, 데이터 백업/복구 중요성이 높아지면서 인프라 운영 방식에 대한 재검토가 필요합니다.",
-      "클라우드 서버는 사용량에 따른 탄력적 확장, 신속한 자원 증설, 모니터링 및 백업 자동화, 보안 정책 표준화 측면에서 기존 방식 대비 운영 유연성을 확보할 수 있습니다.",
-      "다만 사업자별 비용 구조, 보안 기능, 국내 지원 체계, 운영 난이도와 연계 서비스 범위가 달라 동일 기준의 비교 검토 후 도입 여부를 결정해야 합니다.",
-    ]) {
-      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
-    }
-    groupwareSectionGap(blocks);
-
-    groupwarePushParagraph(blocks, "2.2 검토 대상 및 기준", { indent: 4, bold: true });
-    blocks.push(groupwareInfoTable([
-      ["검토 대상", providers.join(", ")],
-      ["검토 목적", "사내 업무 시스템 운영에 적합한 클라우드 서버 사업자 및 도입 방향 선정"],
-      ["주요 기준", "안정성, 보안/컴플라이언스, 국내 리전/지원, 비용 구조, 운영 편의성, 확장성"],
-      ["검토 범위", "서버 인스턴스, 네트워크, 스토리지, 백업, 모니터링, 접근 제어, 장애 대응 체계"],
-      ["확정 방식", "비교 검토 후 PoC 또는 상세 견적 검토를 거쳐 최종 사업자 선정"],
-    ]));
-    groupwareSectionGap(blocks);
-
-    groupwarePushParagraph(blocks, "2.3 평가 기준", { indent: 4, bold: true });
-    blocks.push(groupwareMatrixTable(
-      ["평가 항목", "검토 기준", "확인 필요 사항"],
-      [
-        ["안정성", "서비스 가용성, 장애 대응 체계, 백업/복구 기능", "SLA, 백업 주기, 복구 목표 시간"],
-        ["보안성", "계정 권한, 네트워크 통제, 로그 관리, 보안 인증", "MFA, 접근 제어, 감사 로그, 데이터 보호 정책"],
-        ["비용 효율성", "동일 사양 기준 월 사용료, 트래픽/스토리지 과금, 약정 할인", "월 예상 비용, 초기 구축비, 운영 관리비"],
-        ["운영 편의성", "관리 콘솔, 모니터링, 기술 지원, 국내 대응 체계", "운영 담당자 숙련도, 지원 채널, 장애 접수 방식"],
-        ["확장성", "서버 증설, 관리형 서비스 연계, 향후 시스템 확장 가능성", "추가 서비스 연동 계획, 이관 가능성"],
-      ],
-    ));
-    groupwareSectionGap(blocks);
-
-    groupwarePushParagraph(blocks, "2.4 사업자별 비교 검토", { indent: 4, bold: true });
-    blocks.push(groupwareMatrixTable(
-      ["구분", ...providers],
-      buildCloudProviderComparisonRows(providers),
-    ));
-    groupwareSectionGap(blocks);
-
-    groupwarePushParagraph(blocks, "2.5 종합 검토 의견", { indent: 4, bold: true });
-    for (const line of buildCloudReviewLines(providers)) {
-      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
-    }
-    groupwareSectionGap(blocks);
-
-    groupwarePushParagraph(blocks, "2.6 예산 및 일정", { indent: 4, bold: true });
-    for (const line of [
-      "예상 비용: 확인 필요. 최종 비용은 서버 사양, 스토리지 용량, 네트워크 사용량, 백업 보관 기간 및 운영 지원 범위 확정 후 산정 예정입니다.",
-      "비용 검토 방식: 동일 사양 기준 월 예상 비용, 초기 구축 비용, 운영/관리 비용, 약정 할인 여부를 비교하여 산출하겠습니다.",
-      "진행 일정: 1차 요구사항 정리 → 사업자별 견적 및 기술 검토 → 보안/운영 검토 → PoC 또는 최종 제안 비교 → 선정안 상신 순으로 진행 예정입니다.",
-      "예산 과목 및 집행 부서: 확인 필요.",
-    ]) {
-      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
-    }
-    groupwareSectionGap(blocks);
-
-    groupwarePushParagraph(blocks, "2.7 리스크 및 관리 방안", { indent: 4, bold: true });
-    blocks.push(groupwareMatrixTable(
-      ["리스크 항목", "검토 내용", "관리 방안"],
-      [
-        ["비용 증가", "트래픽, 스토리지, 백업 정책에 따라 월 비용이 변동될 수 있음", "예산 상한, 알림 기준, 리소스 사용량 모니터링 체계 설정"],
-        ["보안 및 접근 제어", "계정 권한, 외부 접속, 데이터 보호 정책 미흡 시 보안 리스크 발생", "MFA, 최소 권한, 접속 로그, 네트워크 보안 그룹 기준 수립"],
-        ["운영 종속성", "특정 사업자 서비스에 의존할 경우 이전/확장 시 제약 발생 가능", "표준 아키텍처, 백업/이관 계획, 계약 조건 사전 검토"],
-        ["장애 대응", "서비스 장애 또는 구성 오류 시 업무 시스템 영향 가능", "백업, 스냅샷, 모니터링, 장애 대응 연락 체계 마련"],
-      ],
-    ));
-    groupwareSectionGap(blocks);
-
-    groupwarePushParagraph(blocks, "2.8 요청 사항", { indent: 4, bold: true });
-    for (const line of [
-      "상기 비교 검토 기준에 따라 클라우드 서버 도입 검토를 진행할 수 있도록 승인 요청드립니다.",
-      "승인 후 각 사업자별 동일 기준 견적, 보안 검토 자료, 운영 구성안을 확보하여 최종 선정안을 별도 보고하겠습니다.",
-    ]) {
-      groupwarePushParagraph(blocks, `- ${line}`, { indent: 8 });
-    }
-    groupwareSectionGap(blocks);
-
-    appendApprovalClosing(blocks, { ...context, subject: "클라우드 서버 도입 비교 검토" });
-    return `<div data-ds-one-groupware-body="approval-v81" data-ds-one-template="cloud-server-comparison">${blocks.join("")}</div>`;
-  }
-
-  function appendApprovalClosing(blocks, context) {
-    const closing = inferApprovalClosing(context);
-    groupwarePushParagraph(blocks, `3. ${closing.heading}`, { bold: true });
-    closing.lines.forEach((line) => {
-      blocks.push(groupwareParagraph(`- ${line}`, { indent: 4 }));
-    });
-    blocks.push(groupwareBlank(3));
-    blocks.push(groupwareParagraph("첨  부. OOO 1부.  -끝-  (첨부물이 1가지인 경우)", { indent: 11 }));
-    blocks.push(groupwareParagraph("첨  부. 1. OOO 1부", { indent: 11 }));
-    blocks.push(groupwareParagraph("2. XXX 1부.  -끝-  (첨부물이 2가지 이상인 경우)(본 예시는 삭제 후 작성 바랍니다)", { indent: 22 }));
-  }
-
-  function inferApprovalClosing(context) {
-    if (context.category === "cloud_server") {
-      return {
-        heading: "향후 계획",
-        lines: [
-          "승인 후 내부 시스템 요구사항, 예상 사용량, 보안 기준 및 운영 담당 범위를 정리하여 사업자별 동일 조건 견적을 요청하겠습니다.",
-          "견적 및 기술 검토 결과를 기준으로 PoC 필요 여부를 판단하고, 최종 사업자 선정안과 세부 도입 계획은 별도 보고 후 진행하겠습니다.  -끝-  (첨부물이 있는 '-끝-' 표시는 아래 예시 참고바랍니다)",
-        ],
-      };
-    }
-    if (context.category === "it_asset" || context.category === "software" || context.isPurchase) {
-      return {
-        heading: "향후 계획",
-        lines: [
-          "승인 후 세부 사양, 견적, 납기 및 비용 처리 기준을 최종 확인하여 구매/진행 절차를 추진하겠습니다.",
-          `진행 과정에서 변경 사항이 발생할 경우 관련 부서와 협의 후 보고하고, 필요한 증빙 자료는 보완하겠습니다.  -끝-  (첨부물이 있는 '-끝-' 표시는 아래 예시 참고바랍니다)`,
-        ],
-      };
-    }
-    if (context.category === "business") {
-      return {
-        heading: "향후 계획",
-        lines: [
-          "승인 후 세부 일정과 담당 역할을 확정하고, 관련 부서와 협의하여 계획된 업무를 차질 없이 진행하겠습니다.",
-          "진행 결과 및 후속 조치가 필요한 사항은 별도 정리하여 보고하겠습니다.  -끝-  (첨부물이 있는 '-끝-' 표시는 아래 예시 참고바랍니다)",
-        ],
-      };
-    }
-    return {
-      heading: "기타사항",
-      lines: [
-        `상기와 같이 ${context.subject} 건을 검토 요청드리며, 세부 내용은 승인 후 관련 기준에 따라 보완 및 진행하겠습니다.  -끝-  (첨부물이 있는 '-끝-' 표시는 아래 예시 참고바랍니다)`,
-      ],
-    };
-  }
-
-  function inferApprovalContext(message) {
-    const cleanRequest = cleanApprovalRequest(message);
-    const item = inferApprovalItemName(message);
-    const quantity = extractApprovalQuantity(message);
-    const amount = extractApprovalAmount(message);
-    const schedule = extractApprovalSchedule(message);
-    const category = inferApprovalCategory(message, item);
-    const providers = extractCloudProviders(message);
-    const subject = cleanRequest || `${item} 진행`;
-    return {
-      original: message,
-      cleanRequest,
-      item,
-      quantity,
-      amount,
-      schedule,
-      category,
-      providers,
-      subject,
-      isPurchase: category === "purchase" || category === "it_asset" || category === "software" || category === "cloud_server",
-    };
-  }
-
-  function cleanApprovalRequest(message) {
-    return String(message || "")
-      .replace(/\[[\s\S]*?\]/g, " ")
-      .replace(/(기안\s*품의서|기안품의서|품의서|기안서|전자결재|결재\s*문서|결재문서)/g, " ")
-      .replace(/(작성해줘|작성해\s*줘|작성해\s*주세요|써줘|써\s*줘|생성해줘|만들어줘|보관해줘|저장해줘|해줘|해주세요)/g, " ")
-      .replace(/(에\s*대한|관련|대해서|으로|로)$/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  function inferApprovalCategory(message, item) {
-    const text = `${message || ""} ${item || ""}`;
-    if (isCloudServerApprovalRequest(text)) return "cloud_server";
-    if (/노트북|laptop|랩톱|PC|컴퓨터|데스크탑|데스크톱|모니터|장비/i.test(text)) return "it_asset";
-    if (/소프트웨어|라이선스|라이센스|구독|SaaS/i.test(text)) return "software";
-    if (/구매|구입|도입|발주|계약|견적/.test(text)) return "purchase";
-    if (/출장|교육|회의|행사|프로젝트|용역|서비스/.test(text)) return "business";
-    return "general";
-  }
-
-  function isCloudServerApprovalRequest(message) {
-    const text = String(message || "");
-    return /(클라우드|cloud|서버|인프라|IaaS|iaas|AWS|NCP|Azure|애저)/i.test(text)
-      && /(도입|이전|구축|검토|비교|선정|서버)/.test(text);
-  }
-
-  function extractCloudProviders(message) {
-    const text = String(message || "");
-    const candidates = [
-      [/AWS|Amazon\s*Web\s*Services/i, "AWS"],
-      [/NCP|Naver\s*Cloud|네이버\s*클라우드|네이버클라우드/i, "NCP"],
-      [/MS\s*Azure|Microsoft\s*Azure|Azure|애저/i, "MS Azure"],
-      [/GCP|Google\s*Cloud|구글\s*클라우드|구글클라우드/i, "GCP"],
-      [/Oracle\s*Cloud|OCI/i, "Oracle Cloud"],
-    ];
-    const providers = [];
-    for (const [pattern, label] of candidates) {
-      if (pattern.test(text) && !providers.includes(label)) providers.push(label);
-    }
-    return providers;
-  }
-
-  function buildCloudProviderComparisonRows(providers) {
-    const profile = {
-      AWS: {
-        fit: "글로벌 서비스 범위와 레퍼런스가 넓어 확장성 높은 시스템에 유리",
-        operation: "서비스 선택지가 많아 아키텍처 설계 역량과 운영 표준 수립 필요",
-        security: "보안 기능과 인증 체계가 풍부하나 계정/권한/네트워크 정책 설계 필요",
-        cost: "사용량 기반 비용 최적화 여지가 크지만 리소스 관리 미흡 시 비용 증가 가능",
-        note: "글로벌 확장, 다양한 관리형 서비스 활용 시 우선 검토",
-      },
-      NCP: {
-        fit: "국내 리전, 국내 고객 지원, 한국어 운영 환경 측면에서 내부 운영 대응이 용이",
-        operation: "국내 업무 시스템 운영과 지원 커뮤니케이션에 강점",
-        security: "국내 보안/공공/기업 환경 대응 자료 확보가 비교적 용이",
-        cost: "국내 트래픽과 지원 조건 기준으로 견적 비교 필요",
-        note: "국내 중심 업무 시스템과 운영 대응 속도 중시 시 우선 검토",
-      },
-      "MS Azure": {
-        fit: "Microsoft 365, Entra ID, Windows Server 등 MS 생태계 연계에 강점",
-        operation: "기존 MS 계정/보안 정책과 연동 시 관리 효율 기대",
-        security: "ID 기반 접근 제어와 보안 관리 체계 연계가 용이",
-        cost: "라이선스 포함 여부와 약정 조건에 따라 총비용 차이 발생 가능",
-        note: "MS 기반 업무 환경, AD/계정 연동 요건이 큰 경우 우선 검토",
-      },
-      GCP: {
-        fit: "데이터 분석, AI/ML, 컨테이너 기반 워크로드에 강점",
-        operation: "클라우드 네이티브 운영 역량 확보 시 효과적",
-        security: "IAM 및 데이터 보안 기능 검토 필요",
-        cost: "데이터 처리/네트워크 사용량 기준 비용 검토 필요",
-        note: "분석/AI 연계 워크로드가 핵심일 때 검토",
-      },
-      "Oracle Cloud": {
-        fit: "Oracle DB 및 관련 업무 시스템 연계 시 비용/성능 검토 가치 있음",
-        operation: "DB 중심 워크로드 운영 조건 확인 필요",
-        security: "기업 보안 요건과 네트워크 구성 검토 필요",
-        cost: "DB 라이선스 및 약정 조건에 따른 비용 비교 필요",
-        note: "Oracle 기반 시스템 이전 또는 확장 시 검토",
-      },
-    };
-    const value = (provider, key) => profile[provider]?.[key] || "요구사항 기준 상세 검토 필요";
-    return [
-      ["적합성", ...providers.map((provider) => value(provider, "fit"))],
-      ["운영 편의성", ...providers.map((provider) => value(provider, "operation"))],
-      ["보안/권한 관리", ...providers.map((provider) => value(provider, "security"))],
-      ["비용 검토", ...providers.map((provider) => value(provider, "cost"))],
-      ["검토 의견", ...providers.map((provider) => value(provider, "note"))],
-    ];
-  }
-
-  function buildCloudReviewLines(providers, draftText) {
-    const generated = extractUsefulDraftLines(draftText, {
-      item: "클라우드 서버",
-      subject: "클라우드 서버 도입 비교 검토",
-      category: "cloud_server",
-      isPurchase: true,
-    }).filter((line) => !/확인 필요/.test(line)).slice(0, 2);
-    return [
-      ...generated,
-      `${providers.join(", ")}는 모두 클라우드 서버 운영이 가능하나, 내부 시스템의 위치, 보안 기준, 계정 연동 방식, 운영 인력 숙련도에 따라 적합도가 달라집니다.`,
-      "국내 업무 시스템 중심이면 국내 리전과 지원 체계가 강한 사업자를 우선 검토하고, 글로벌 확장 또는 다양한 관리형 서비스 활용이 중요하면 글로벌 사업자를 함께 비교하는 방식이 적절합니다.",
-      "최종 사업자 선정 전 동일 사양 기준 견적, 장애 대응 조건, 백업/복구 정책, 보안 설정 기준을 확보하여 총소유비용과 운영 리스크를 함께 비교해야 합니다.",
-    ].slice(0, 5);
-  }
-
-  function extractApprovalQuantity(message) {
-    const match = String(message || "").match(/(\d+(?:,\d+)?)\s*(대|개|식|건|명|부|EA|ea)/);
-    return match ? `${match[1]}${match[2]}` : "확인 필요";
-  }
-
-  function extractApprovalAmount(message) {
-    const match = String(message || "").match(/((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(억원|천만원|백만원|만원|천원|원)/);
-    return match ? `${match[1]}${match[2]}` : "확인 필요";
-  }
-
-  function extractApprovalSchedule(message) {
-    const match = String(message || "").match(/(\d{4}[.-]\d{1,2}[.-]\d{1,2}|\d{1,2}월\s*\d{1,2}일|\d{1,2}월\s*중|상반기|하반기|금주|내주|이번\s*달|다음\s*달|즉시|긴급)/);
-    return match ? match[1].replace(/\s+/g, " ") : "확인 필요";
-  }
-
-  function buildApprovalPurpose(context) {
-    if (context.category === "it_asset") {
-      return `${context.item} 확보를 통해 담당 업무 수행에 필요한 전산 환경을 안정적으로 마련하고, 업무 처리 지연 및 장비 사용 불편을 최소화하고자 품의합니다.`;
-    }
-    if (context.category === "software") {
-      return `${context.item} 도입을 통해 업무 수행에 필요한 사용 권한과 기능을 확보하고, 관련 업무의 처리 효율과 관리 체계를 개선하고자 품의합니다.`;
-    }
-    if (context.isPurchase) {
-      return `${context.subject}에 필요한 품목 및 조건을 검토한 결과, 원활한 업무 수행을 위해 구매/진행 승인이 필요하여 품의합니다.`;
-    }
-    return `${context.subject} 건의 필요성과 진행 내용을 검토한 결과, 원활한 업무 수행을 위해 내부 승인 절차를 진행하고자 품의합니다.`;
-  }
-
-  function buildApprovalBackgroundLines(context) {
-    if (context.category === "it_asset") {
-      return [
-        `${context.item}은 사용자의 일상 업무 처리, 문서 작성, 사내 시스템 접속 및 협업 업무 수행에 필요한 기본 업무 장비입니다.`,
-        "업무 연속성과 처리 효율을 확보하기 위해 사용 목적, 지급 대상, 예산 및 납기 조건을 사전에 정리한 후 구매 절차를 진행할 필요가 있습니다.",
-      ];
-    }
-    if (context.category === "software") {
-      return [
-        `${context.item}은 업무 수행에 필요한 기능 제공, 사용 권한 관리, 자료 처리 효율 향상을 위해 검토가 필요한 항목입니다.`,
-        "도입 전 사용 범위, 라이선스 조건, 예산 적정성, 보안 및 계약 조건을 함께 확인할 필요가 있습니다.",
-      ];
-    }
-    if (context.isPurchase) {
-      return [
-        `${context.subject} 진행을 위해 품목, 수량, 예산, 납기 및 첨부 자료를 기준으로 구매 필요성을 검토했습니다.`,
-        "구매 진행 전 세부 조건을 확인하여 비용 집행의 적정성과 업무 필요성을 함께 확보하고자 합니다.",
-      ];
-    }
-    return [
-      `${context.subject}의 원활한 진행을 위해 추진 배경, 필요성, 예상 일정 및 후속 조치를 사전에 정리했습니다.`,
-      "관련 부서와 이해관계자가 동일한 기준으로 검토할 수 있도록 핵심 내용을 문서화하고자 합니다.",
-    ];
-  }
-
-  function buildApprovalDetailRows(context) {
-    const rows = [
-      ["구분", context.isPurchase ? "구매/진행 요청" : "업무 진행 요청"],
-      ["품목/내용", context.item],
-      ["수량/범위", context.quantity],
-      ["사용 목적", buildUsagePurpose(context)],
-      ["예상 금액", context.amount],
-      ["필요 시점", context.schedule],
-      ["첨부 예정", inferApprovalAttachmentSummary(context)],
-    ];
-    return rows;
-  }
-
-  function buildUsagePurpose(context) {
-    if (context.category === "it_asset") return "업무용 문서 작성, 사내 시스템 접속, 협업 및 일상 업무 수행";
-    if (context.category === "software") return "업무 처리 효율 향상, 기능 사용 권한 확보 및 관련 산출물 관리";
-    if (context.isPurchase) return "업무 수행에 필요한 품목 확보 및 관련 업무 진행";
-    return "업무 진행에 필요한 내부 승인 및 실행 기준 확보";
-  }
-
-  function extractUsefulDraftLines(draftText, context) {
-    const lines = String(draftText || "")
-      .replace(/\r/g, "")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => line.replace(/^[-*ㆍ•]\s*/, "").replace(/^\d+(\.\d+)*\s*/, "").trim())
-      .filter((line) => line.length >= 8)
-      .filter((line) => !/^(결론|분석 결과|상세 설명|기준 및 근거|파일|표 복사|확인 필요)$/i.test(line))
-      .filter((line) => !/```|^\|/.test(line))
-      .slice(0, 4);
-
-    const fallback = [
-      `${context.item}의 업무 필요성, 사용 범위, 예산 적정성 및 납기 조건을 기준으로 진행 여부를 검토할 필요가 있습니다.`,
-      "구매 또는 진행 전 견적서, 비교 자료, 세부 사양 등 증빙 자료를 확인하여 집행 근거를 보완합니다.",
-      "승인 후에는 자산 등록, 지급 이력 관리, 비용 처리 등 후속 절차가 누락되지 않도록 관리합니다.",
-    ];
-    return [...lines, ...fallback].slice(0, 5);
-  }
-
-  function buildBudgetScheduleLines(context) {
-    return [
-      `예상 금액: ${context.amount}`,
-      `필요 시점/납기: ${context.schedule}`,
-      "예산 과목 및 비용 처리 부서: 확인 필요",
-      "최종 집행 금액은 견적서 및 내부 구매 절차 확인 후 확정 예정입니다.",
-    ];
-  }
-
-  function buildFollowUpLines(context) {
-    if (context.category === "it_asset") {
-      return [
-        "승인 후 구매 절차를 진행하고, 입고 완료 시 자산 등록 및 지급 이력을 관리하겠습니다.",
-        "세부 사양, 견적서, 비교견적서 등 증빙 자료는 확인 후 첨부 또는 보완하겠습니다.",
-      ];
-    }
-    if (context.category === "software") {
-      return [
-        "승인 후 라이선스 조건, 사용 기간, 계정 발급 및 보안 검토 사항을 확인하겠습니다.",
-        "계약 또는 결제 진행 전 견적서와 사용 범위를 재확인하여 비용 집행 근거를 보완하겠습니다.",
-      ];
-    }
-    return [
-      "승인 후 관련 부서와 세부 일정 및 실행 조건을 확정하여 진행하겠습니다.",
-      "필요 증빙 및 참고 자료는 확인 후 첨부 또는 보완하겠습니다.",
-    ];
-  }
-
-  function inferApprovalAttachmentSummary(context) {
-    if (context.category === "cloud_server") return "사업자별 견적서, 비교 검토표, 구성도, 보안 검토 자료";
-    if (context.category === "it_asset") return "견적서, 비교견적서, 제품 사양서 또는 구성 내역";
-    if (context.category === "software") return "견적서, 라이선스 조건, 서비스/계약 조건 자료";
-    if (context.isPurchase) return "견적서, 비교견적서, 세부 산출 내역";
-    return "관련 계획서, 참고 자료, 필요 증빙";
-  }
-
-  function inferApprovalItemName(message) {
-    const text = String(message || "");
-    if (isCloudServerApprovalRequest(text)) return "클라우드 서버";
-    if (/노트북|laptop|랩톱/i.test(text)) return "노트북";
-    if (/PC|컴퓨터|데스크탑|데스크톱/i.test(text)) return "PC/전산장비";
-    if (/모니터/i.test(text)) return "모니터";
-    if (/소프트웨어|라이선스|라이센스/i.test(text)) return "소프트웨어/라이선스";
-    return "확인 필요";
-  }
-
-  function inferApprovalAttachmentLines(message, item) {
-    const base = [
-      "- 견적서: 첨부 예정",
-      "- 비교견적서: 필요 시 첨부",
-    ];
-    if (/노트북|PC|컴퓨터|모니터|장비|소프트웨어|라이선스|라이센스/i.test(`${message} ${item}`)) {
-      base.push("- 제품 사양서 또는 구성 내역: 첨부 예정");
-    }
-    base.push("- 기타 참고자료: 필요 시 첨부");
-    return base;
-  }
-
-  async function requestGroupwareApprovalDraft(message, history) {
-    const activeToken = await ensureValidSession({ silent: false });
-    if (!activeToken) throw new Error("세션 갱신이 필요합니다. 그룹웨어 DS ONE 버튼으로 다시 접속해 주세요.");
-
-    const draftData = await requestAgentAnswer(buildGroupwareDraftPrompt(message), history);
-    const draftText = extractAnswerText(draftData) || message;
-    const title = deriveGroupwareApprovalTitle(message);
-    const bodyHtml = buildGroupwareApprovalBodyHtml(message, draftText);
-
-    const extensionResult = await requestGroupwareApprovalViaExtension({
-      requestText: message,
-      title,
-      bodyHtml,
-      formId: "1176",
-      autoSave: true,
-    }).catch(() => null);
-    if (extensionResult?.ok || extensionResult?.status === "failed" || extensionResult?.status === "blocked") {
-      return { ...extensionResult, answer: formatGroupwareApprovalExtensionAnswer(extensionResult, title) };
-    }
-
-    const res = await fetch(RPA_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
-      body: JSON.stringify({
-        action: "groupware_approval_draft",
-        requestText: message,
-        title,
-        bodyHtml,
-        formId: "1176",
-        saveMode: "draft",
-      }),
-    });
-    const data = await readApiResponse(res);
-    const completed = await pollGroupwareApprovalDraftStatus(data.jobId, activeToken).catch(() => null);
-    return { ...data, answer: formatGroupwareApprovalDraftAnswer(completed || data, title) };
-  }
-
-  function requestGroupwareApprovalViaExtension(payload) {
-    return new Promise((resolve) => {
-      const requestId = `dsone-gw-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      let latest = null;
-      let extensionSeen = false;
-      const cleanup = () => {
-        window.removeEventListener("message", onMessage);
-        clearTimeout(initialTimer);
-        clearTimeout(finalTimer);
-      };
-      const finish = (result) => {
-        cleanup();
-        resolve(result || latest);
-      };
-      const initialTimer = setTimeout(() => {
-        if (!extensionSeen) finish(null);
-      }, 1500);
-      const finalTimer = setTimeout(() => {
-        finish(latest);
-      }, 90000);
-      const onMessage = (event) => {
-        if (event.source !== window) return;
-        const data = event.data || {};
-        if (data.source !== "DS_ONE_GROUPWARE_EXTENSION") return;
-        if (data.type === "DS_ONE_GROUPWARE_EXTENSION_READY") {
-          extensionSeen = true;
-          return;
-        }
-        if (data.requestId !== requestId) return;
-        extensionSeen = true;
-        latest = data;
-        if (data.type === "DS_ONE_GROUPWARE_DRAFT_ACK" && data.ok === false) finish(data);
-        if (data.type === "DS_ONE_GROUPWARE_DRAFT_RESULT") finish(data);
-      };
-      window.addEventListener("message", onMessage);
-      window.postMessage({
-        source: "DS_ONE_WEB",
-        type: "DS_ONE_GROUPWARE_DRAFT_REQUEST",
-        requestId,
-        payload,
-      }, window.location.origin);
-    });
-  }
-
-  function formatGroupwareApprovalExtensionAnswer(data, title) {
-    const status = String(data?.status || "").trim();
-    if (data?.ok && status === "succeeded") {
-      return [
-        "기안품의서가 현재 브라우저의 그룹웨어 탭에서 보관되었습니다.",
-        "",
-        `제목: ${title}`,
-        data.jobId ? `작업 ID: ${data.jobId}` : "",
-        "다음 단계: 그룹웨어 보관함에서 문서 내용을 확인한 뒤 상신하세요.",
-      ].filter(Boolean).join("\n");
-    }
-    if (data?.ok && (status === "opened" || status === "filled")) {
-      return [
-        status === "filled" ? "그룹웨어 탭에 기안품의서 제목과 본문을 입력했습니다." : "그룹웨어 탭을 열고 자동 입력/보관을 요청했습니다.",
-        "",
-        `제목: ${title}`,
-        data.jobId ? `작업 ID: ${data.jobId}` : "",
-        "그룹웨어 로그인 상태가 유지되어 있으면 자동으로 보관됩니다.",
-      ].filter(Boolean).join("\n");
-    }
-    return [
-      "Chrome Extension을 통한 그룹웨어 자동 보관에 실패했습니다.",
-      "",
-      `제목: ${title}`,
-      data?.message || "그룹웨어 로그인 상태, 확장 프로그램 권한, 양식 로딩 상태를 확인해 주세요.",
-      data?.jobId ? `작업 ID: ${data.jobId}` : "",
-    ].filter(Boolean).join("\n");
-  }
-
-  async function pollGroupwareApprovalDraftStatus(jobId, activeToken) {
-    if (!jobId) return null;
-    const startedAt = Date.now();
-    while (Date.now() - startedAt < 30000) {
-      await new Promise((resolve) => setTimeout(resolve, 2500));
-      const res = await fetch(RPA_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
-        body: JSON.stringify({ action: "groupware_approval_status", jobId }),
-      });
-      const data = await readApiResponse(res);
-      if (["succeeded", "failed", "blocked"].includes(String(data.status || ""))) return data;
-    }
-    return null;
-  }
-
-  function formatGroupwareApprovalDraftAnswer(data, title) {
-    const status = String(data?.status || "").trim();
-    if (data?.ok && status === "succeeded") {
-      return [
-        "기안품의서가 그룹웨어에 보관되었습니다.",
-        "",
-        `제목: ${title}`,
-        data.jobId ? `작업 ID: ${data.jobId}` : "",
-        "다음 단계: 그룹웨어 보관함에서 문서 내용을 확인한 뒤 상신하세요.",
-      ].filter(Boolean).join("\n");
-    }
-    if (status === "failed" || status === "blocked" || data?.ok === false) {
-      return [
-        "기안품의서 자동 보관에 실패했습니다.",
-        "",
-        `제목: ${title}`,
-        data?.message || data?.error || "RPA 워커 실행 결과를 확인해 주세요.",
-        data?.jobId ? `작업 ID: ${data.jobId}` : "",
-      ].filter(Boolean).join("\n");
-    }
-    return [
-      "기안품의서 보관 작업을 접수했습니다.",
-      "",
-      `제목: ${title}`,
-      data?.jobId ? `작업 ID: ${data.jobId}` : "",
-      "현재 자동 보관 중입니다. 완료 여부는 RPA 작업 상태에서 확인하세요.",
-    ].filter(Boolean).join("\n");
-  }
-
   async function requestFileAnalysis(message, history) {
     const activeToken = await ensureValidSession({ silent: false });
     if (!activeToken) throw new Error("세션 갱신이 필요합니다. 그룹웨어 DS ONE 버튼으로 다시 접속해 주세요.");
@@ -2700,6 +2278,79 @@
     const endpoint = isPdfOnlySelection() ? PDF_API_URL : FILE_API_URL;
     const res = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${activeToken}` }, body: formData });
     return readApiResponse(res);
+  }
+
+  async function requestRpaApi(action, payload = {}, options = {}) {
+    const activeToken = await ensureValidSession({ silent: options.silent !== false });
+    if (!activeToken) throw new Error("세션 갱신이 필요합니다. 그룹웨어 DS ONE 버튼으로 다시 접속해 주세요.");
+    const res = await fetch(RPA_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    return readApiResponse(res);
+  }
+
+  async function refreshRpaAccess(options = {}) {
+    if (rpaAccessPromise) return await rpaAccessPromise;
+    const force = options.force === true;
+    if (!force && rpaAccessState.checked && Date.now() - rpaAccessState.lastLoadedAt < RPA_ACCESS_REFRESH_MS) {
+      return rpaAccessState;
+    }
+    rpaAccessState.loading = true;
+    rpaAccessPromise = (async () => {
+      try {
+        const data = await requestRpaApi("list", {}, { silent: options.silent !== false });
+        rpaAccessState.releases = normalizeRpaReleases(data.releases);
+        rpaAccessState.jobs = normalizeRpaJobs(data.jobs);
+        rpaAccessState.authorized = data.authorized === true || rpaAccessState.releases.length > 0;
+        rpaAccessState.checked = true;
+        rpaAccessState.error = "";
+        rpaAccessState.lastLoadedAt = Date.now();
+      } catch (error) {
+        rpaAccessState.releases = [];
+        rpaAccessState.jobs = [];
+        rpaAccessState.authorized = false;
+        rpaAccessState.checked = true;
+        rpaAccessState.error = getErrorMessage(error);
+        if (!options.silent) showToast("RPA 권한 또는 목록을 확인하지 못했습니다.");
+      } finally {
+        rpaAccessState.loading = false;
+        rpaAccessPromise = null;
+        updateActionCardsForFeature();
+      }
+      return rpaAccessState;
+    })();
+    return await rpaAccessPromise;
+  }
+
+  function normalizeRpaReleases(releases) {
+    return (Array.isArray(releases) ? releases : [])
+      .map((item) => ({
+        key: String(item.Key || item.key || item.releaseKey || "").trim(),
+        folderId: String(item.folderId || item.FolderId || "").trim(),
+        name: String(item.Name || item.name || item.displayName || "RPA 작업").trim(),
+        processName: String(item.ProcessName || item.processName || item.OriginalName || "").trim(),
+        processKey: String(item.ProcessKey || item.processKey || "").trim(),
+        permissionCode: String(item.PermissionCode || item.permissionCode || "").trim(),
+        description: String(item.Description || item.description || "").trim(),
+        source: String(item.source || "").trim(),
+      }))
+      .filter((item) => item.key && item.folderId);
+  }
+
+  function normalizeRpaJobs(jobs) {
+    return (Array.isArray(jobs) ? jobs : [])
+      .map((item) => ({
+        id: String(item.id || item.key || item.Key || "").trim(),
+        key: String(item.key || item.Key || "").trim(),
+        folderId: String(item.folderId || "").trim(),
+        name: String(item.name || item.Name || item.ReleaseName || "RPA 작업").trim(),
+        state: String(item.state || item.status || item.State || "").trim(),
+        robotName: String(item.robotName || item.RobotName || "").trim(),
+        startedAt: String(item.startedAt || item.createdAt || item.StartTime || item.CreationTime || "").trim(),
+      }))
+      .filter((item) => item.id || item.key || item.name);
   }
 
   async function readApiResponse(res) {
@@ -2718,7 +2369,6 @@
     if (value === "excel_analysis") return "excel_analysis";
     if (value === "document_summary") return "document_summary";
     if (value === "translation") return "translation";
-    if (value === "report_summary") return "report_summary";
     return value;
   }
 
@@ -2741,6 +2391,186 @@
       .replace(/\n?\s*근거 안내\s*\n\s*SideTalk 응답에 별도 근거 문서 정보가 포함되지 않았습니다\.[\s\S]*$/i, "")
       .replace(/\n?\s*근거 문서\s*\n(?:\s*\d+\.\s*[^\n]+\n?)+\s*$/i, "")
       .trim();
+  }
+
+  async function openRpaWorkspace() {
+    selectedFiles = [];
+    renderFileChips();
+    clearMessages();
+    addMessage("user", "RPA 실행");
+    setMode("doc");
+    renderRpaPanel({ loading: true });
+    await refreshRpaAccess({ force: true, silent: false });
+    renderRpaPanel();
+  }
+
+  function renderRpaPanel(options = {}) {
+    if (!state.agentBody) return;
+    state.agentBody.querySelector("[data-rpa-panel-row]")?.remove();
+
+    const row = document.createElement("div");
+    row.className = "ds-chat-row ds-bot-row";
+    row.dataset.rpaPanelRow = "true";
+
+    const avatar = document.createElement("span");
+    avatar.className = "ds-chat-avatar ds-rpa-avatar";
+    avatar.textContent = "RPA";
+    row.appendChild(avatar);
+
+    const panel = document.createElement("div");
+    panel.className = "ds-rpa-panel";
+    panel.setAttribute("role", "region");
+    panel.setAttribute("aria-label", "RPA 실행");
+
+    const head = document.createElement("div");
+    head.className = "ds-rpa-head";
+    const copy = document.createElement("div");
+    const title = document.createElement("h2");
+    title.textContent = "RPA 실행";
+    const subtitle = document.createElement("p");
+    subtitle.textContent = "rpa_auth 권한이 있는 자동화 업무만 표시됩니다.";
+    copy.append(title, subtitle);
+    const refresh = document.createElement("button");
+    refresh.type = "button";
+    refresh.className = "ds-rpa-refresh";
+    refresh.dataset.rpaRefresh = "true";
+    refresh.textContent = "새로고침";
+    refresh.disabled = options.loading || rpaAccessState.loading;
+    head.append(copy, refresh);
+    panel.appendChild(head);
+
+    const metrics = document.createElement("div");
+    metrics.className = "ds-rpa-metrics";
+    appendRpaMetric(metrics, "실행 가능", `${rpaAccessState.releases.length}건`);
+    appendRpaMetric(metrics, "진행 중", `${rpaAccessState.jobs.length}건`);
+    appendRpaMetric(metrics, "권한 기준", "rpa_auth");
+    panel.appendChild(metrics);
+
+    if (options.notice) appendRpaNotice(panel, options.notice, "success");
+    if (options.error || rpaAccessState.error) appendRpaNotice(panel, options.error || rpaAccessState.error, "error");
+
+    if (options.loading || rpaAccessState.loading) {
+      const loading = document.createElement("div");
+      loading.className = "ds-rpa-empty";
+      loading.textContent = "RPA 권한과 실행 가능 목록을 확인하고 있습니다.";
+      panel.appendChild(loading);
+    } else if (!rpaAccessState.authorized) {
+      const empty = document.createElement("div");
+      empty.className = "ds-rpa-empty";
+      empty.textContent = "현재 계정에 실행 가능한 RPA 권한이 없습니다.";
+      panel.appendChild(empty);
+    } else if (!rpaAccessState.releases.length) {
+      const empty = document.createElement("div");
+      empty.className = "ds-rpa-empty";
+      empty.textContent = "RPA 권한은 확인됐지만 실행 가능한 자동화 업무가 아직 등록되지 않았습니다.";
+      panel.appendChild(empty);
+    } else {
+      const list = document.createElement("div");
+      list.className = "ds-rpa-list";
+      rpaAccessState.releases.forEach((release) => list.appendChild(createRpaReleaseItem(release)));
+      panel.appendChild(list);
+    }
+
+    row.appendChild(panel);
+    state.agentBody.appendChild(row);
+    state.agentBody.scrollTop = state.agentBody.scrollHeight;
+  }
+
+  function appendRpaMetric(parent, label, value) {
+    const item = document.createElement("span");
+    item.className = "ds-rpa-metric";
+    const strong = document.createElement("strong");
+    strong.textContent = value;
+    const small = document.createElement("span");
+    small.textContent = label;
+    item.append(strong, small);
+    parent.appendChild(item);
+  }
+
+  function appendRpaNotice(parent, message, tone = "info") {
+    const notice = document.createElement("div");
+    notice.className = `ds-rpa-notice ${tone === "error" ? "is-error" : tone === "success" ? "is-success" : ""}`;
+    notice.textContent = message;
+    parent.appendChild(notice);
+  }
+
+  function createRpaReleaseItem(release) {
+    const item = document.createElement("article");
+    item.className = "ds-rpa-item";
+    const activeJob = findActiveRpaJob(release);
+    if (activeJob) item.classList.add("is-active-job");
+
+    const copy = document.createElement("div");
+    copy.className = "ds-rpa-item-copy";
+    const title = document.createElement("strong");
+    title.textContent = release.name;
+    const meta = document.createElement("span");
+    const metaParts = [release.processName, release.permissionCode ? `권한 ${release.permissionCode}` : "", activeJob ? `상태 ${activeJob.state || "실행 중"}` : ""].filter(Boolean);
+    meta.textContent = metaParts.join(" · ") || "권한 확인 완료";
+    copy.append(title, meta);
+    if (release.description) {
+      const desc = document.createElement("p");
+      desc.textContent = release.description;
+      copy.appendChild(desc);
+    }
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "ds-rpa-run";
+    button.dataset.rpaReleaseKey = release.key;
+    button.dataset.rpaFolderId = release.folderId;
+    button.textContent = activeJob ? "진행 중" : "실행";
+    button.disabled = Boolean(activeJob);
+
+    item.append(copy, button);
+    return item;
+  }
+
+  function findActiveRpaJob(release) {
+    const candidates = [release.name, release.processName, release.processKey, release.key]
+      .map((value) => normalizeRpaComparable(value))
+      .filter(Boolean);
+    return rpaAccessState.jobs.find((job) => {
+      if (release.folderId && job.folderId && release.folderId !== job.folderId) return false;
+      const jobValues = [job.name, job.key, job.id].map((value) => normalizeRpaComparable(value)).filter(Boolean);
+      return jobValues.some((value) => candidates.includes(value));
+    }) || null;
+  }
+
+  function normalizeRpaComparable(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  async function handleRpaPanelRefresh(button) {
+    if (button) button.disabled = true;
+    renderRpaPanel({ loading: true });
+    await refreshRpaAccess({ force: true, silent: false });
+    renderRpaPanel();
+  }
+
+  async function handleRpaRun(button) {
+    const releaseKey = String(button?.dataset?.rpaReleaseKey || "").trim();
+    const folderId = String(button?.dataset?.rpaFolderId || "").trim();
+    if (!releaseKey || !folderId) {
+      showToast("RPA 실행 대상 정보가 없습니다.");
+      return;
+    }
+    button.disabled = true;
+    button.textContent = "요청 중";
+    try {
+      const data = await requestRpaApi("run", { releaseKey, folderId }, { silent: false });
+      rpaAccessState.jobs = normalizeRpaJobs(data.jobs);
+      rpaAccessState.lastLoadedAt = Date.now();
+      showToast("RPA 실행 요청이 접수되었습니다.");
+      renderRpaPanel({ notice: "RPA 실행 요청이 접수되었습니다. 진행 상태는 새로고침으로 확인할 수 있습니다." });
+      window.clearTimeout(rpaPanelRefreshTimer);
+      rpaPanelRefreshTimer = window.setTimeout(() => {
+        void handleRpaPanelRefresh();
+      }, 2500);
+    } catch (error) {
+      showToast("RPA 실행 요청에 실패했습니다.");
+      renderRpaPanel({ error: getErrorMessage(error) });
+    }
   }
 
   function addMessage(role, text) {
@@ -3349,7 +3179,7 @@
   function looksLikeAgentFileOrExcelConversation(item) {
     const text = getConversationTextForFeature(item);
     if (!text) return false;
-    return /\.(xlsx|xls|csv|pptx|docx|pdf)\b/i.test(text)
+    return /\.(xlsx|xls|csv|docx|pdf)\b/i.test(text)
       || text.includes("첨부 파일")
       || text.includes("파일 분석")
       || text.includes("엑셀")
@@ -4301,7 +4131,6 @@
       .replace(/\s*에\s*(?:대한|대해)\s*/g, " ")
       .replace(/(?:좀|한번)\s*/g, "")
       .replace(/기안\s*품의서/gi, "기안품의")
-      .replace(/기안품의서/gi, "기안품의")
       .replace(/보고서\s*작성/gi, "보고서")
       .replace(/엑셀\s*파일\s*분석/gi, "엑셀 분석")
       .replace(/(?:은|는|이|가)\s*몇\s*(?:개|명|건|톤|원|퍼센트|%|시간|일|개월|대)(?:이야|인가요|야|니|입니까)?[?.!~]*$/i, "")

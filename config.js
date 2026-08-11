@@ -9,7 +9,6 @@ window.DS_ONE_CONFIG = Object.freeze({
     rpaApi: "https://kqqfvskmozjalmairjxa.supabase.co/functions/v1/rpa-api",
   }),
   tasks: Object.freeze({
-    pptDraft: "ppt_draft",
     excelDraft: "excel_draft",
     webSearch: "web_search",
   }),
@@ -29,11 +28,9 @@ window.DS_ONE_CONFIG = Object.freeze({
   }),
   ui: Object.freeze({
     defaultHomeGreeting: "필요한 업무를 선택해 주세요",
-    rpaStatusPollIntervalMs: 30 * 1000,
-    rpaStatusPollMaxMs: 10 * 60 * 1000,
   }),
   filePolicy: Object.freeze({
-    allowedExtensions: Object.freeze(["txt", "md", "csv", "json", "docx", "xlsx", "pptx", "pdf"]),
+    allowedExtensions: Object.freeze(["txt", "md", "csv", "json", "docx", "xlsx", "pdf"]),
     blockedExtensions: Object.freeze(["exe", "dll", "msi", "bat", "cmd", "com", "scr", "ps1", "vbs", "js", "mjs", "jar", "sh", "php", "asp", "aspx", "jsp", "html", "htm", "xml", "doc", "xls", "ppt", "docm", "xlsm", "pptm", "hwp", "hwpx", "zip", "7z", "rar", "tar", "gz", "png", "jpg", "jpeg", "webp"]),
     maxFileSizeBytes: 50 * 1024 * 1024,
   }),

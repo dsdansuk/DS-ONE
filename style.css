@@ -2059,10 +2059,7 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   }
 }
 
-/* v105: enterprise quick-action rail
-   One shared container, no individual heavy cards.
-   Agent uses 5 actions; knowledge keeps 6.
-   Designed to avoid a vaporware PPT slot while preserving a premium DS ONE feel. */
+/* Enterprise quick-action rail. */
 .home-fit {
   --quick-action-gap: clamp(12px, 1.2vw, 18px);
   --quick-action-item-width: clamp(98px, 8.9vw, 114px);
@@ -2694,4 +2691,3 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
     min-width: 0;
   }
 }
-
