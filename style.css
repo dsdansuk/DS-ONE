@@ -2496,3 +2496,202 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   }
 }
 
+/* v109: executive monochrome quick-action rail
+   Mirrors the approved concept: one quiet rail, five navy line icons, subtle dividers. */
+:root {
+  --executive-ink: #10264f;
+  --executive-divider: rgba(151, 166, 188, 0.30);
+}
+
+.action-grid {
+  width: min(760px, calc(100% - 36px));
+  max-width: 760px;
+  margin-inline: auto;
+  padding: 10px 16px;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.40);
+  border: 1px solid rgba(190, 203, 220, 0.40);
+  border-radius: 14px;
+  box-shadow: 0 5px 16px rgba(44, 62, 95, 0.022);
+  backdrop-filter: blur(3px);
+}
+
+.action-card {
+  position: relative;
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: clamp(70px, 7.2dvh, 80px);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  box-shadow: none;
+  transform: none;
+  color: var(--executive-ink);
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.action-card + .action-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1px;
+  height: 42px;
+  transform: translateY(-50%);
+  background: var(--executive-divider);
+  pointer-events: none;
+}
+
+.action-card:hover {
+  background: rgba(239, 245, 255, 0.62);
+  box-shadow: none;
+  transform: none;
+}
+
+.action-card:focus-visible {
+  outline: 2px solid rgba(68, 113, 194, 0.28);
+  outline-offset: -2px;
+  background: rgba(239, 245, 255, 0.70);
+}
+
+.card-head {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.card-title {
+  width: 100%;
+  color: #17223b;
+  font-size: clamp(13.5px, 0.86vw, 14.5px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.012em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-desc {
+  display: none !important;
+}
+
+.action-card .card-mode-icon-agent {
+  width: 29px;
+  height: 29px;
+  flex: 0 0 29px;
+  display: grid;
+  place-items: center;
+  color: var(--executive-ink);
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.action-card .card-mode-icon-agent > svg,
+.action-card .card-mode-icon-agent .quick-action-svg,
+.action-card .card-mode-icon-agent .executive-action-icon {
+  width: 29px;
+  height: 29px;
+  display: block;
+  color: inherit;
+}
+
+/* Knowledge mode keeps its green identity while inheriting the mature rail geometry. */
+.action-card .card-mode-icon-knowledge {
+  width: 29px;
+  height: 29px;
+  flex: 0 0 29px;
+}
+
+@media (min-width: 1600px) and (min-height: 760px) {
+  .action-grid {
+    width: min(780px, calc(100% - 48px));
+    max-width: 780px;
+    padding-inline: 18px;
+  }
+
+  .action-card {
+    height: clamp(72px, 7.1dvh, 82px);
+  }
+
+  .action-card .card-mode-icon-agent,
+  .action-card .card-mode-icon-agent > svg,
+  .action-card .card-mode-icon-agent .quick-action-svg,
+  .action-card .card-mode-icon-agent .executive-action-icon {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+@media (max-width: 1100px) and (min-width: 761px) {
+  .action-grid {
+    width: min(720px, calc(100% - 28px));
+    max-width: 720px;
+    padding-inline: 12px;
+  }
+
+  .action-card {
+    height: 68px;
+    padding-inline: 8px;
+  }
+
+  .action-card + .action-card::before {
+    height: 38px;
+  }
+
+  .action-card .card-mode-icon-agent,
+  .action-card .card-mode-icon-agent > svg,
+  .action-card .card-mode-icon-agent .quick-action-svg,
+  .action-card .card-mode-icon-agent .executive-action-icon {
+    width: 27px;
+    height: 27px;
+  }
+
+  .card-title {
+    font-size: 13px;
+  }
+}
+
+/* Only genuinely compact/split layouts wrap; dividers are suppressed there. */
+@media (max-width: 760px) {
+  .action-grid {
+    width: min(100%, 560px);
+    max-width: 560px;
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .action-card {
+    flex: 1 1 calc(33.333% - 8px);
+    min-width: 130px;
+  }
+
+  .action-card + .action-card::before {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .action-card {
+    flex-basis: calc(50% - 4px);
+    min-width: 0;
+  }
+}
+
