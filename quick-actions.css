@@ -133,6 +133,9 @@
 }
 
 .action-card .card-mode-icon-agent {
+  --qa-icon-scale: 1;
+  --qa-icon-shift-x: 0px;
+  --qa-icon-shift-y: 0px;
   width: 29px;
   height: 29px;
   flex: 0 0 29px;
@@ -151,6 +154,17 @@
   height: 29px;
   display: block;
   color: inherit;
+  transform: translate(var(--qa-icon-shift-x), var(--qa-icon-shift-y)) scale(var(--qa-icon-scale));
+  transform-origin: center;
+}
+
+.action-card .app-icon.summary {
+  --qa-icon-scale: 1.06;
+}
+
+.action-card .app-icon.file {
+  --qa-icon-scale: 1.12;
+  --qa-icon-shift-x: 0.2px;
 }
 
 .action-card .card-mode-icon-knowledge {
