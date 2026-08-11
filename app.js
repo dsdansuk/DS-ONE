@@ -1432,7 +1432,7 @@
       card.dataset.featureTemplate = item.template || "";
       card.dataset.featureAttach = item.attach ? "true" : "false";
       card.dataset.featureMode = currentFeature;
-      card.dataset.recommended = !isDisabled && index === 0 ? "true" : "false";
+      card.dataset.recommended = "false";
       card.classList.toggle("is-disabled", isDisabled);
       card.classList.toggle("is-selected", selected);
       card.setAttribute("aria-disabled", isDisabled ? "true" : "false");
@@ -1456,7 +1456,6 @@
       if (title) title.textContent = item.title || "업무 요청";
       if (desc) desc.innerHTML = item.desc || "";
     });
-    syncActionGridSelectionState(cards);
   }
 
   function getPlainCardDescription(value) {
@@ -1480,13 +1479,6 @@
       card.classList.toggle("is-selected", selected);
       card.setAttribute("aria-pressed", selected ? "true" : "false");
     });
-    syncActionGridSelectionState(cards);
-  }
-
-  function syncActionGridSelectionState(cards = []) {
-    const grid = document.querySelector(".action-grid");
-    if (!grid) return;
-    grid.classList.toggle("has-selection", cards.some((card) => card.classList.contains("is-selected")));
   }
 
   function syncActionCardIconVisibility(card, mode) {

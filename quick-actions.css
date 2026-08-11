@@ -11,8 +11,6 @@
   --qa-rail-border: rgba(174, 190, 212, 0.58);
   --qa-divider: rgba(142, 158, 181, 0.26);
   --qa-hover-bg: rgba(239, 245, 255, 0.78);
-  --qa-recommended-bg: rgba(229, 238, 255, 0.78);
-  --qa-recommended-border: rgba(74, 118, 207, 0.42);
   --qa-focus: rgba(47, 111, 237, 0.34);
 }
 
@@ -74,18 +72,6 @@
   transform: translateY(-50%);
   background: var(--qa-divider);
   pointer-events: none;
-}
-
-.action-card[data-recommended="true"] {
-  color: var(--qa-ink-strong);
-  background: var(--qa-recommended-bg);
-  border-color: var(--qa-recommended-border);
-}
-
-.action-grid.has-selection .action-card[data-recommended="true"]:not(.is-selected) {
-  color: var(--qa-ink);
-  background: transparent;
-  border-color: transparent;
 }
 
 .action-card:hover {
