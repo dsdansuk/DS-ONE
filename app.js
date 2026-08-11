@@ -339,6 +339,10 @@
         padding: 0 clamp(18px, 4vw, 72px) clamp(12px, 2dvh, 22px);
         overflow: hidden;
       }
+      .ds-agent-workspace.is-rpa-workspace {
+        grid-template-rows: minmax(0, 1fr);
+        padding-bottom: clamp(28px, 5dvh, 56px);
+      }
       .ds-agent-body {
         min-height: 0;
         display: flex;
@@ -348,12 +352,18 @@
         padding: clamp(28px, 7dvh, 78px) 0 28px;
         scrollbar-width: thin;
       }
+      .ds-agent-workspace.is-rpa-workspace .ds-agent-body {
+        padding: clamp(42px, 9dvh, 96px) 0 clamp(42px, 8dvh, 84px);
+      }
       .ds-chat-row,
       .ds-thinking-row {
         width: min(900px, 100%);
         display: flex;
         gap: 12px;
         margin: 0 auto;
+      }
+      .ds-rpa-panel-row {
+        width: min(960px, 100%);
       }
       .ds-user-row { justify-content: flex-end; }
       .ds-bot-row { justify-content: flex-start; align-items: flex-start; }
@@ -781,6 +791,7 @@
         padding: 8px 4px;
       }
       .ds-agent-disclaimer { margin: 0; color: #8a93a5; font-size: 12px; text-align: center; }
+      .ds-agent-composer[hidden] { display: none !important; }
       .ds-recent-empty {
         width: calc(100% - 8px);
         min-height: 92px;
@@ -1560,7 +1571,29 @@
 
   function isCurrentRpaWorkspace(seq) {
     if (seq && seq !== rpaWorkspaceSeq) return false;
+    return isRpaWorkspaceView();
+  }
+
+  function isRpaWorkspaceView() {
     return rpaProductActive && currentTask === RPA_TASK && currentMode === "doc";
+  }
+
+  function syncRpaWorkspaceChrome() {
+    const active = isRpaWorkspaceView();
+    if (state.docPanel) {
+      state.docPanel.classList.toggle("is-rpa-workspace", active);
+      state.docPanel.setAttribute("aria-label", active ? "RPA 실행" : `${getCurrentFeatureProfile().label} 대화`);
+    }
+    if (!state.agentForm) return;
+    state.agentForm.hidden = active;
+    state.agentForm.setAttribute("aria-hidden", active ? "true" : "false");
+    if (active) {
+      if (state.agentMessageInput) {
+        state.agentMessageInput.value = "";
+        resetTextareaVisualState(state.agentMessageInput);
+      }
+      state.agentFileChips?.setAttribute("hidden", "");
+    }
   }
 
   function setRpaProductModeActive(active) {
@@ -1568,9 +1601,18 @@
     const item = state.rpaMenuButton || ensureRpaMenuItem();
     if (item) item.setAttribute("aria-checked", rpaProductActive ? "true" : "false");
     state.productModeMenu?.querySelectorAll("button[data-feature-mode]").forEach((button) => {
-      if (rpaProductActive) button.setAttribute("aria-checked", "false");
+      button.setAttribute("aria-checked", rpaProductActive
+        ? "false"
+        : button.getAttribute("data-feature-mode") === normalizeFeatureMode(currentFeature) ? "true" : "false");
     });
-    if (!rpaProductActive) return;
+    if (!rpaProductActive) {
+      const profile = getCurrentFeatureProfile();
+      syncProductModeIcon(currentFeature, profile);
+      if (state.productModeLabel) state.productModeLabel.textContent = profile.label;
+      if (state.productModeButton) state.productModeButton.setAttribute("aria-label", `${profile.label} 선택됨. 기능 변경`);
+      syncRpaWorkspaceChrome();
+      return;
+    }
     if (state.productModeLabel) state.productModeLabel.textContent = "RPA 실행";
     if (state.productModeButton) state.productModeButton.setAttribute("aria-label", "RPA 실행 선택됨");
     const icon = state.productModeIcon || document.getElementById("productModeIcon");
@@ -1581,6 +1623,7 @@
     icon.dataset.featureModeIcon = "rpa";
     const use = icon.querySelector("use");
     if (use) use.setAttribute("href", "#i-rpa-run");
+    syncRpaWorkspaceChrome();
   }
 
   function bindFeatureSwitcherEvents() {
@@ -2086,9 +2129,12 @@
     }
     if (state.homeContent) state.homeContent.hidden = isDocMode;
     if (state.docPanel) state.docPanel.hidden = !isDocMode;
+    syncRpaWorkspaceChrome();
 
     if (isDocMode) {
-      window.setTimeout(() => state.agentMessageInput?.focus(), 60);
+      if (!isRpaWorkspaceView()) {
+        window.setTimeout(() => state.agentMessageInput?.focus(), 60);
+      }
     } else {
       // 대화 화면에서 홈으로 돌아올 때 숨겨진 textarea를 측정해 생긴 inline height를 제거합니다.
       // 빈 홈 input은 첫 접속 화면과 동일한 CSS 기본 높이를 항상 유지합니다.
@@ -2519,7 +2565,6 @@
     selectedFiles = [];
     renderFileChips();
     clearMessages();
-    addMessage("user", "RPA 실행");
     setMode("doc");
     renderRpaPanel({ loading: true, workspaceSeq });
     await refreshRpaAccess({ force: true, silent: false });
@@ -2530,10 +2575,12 @@
   function renderRpaPanel(options = {}) {
     if (!isCurrentRpaWorkspace(options.workspaceSeq)) return;
     if (!state.agentBody) return;
+    const emptyCard = state.agentBody.querySelector(".ds-agent-empty-card");
+    if (emptyCard) emptyCard.hidden = true;
     state.agentBody.querySelector("[data-rpa-panel-row]")?.remove();
 
     const row = document.createElement("div");
-    row.className = "ds-chat-row ds-bot-row";
+    row.className = "ds-chat-row ds-bot-row ds-rpa-panel-row";
     row.dataset.rpaPanelRow = "true";
 
     const avatar = document.createElement("span");
