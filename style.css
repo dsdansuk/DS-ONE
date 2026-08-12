@@ -1276,6 +1276,10 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   background: linear-gradient(145deg, #405f95, #7489b5);
 }
 
+.product-mode-icon-rpa .icon {
+  stroke-width: 2.45;
+}
+
 .product-switch-chevron {
   width: 16px;
   height: 16px;
@@ -1433,6 +1437,10 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 
 .product-mode-menu-icon-rpa {
   background: linear-gradient(145deg, #405f95, #7489b5);
+}
+
+.product-mode-menu-icon-rpa .icon {
+  stroke-width: 2.45;
 }
 
 .product-mode-menu-copy {
