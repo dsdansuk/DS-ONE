@@ -1273,7 +1273,7 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 }
 
 .product-mode-icon-rpa {
-  background: linear-gradient(145deg, #173b7a, #5f8df1);
+  background: linear-gradient(145deg, #405f95, #7489b5);
 }
 
 .product-switch-chevron {
@@ -1371,6 +1371,16 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   background: linear-gradient(135deg, rgba(15, 159, 121, 0.18), rgba(83, 210, 177, 0.24));
 }
 
+.product-mode-menu button[data-rpa-menu-action][aria-checked="true"] {
+  background: linear-gradient(135deg, rgba(64, 95, 149, 0.12), rgba(116, 137, 181, 0.16));
+  border-color: rgba(64, 95, 149, 0.22);
+  box-shadow: inset 3px 0 0 rgba(64, 95, 149, 0.86);
+}
+
+.product-mode-menu button[data-rpa-menu-action][aria-checked="true"]:hover {
+  background: linear-gradient(135deg, rgba(64, 95, 149, 0.16), rgba(116, 137, 181, 0.22));
+}
+
 .product-mode-menu button[aria-checked="true"]::after {
   content: "✓";
   position: absolute;
@@ -1390,6 +1400,10 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 
 .product-mode-menu button[data-feature-mode="knowledge"][aria-checked="true"]::after {
   background: #0f9f79;
+}
+
+.product-mode-menu button[data-rpa-menu-action][aria-checked="true"]::after {
+  background: #405f95;
 }
 
 .product-mode-menu-icon {
@@ -1418,7 +1432,7 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 }
 
 .product-mode-menu-icon-rpa {
-  background: linear-gradient(145deg, #173b7a, #5f8df1);
+  background: linear-gradient(145deg, #405f95, #7489b5);
 }
 
 .product-mode-menu-copy {
@@ -1477,6 +1491,14 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
 
 .product-mode-menu button[data-feature-mode="knowledge"][aria-checked="true"] .product-mode-menu-copy > span {
   color: #3d7668;
+}
+
+.product-mode-menu button[data-rpa-menu-action][aria-checked="true"] strong {
+  color: #334d7e;
+}
+
+.product-mode-menu button[data-rpa-menu-action][aria-checked="true"] .product-mode-menu-copy > span {
+  color: #5e6f8b;
 }
 
 .app-icon.knowledge {
