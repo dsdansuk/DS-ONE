@@ -2599,7 +2599,7 @@
     const title = document.createElement("h2");
     title.textContent = "RPA 실행";
     const subtitle = document.createElement("p");
-    subtitle.textContent = "rpa_auth 권한이 있는 자동화 업무만 표시됩니다.";
+    subtitle.textContent = "현재 계정으로 실행 가능한 자동화 업무만 표시됩니다.";
     copy.append(title, subtitle);
     const refresh = document.createElement("button");
     refresh.type = "button";
@@ -2614,7 +2614,7 @@
     metrics.className = "ds-rpa-metrics";
     appendRpaMetric(metrics, "실행 가능", `${rpaAccessState.releases.length}건`);
     appendRpaMetric(metrics, "진행 중", `${rpaAccessState.jobs.length}건`);
-    appendRpaMetric(metrics, "권한 기준", "rpa_auth");
+    appendRpaMetric(metrics, "권한 상태", rpaAccessState.loading ? "확인 중" : rpaAccessState.authorized ? "확인됨" : "없음");
     panel.appendChild(metrics);
 
     if (options.notice) appendRpaNotice(panel, options.notice, "success");
@@ -2623,17 +2623,17 @@
     if (options.loading || rpaAccessState.loading) {
       const loading = document.createElement("div");
       loading.className = "ds-rpa-empty";
-      loading.textContent = "RPA 권한과 실행 가능 목록을 확인하고 있습니다.";
+      loading.textContent = "RPA 실행 권한과 자동화 목록을 확인하고 있습니다.";
       panel.appendChild(loading);
     } else if (!rpaAccessState.authorized) {
       const empty = document.createElement("div");
       empty.className = "ds-rpa-empty";
-      empty.textContent = "현재 계정에 실행 가능한 RPA 권한이 없습니다.";
+      empty.textContent = "현재 계정으로 실행 가능한 RPA 업무가 없습니다.";
       panel.appendChild(empty);
     } else if (!rpaAccessState.releases.length) {
       const empty = document.createElement("div");
       empty.className = "ds-rpa-empty";
-      empty.textContent = "RPA 권한은 확인됐지만 실행 가능한 자동화 업무가 아직 등록되지 않았습니다.";
+      empty.textContent = "실행 권한은 확인됐지만 등록된 자동화 업무가 아직 없습니다.";
       panel.appendChild(empty);
     } else {
       const list = document.createElement("div");
@@ -2676,8 +2676,8 @@
     const title = document.createElement("strong");
     title.textContent = release.name;
     const meta = document.createElement("span");
-    const metaParts = [release.processName, release.permissionCode ? `권한 ${release.permissionCode}` : "", activeJob ? `상태 ${activeJob.state || "실행 중"}` : ""].filter(Boolean);
-    meta.textContent = metaParts.join(" · ") || "권한 확인 완료";
+    const metaParts = [release.processName, activeJob ? `상태 ${activeJob.state || "실행 중"}` : ""].filter(Boolean);
+    meta.textContent = metaParts.join(" · ") || "실행 가능";
     copy.append(title, meta);
     if (release.description) {
       const desc = document.createElement("p");
