@@ -32,6 +32,7 @@
   const AUTO_TITLE_MAX_CHARS = 14;
   const AUTO_TITLE_DISPLAY_MAX_CHARS = 14;
   const AUTO_TITLE_MAX_INITIAL_MESSAGES = 2;
+  const TEMPLATE_CURSOR_MARKERS = ["[작성할 내용]", "[요약할 내용]", "[번역할 내용]", "[정리할 내용]", "[질문]"];
   const REMOTE_SESSION_REFRESH_DEBOUNCE_MS = 700;
   const REMOTE_SESSION_LIST_LIMIT = Math.max(MAX_RECENT_WORK, 20);
   const RPA_TASK = "rpa_run";
@@ -132,7 +133,7 @@
         { iconClass: "doc", iconText: "▤", title: "문서 작성", desc: "기획서, 보고서, 메일<br>초안 작성 등", task: "document_draft", attach: false, template: "아래 내용을 바탕으로 업무용 문서 초안을 작성해 주세요.\n\n[작성할 내용]\n" },
         { iconClass: "summary", iconText: "≡", title: "문서 요약", desc: "긴 문서나 회의 내용을<br>핵심만 요약", task: "document_summary", attach: false, template: "아래 내용을 핵심만 간결하게 요약해 주세요.\n\n[요약할 내용]\n" },
         { iconClass: "translate", iconText: "A", title: "문서 번역", desc: "다국어 문서를<br>자연스럽게 번역", task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" },
-        { iconClass: "excel", iconText: "X", title: "엑셀 분석", desc: "데이터 분석 및<br>시각화, 인사이트 도출", task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요." },
+        { iconClass: "excel", iconText: "X", title: "엑셀 분석", desc: "데이터 분석 및<br>시각화, 인사이트 도출", task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일을 원본 시트와 주요 근거를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" },
         { iconClass: "file", iconText: "▰", title: "PDF 분석", desc: "근거 페이지 기반<br>정밀 분석 및 질문", task: "pdf_analysis", attach: true, template: "첨부한 PDF를 원문 근거와 페이지를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" },
       ],
     },
@@ -2106,7 +2107,7 @@
     if (title.includes("문서 작성")) return { task: "document_draft", attach: false, template: "아래 내용을 바탕으로 업무용 문서 초안을 작성해 주세요.\n\n[작성할 내용]\n" };
     if (title.includes("문서 요약")) return { task: "document_summary", attach: false, template: "아래 내용을 핵심만 간결하게 요약해 주세요.\n\n[요약할 내용]\n" };
     if (title.includes("문서 번역")) return { task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" };
-    if (title.includes("엑셀 분석")) return { task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일의 전체 구조를 요약하고 핵심 이슈를 분석해 주세요." };
+    if (title.includes("엑셀 분석")) return { task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일을 원본 시트와 주요 근거를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" };
     if (title.includes("PDF 분석")) return { task: "pdf_analysis", attach: true, template: "첨부한 PDF를 원문 근거와 페이지를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" };
     return { task: "", attach: false, template: "" };
   }
@@ -2172,10 +2173,37 @@
 
   function setHomeInput(value) {
     if (!state.homePromptInput) return;
-    state.homePromptInput.value = String(value || "");
+    const prepared = prepareTemplateInputValue(value);
+    state.homePromptInput.value = prepared.value;
     syncHomePromptEmptyClass();
     resizeTextarea(state.homePromptInput);
-    window.setTimeout(() => state.homePromptInput?.focus(), 30);
+    window.setTimeout(() => {
+      if (!state.homePromptInput) return;
+      state.homePromptInput.focus();
+      if (Number.isFinite(prepared.cursorIndex)) {
+        state.homePromptInput.setSelectionRange(prepared.cursorIndex, prepared.cursorIndex);
+      }
+    }, 30);
+  }
+
+  function prepareTemplateInputValue(value) {
+    let text = String(value || "");
+    let markerIndex = -1;
+    let marker = "";
+    TEMPLATE_CURSOR_MARKERS.forEach((candidate) => {
+      const index = text.lastIndexOf(candidate);
+      if (index > markerIndex) {
+        markerIndex = index;
+        marker = candidate;
+      }
+    });
+    if (markerIndex < 0) return { value: text, cursorIndex: text.length };
+
+    const markerEnd = markerIndex + marker.length;
+    if (text.charAt(markerEnd) !== "\n") {
+      text = `${text.slice(0, markerEnd)}\n${text.slice(markerEnd)}`;
+    }
+    return { value: text, cursorIndex: markerEnd + 1 };
   }
 
   function startNewConversation(options = {}) {
@@ -4374,9 +4402,8 @@
   function extractConversationTitleSource(text) {
     const raw = String(text || "").replace(/\r/g, "").trim();
     if (!raw) return "";
-    const markers = ["[작성할 내용]", "[요약할 내용]", "[번역할 내용]", "[정리할 내용]", "[질문]"];
     let source = raw;
-    for (const marker of markers) {
+    for (const marker of TEMPLATE_CURSOR_MARKERS) {
       const index = source.lastIndexOf(marker);
       if (index >= 0) {
         const after = source.slice(index + marker.length).trim();
