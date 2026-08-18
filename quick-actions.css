@@ -1,4 +1,4 @@
-/* v110: production quick-action rail
+/* v126: production quick-action cards
    Canonical overrides for the home quick-action controls. The historical
    action-card rules in style.css are intentionally superseded here so future
    changes can stay scoped to this file. */
@@ -6,33 +6,36 @@
 :root {
   --qa-ink: #10264f;
   --qa-ink-strong: #0b1d3f;
-  --qa-muted: #536078;
-  --qa-rail-bg: rgba(255, 255, 255, 0.64);
-  --qa-rail-border: rgba(174, 190, 212, 0.54);
-  --qa-divider: rgba(142, 158, 181, 0.19);
-  --qa-hover-bg: rgba(239, 245, 255, 0.78);
+  --qa-muted: #78695d;
+  --qa-card-bg: #ffffff;
+  --qa-card-border: #e4e7ec;
+  --qa-card-shadow: 0 1px 1px rgba(16, 24, 40, 0.025);
+  --qa-card-shadow-hover: 0 10px 22px rgba(24, 45, 82, 0.07);
+  --qa-icon-bg: #cfe4ff;
+  --qa-icon-bg-hover: #c5dcfb;
+  --qa-hover-bg: #ffffff;
   --qa-focus: rgba(47, 111, 237, 0.34);
 }
 
 .prompt-card {
-  margin-bottom: clamp(13px, 1.8dvh, 18px);
+  margin-bottom: 20px;
 }
 
 .action-grid {
-  width: min(760px, calc(100% - 36px));
-  max-width: 760px;
+  width: min(840px, calc(100% - 36px));
+  max-width: 840px;
   margin: 0 auto clamp(18px, 2.6dvh, 28px);
-  padding: 8px 12px;
+  padding: 0;
   display: flex;
   flex-wrap: nowrap;
   align-items: stretch;
   justify-content: center;
-  gap: 0;
-  background: var(--qa-rail-bg);
-  border: 1px solid var(--qa-rail-border);
-  border-radius: 12px;
-  box-shadow: 0 10px 26px rgba(44, 62, 95, 0.045);
-  backdrop-filter: blur(6px);
+  gap: 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .action-card {
@@ -41,57 +44,53 @@
   width: auto;
   min-width: 0;
   max-width: none;
-  height: clamp(66px, 6.8dvh, 74px);
+  height: 138px;
   min-height: 0;
-  padding: 8px 10px;
+  padding: 18px 12px 16px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   color: var(--qa-ink);
   text-align: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  box-shadow: none;
+  background: var(--qa-card-bg);
+  border: 1px solid var(--qa-card-border);
+  border-radius: 14px;
+  box-shadow: var(--qa-card-shadow);
   transform: none;
   cursor: pointer;
   transition:
     background-color 150ms ease,
     border-color 150ms ease,
     color 150ms ease,
-    box-shadow 150ms ease;
+    box-shadow 150ms ease,
+    transform 150ms ease;
 }
 
 .action-card + .action-card::before {
-  content: "";
-  position: absolute;
-  left: -1px;
-  top: 50%;
-  width: 1px;
-  height: 34px;
-  transform: translateY(-50%);
-  background: var(--qa-divider);
-  pointer-events: none;
+  display: none;
 }
 
 .action-card:hover {
   color: var(--qa-ink-strong);
   background: var(--qa-hover-bg);
-  border-color: rgba(112, 142, 190, 0.24);
+  border-color: rgba(162, 187, 222, 0.9);
+  box-shadow: var(--qa-card-shadow-hover);
+  transform: translateY(-1px);
 }
 
 .action-card.is-selected {
   color: var(--qa-ink-strong);
   background: #fff;
-  border-color: rgba(62, 108, 199, 0.48);
-  box-shadow: 0 0 0 2px rgba(47, 111, 237, 0.08);
+  border-color: rgba(76, 132, 222, 0.76);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.09), var(--qa-card-shadow);
 }
 
 .action-card:focus-visible {
   outline: 2px solid var(--qa-focus);
   outline-offset: 2px;
   color: var(--qa-ink-strong);
-  background: rgba(239, 245, 255, 0.86);
+  background: #fff;
 }
 
 .action-card:disabled,
@@ -99,9 +98,10 @@
 .action-card:disabled:hover,
 .action-card.is-disabled:hover {
   color: #8892a3;
-  background: transparent;
-  border-color: transparent;
+  background: rgba(246, 248, 251, 0.75);
+  border-color: rgba(218, 224, 233, 0.78);
   box-shadow: none;
+  transform: none;
   cursor: not-allowed;
 }
 
@@ -112,15 +112,15 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 13px;
 }
 
 .card-title {
   width: 100%;
   color: inherit;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.18;
   letter-spacing: 0;
   text-align: center;
   white-space: nowrap;
@@ -129,29 +129,40 @@
 }
 
 .card-desc {
-  display: none !important;
+  display: block !important;
+  width: 100%;
+  margin-top: 7px;
+  color: var(--qa-muted);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .action-card .card-mode-icon-agent {
   --qa-icon-scale: 1;
   --qa-icon-shift-x: 0px;
   --qa-icon-shift-y: 0px;
-  width: 29px;
-  height: 29px;
-  flex: 0 0 29px;
-  display: grid;
+  width: 45px !important;
+  height: 45px !important;
+  flex: 0 0 45px !important;
+  display: grid !important;
   place-items: center;
-  color: currentColor;
-  background: transparent;
-  border-radius: 0;
-  box-shadow: none;
+  color: #1768ce !important;
+  background: var(--qa-icon-bg) !important;
+  border-radius: 11px !important;
+  box-shadow: none !important;
 }
 
 .action-card .card-mode-icon-agent > svg,
 .action-card .card-mode-icon-agent .quick-action-svg,
 .action-card .card-mode-icon-agent .executive-action-icon {
-  width: 29px;
-  height: 29px;
+  width: 23px !important;
+  height: 23px !important;
   display: block;
   color: inherit;
   transform: translate(var(--qa-icon-shift-x), var(--qa-icon-shift-y)) scale(var(--qa-icon-scale));
@@ -159,23 +170,27 @@
 }
 
 .action-card .app-icon.summary {
-  --qa-icon-scale: 1.08;
+  --qa-icon-scale: 1;
 }
 
 .action-card .app-icon.doc {
-  --qa-icon-scale: 0.97;
+  --qa-icon-scale: 1;
 }
 
 .action-card .app-icon.file {
-  --qa-icon-scale: 1.1;
+  --qa-icon-scale: 1;
   --qa-icon-shift-x: 0.1px;
 }
 
 .action-card .card-mode-icon-knowledge {
-  width: 29px;
-  height: 29px;
-  flex: 0 0 29px;
-  border-radius: 8px;
+  width: 45px;
+  height: 45px;
+  flex: 0 0 45px;
+  border-radius: 11px;
+}
+
+.action-card:hover .card-mode-icon-agent {
+  background: var(--qa-icon-bg-hover) !important;
 }
 
 .card-status {
@@ -252,49 +267,58 @@
 
 @media (min-width: 1600px) and (min-height: 760px) {
   .action-grid {
-    width: min(780px, calc(100% - 48px));
-    max-width: 780px;
-    padding: 8px 14px;
+    width: min(840px, calc(100% - 48px));
+    max-width: 840px;
   }
 
   .action-card {
-    height: clamp(68px, 6.8dvh, 76px);
+    height: 138px;
   }
 
-  .action-card .card-mode-icon-agent,
+  .action-card .card-mode-icon-agent {
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
+  }
+
   .action-card .card-mode-icon-agent > svg,
   .action-card .card-mode-icon-agent .quick-action-svg,
   .action-card .card-mode-icon-agent .executive-action-icon {
-    width: 30px;
-    height: 30px;
+    width: 23px;
+    height: 23px;
   }
 }
 
 @media (max-width: 1100px) and (min-width: 761px) {
   .action-grid {
-    width: min(720px, calc(100% - 28px));
-    max-width: 720px;
-    padding-inline: 10px;
+    width: min(800px, calc(100% - 28px));
+    max-width: 800px;
+    gap: 10px;
   }
 
   .action-card {
-    height: 68px;
-    padding-inline: 8px;
+    height: 128px;
+    padding: 16px 10px 14px;
   }
 
-  .action-card + .action-card::before {
-    height: 32px;
+  .action-card .card-mode-icon-agent {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
   }
 
-  .action-card .card-mode-icon-agent,
   .action-card .card-mode-icon-agent > svg,
   .action-card .card-mode-icon-agent .quick-action-svg,
   .action-card .card-mode-icon-agent .executive-action-icon {
-    width: 27px;
-    height: 27px;
+    width: 23px;
+    height: 23px;
   }
 
   .card-title {
+    font-size: 14.5px;
+  }
+
+  .card-desc {
     font-size: 13px;
   }
 }
@@ -303,25 +327,20 @@
   .action-grid {
     width: min(100%, 560px);
     max-width: 560px;
-    padding: 10px 12px;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 10px;
   }
 
   .action-card {
-    flex: 1 1 calc(33.333% - 8px);
+    flex: 1 1 calc(33.333% - 10px);
     min-width: 130px;
-    height: 72px;
-  }
-
-  .action-card + .action-card::before {
-    display: none;
+    height: 116px;
   }
 }
 
 @media (max-width: 520px) {
   .action-card {
-    flex-basis: calc(50% - 4px);
+    flex-basis: calc(50% - 5px);
     min-width: 0;
   }
 }

@@ -130,11 +130,11 @@
       disclaimer: "AI 답변은 참고용입니다. 중요한 업무에는 근거와 원문을 확인해 주세요.",
       attachEnabled: true,
       cards: [
-        { iconClass: "doc", iconText: "▤", title: "문서 작성", desc: "기획서, 보고서, 메일<br>초안 작성 등", task: "document_draft", attach: false, template: "아래 내용을 바탕으로 업무용 문서 초안을 작성해 주세요.\n\n[작성할 내용]\n" },
-        { iconClass: "summary", iconText: "≡", title: "문서 요약", desc: "긴 문서나 회의 내용을<br>핵심만 요약", task: "document_summary", attach: false, template: "아래 내용을 핵심만 간결하게 요약해 주세요.\n\n[요약할 내용]\n" },
-        { iconClass: "translate", iconText: "A", title: "문서 번역", desc: "다국어 문서를<br>자연스럽게 번역", task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" },
-        { iconClass: "excel", iconText: "X", title: "엑셀 분석", desc: "데이터 분석 및<br>시각화, 인사이트 도출", task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일을 원본 시트와 주요 근거를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" },
-        { iconClass: "file", iconText: "▰", title: "PDF 분석", desc: "근거 페이지 기반<br>정밀 분석 및 질문", task: "pdf_analysis", attach: true, template: "첨부한 PDF를 원문 근거와 페이지를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" },
+        { iconClass: "doc", iconText: "▤", title: "문서 작성", desc: "초안을 빠르게", task: "document_draft", attach: false, template: "아래 내용을 바탕으로 업무용 문서 초안을 작성해 주세요.\n\n[작성할 내용]\n" },
+        { iconClass: "summary", iconText: "≡", title: "문서 요약", desc: "핵심만 콕콕", task: "document_summary", attach: false, template: "아래 내용을 핵심만 간결하게 요약해 주세요.\n\n[요약할 내용]\n" },
+        { iconClass: "translate", iconText: "A", title: "문서 번역", desc: "언어 걱정 끝", task: "translation", attach: false, template: "아래 문서를 자연스러운 업무 문체로 번역해 주세요.\n\n[번역할 내용]\n" },
+        { iconClass: "excel", iconText: "X", title: "엑셀 분석", desc: "데이터 한눈에", task: "excel_analysis", attach: true, template: "첨부한 엑셀 파일을 원본 시트와 주요 근거를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" },
+        { iconClass: "file", iconText: "▰", title: "PDF 분석", desc: "내용 바로 파악", task: "pdf_analysis", attach: true, template: "첨부한 PDF를 원문 근거와 페이지를 표시하여 정확하게 분석해 주세요.\n\n[질문]\n" },
       ],
     },
     knowledge: {
