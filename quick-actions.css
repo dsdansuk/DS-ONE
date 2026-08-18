@@ -1,4 +1,4 @@
-/* v126: production quick-action cards
+/* v128: production quick-action cards
    Canonical overrides for the home quick-action controls. The historical
    action-card rules in style.css are intentionally superseded here so future
    changes can stay scoped to this file. */
@@ -40,13 +40,14 @@
 
 .action-card {
   position: relative;
+  box-sizing: border-box;
   flex: 1 1 0;
   width: auto;
   min-width: 0;
   max-width: none;
-  height: 138px;
-  min-height: 0;
-  padding: 18px 12px 16px;
+  height: auto;
+  min-height: 148px;
+  padding: 18px 12px 18px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -57,6 +58,7 @@
   border: 1px solid var(--qa-card-border);
   border-radius: 14px;
   box-shadow: var(--qa-card-shadow);
+  overflow: visible;
   transform: none;
   cursor: pointer;
   transition:
@@ -135,12 +137,13 @@
   color: var(--qa-muted);
   font-size: 14px;
   font-weight: 500;
-  line-height: 1.25;
+  line-height: 1.35;
   letter-spacing: 0;
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: keep-all;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .action-card .card-mode-icon-agent {
@@ -272,7 +275,7 @@
   }
 
   .action-card {
-    height: 138px;
+    min-height: 148px;
   }
 
   .action-card .card-mode-icon-agent {
@@ -297,8 +300,8 @@
   }
 
   .action-card {
-    height: 128px;
-    padding: 16px 10px 14px;
+    min-height: 140px;
+    padding: 16px 10px 16px;
   }
 
   .action-card .card-mode-icon-agent {
@@ -334,7 +337,8 @@
   .action-card {
     flex: 1 1 calc(33.333% - 10px);
     min-width: 130px;
-    height: 116px;
+    min-height: 136px;
+    padding: 15px 10px;
   }
 }
 
@@ -342,6 +346,7 @@
   .action-card {
     flex-basis: calc(50% - 5px);
     min-width: 0;
+    min-height: 136px;
   }
 }
 
