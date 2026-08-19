@@ -39,6 +39,37 @@
   const RPA_ACCESS_REFRESH_MS = 3 * 60 * 1000;
   const RPA_ACCESS_CACHE_KEY = STORAGE.rpaAccessCacheKey || "ds_one_rpa_access_cache_v1";
   const RPA_ACCESS_CACHE_TTL_MS = Number(STORAGE.rpaAccessCacheTtlMs || 6 * 60 * 60 * 1000);
+  const QUICK_START_SAMPLE_PROMPT = "아래 회의 내용을 핵심만 요약하고, 해야 할 일을 담당자별로 정리해 주세요.\n\n[요약할 내용]\n";
+  const QUICK_START_GUIDE_STEPS = [
+    {
+      badge: "1",
+      title: "업무 유형을 먼저 고르세요",
+      desc: "문서 작성, 요약, 번역, 엑셀 분석, PDF 분석 중 가장 가까운 버튼을 선택하면 입력창에 맞춤 양식이 자동으로 준비됩니다.",
+      hint: "처음 사용하는 직원은 문서 요약이나 PDF 분석처럼 목적이 분명한 기능부터 시작하면 쉽습니다.",
+      highlight: "actions",
+    },
+    {
+      badge: "2",
+      title: "질문은 목적과 출력 형식을 같이 적으세요",
+      desc: "단순히 ‘요약해줘’보다 ‘핵심 요약, 이슈, 해야 할 일로 나눠줘’처럼 원하는 결과 형태를 함께 쓰면 답변 품질이 좋아집니다.",
+      hint: "좋은 요청 = 자료 + 원하는 결과 + 형식. 이 세 가지만 기억하면 됩니다.",
+      highlight: "prompt",
+    },
+    {
+      badge: "3",
+      title: "파일 분석은 근거까지 요청하세요",
+      desc: "PDF와 엑셀은 첨부 후 질문을 입력합니다. 중요한 업무라면 원문 근거, 페이지, 시트명을 함께 표시해 달라고 요청하세요.",
+      hint: "DS ONE은 분석 결과를 보여주지만, 최종 제출 전에는 근거와 원문을 확인하는 습관이 필요합니다.",
+      highlight: "attach",
+    },
+    {
+      badge: "4",
+      title: "답변은 이어서 다듬으면 됩니다",
+      desc: "첫 답변이 끝이 아닙니다. 더 짧게, 표로, 메일 문체로, 보고서 형식으로처럼 이어서 요청하면 결과를 업무용 산출물에 가깝게 만들 수 있습니다.",
+      hint: "복사하기 전에 ‘임원 보고용으로 더 간결하게’ 같은 후속 질문을 한 번 더 해보세요.",
+      highlight: "answer",
+    },
+  ];
 
   const ALLOWED_EXTENSIONS = (FILE_POLICY.allowedExtensions || ["txt", "md", "csv", "json", "docx", "xlsx", "pdf"])
     .map((value) => String(value || "").toLowerCase().replace(/^\./, ""))
@@ -117,6 +148,7 @@
     promptCard: null,
     actionCards: [],
     agentDisclaimer: null,
+    guideDialog: null,
   };
 
   const FEATURE_PROFILES = {
@@ -1381,8 +1413,495 @@
         25% { filter: drop-shadow(0 0 10px rgba(47,111,237,.18)); }
         100% { filter: drop-shadow(0 0 0 rgba(47,111,237,0)); }
       }
+      .ds-guide-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 10020;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: rgba(15, 23, 42, .34);
+        backdrop-filter: blur(8px);
+      }
+      .ds-guide-card {
+        width: min(1080px, calc(100vw - 48px));
+        height: min(720px, calc(100dvh - 48px));
+        min-height: min(620px, calc(100dvh - 48px));
+        display: grid;
+        grid-template-columns: 286px minmax(0, 1fr);
+        overflow: hidden;
+        color: #10264f;
+        background: #fff;
+        border: 1px solid rgba(205, 217, 234, .92);
+        border-radius: 22px;
+        box-shadow: 0 28px 80px rgba(15, 23, 42, .24);
+      }
+      .ds-guide-side {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding: 24px 18px 20px;
+        background:
+          radial-gradient(circle at 20% 0%, rgba(47, 111, 237, .13), transparent 34%),
+          linear-gradient(180deg, #f8fbff 0%, #f4f8ff 100%);
+        border-right: 1px solid rgba(213, 224, 239, .82);
+      }
+      .ds-guide-brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+      }
+      .ds-guide-brand-icon {
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        border-radius: 13px;
+        background: linear-gradient(145deg, #2f6fed, #84adff);
+        box-shadow: 0 14px 28px rgba(47, 111, 237, .24);
+      }
+      .ds-guide-brand-icon svg {
+        width: 21px;
+        height: 21px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .ds-guide-brand strong {
+        display: block;
+        color: #111827;
+        font-size: 16px;
+        font-weight: 950;
+        letter-spacing: 0;
+      }
+      .ds-guide-brand span {
+        display: block;
+        margin-top: 2px;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 750;
+      }
+      .ds-guide-nav {
+        display: grid;
+        gap: 8px;
+      }
+      .ds-guide-nav button {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 12px;
+        color: #334155;
+        text-align: left;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 14px;
+        cursor: pointer;
+      }
+      .ds-guide-nav button[aria-current="true"] {
+        color: #123b82;
+        background: #eaf2ff;
+        border-color: rgba(77, 130, 226, .28);
+        box-shadow: inset 0 0 0 1px rgba(47, 111, 237, .04);
+      }
+      .ds-guide-nav button:disabled {
+        color: #94a3b8;
+        cursor: not-allowed;
+      }
+      .ds-guide-nav-mark {
+        width: 28px;
+        height: 28px;
+        flex: 0 0 28px;
+        display: grid;
+        place-items: center;
+        color: #2f6fed;
+        font-size: 12px;
+        font-weight: 950;
+        border-radius: 10px;
+        background: #dcecff;
+      }
+      .ds-guide-nav-copy strong {
+        display: block;
+        font-size: 13px;
+        font-weight: 950;
+        letter-spacing: 0;
+      }
+      .ds-guide-nav-copy span {
+        display: block;
+        margin-top: 2px;
+        font-size: 11.5px;
+        font-weight: 750;
+      }
+      .ds-guide-note {
+        margin-top: auto;
+        padding: 13px 14px;
+        color: #475569;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.55;
+        background: rgba(255, 255, 255, .72);
+        border: 1px solid rgba(213, 224, 239, .8);
+        border-radius: 16px;
+      }
+      .ds-guide-main {
+        min-width: 0;
+        min-height: 0;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        background:
+          radial-gradient(circle at 88% 2%, rgba(47, 111, 237, .09), transparent 28%),
+          linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+      }
+      .ds-guide-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 24px 26px 14px;
+      }
+      .ds-guide-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 8px;
+        color: #2f6fed;
+        font-size: 12px;
+        font-weight: 950;
+        letter-spacing: 0;
+      }
+      .ds-guide-title {
+        margin: 0;
+        color: #111827;
+        font-size: clamp(22px, 2.1vw, 30px);
+        font-weight: 950;
+        line-height: 1.16;
+        letter-spacing: 0;
+      }
+      .ds-guide-desc {
+        margin: 9px 0 0;
+        max-width: 620px;
+        color: #526070;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.62;
+        word-break: keep-all;
+      }
+      .ds-guide-close {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 auto;
+        display: grid;
+        place-items: center;
+        color: #334155;
+        background: #fff;
+        border: 1px solid rgba(203, 213, 225, .95);
+        border-radius: 13px;
+        cursor: pointer;
+      }
+      .ds-guide-close:hover,
+      .ds-guide-close:focus-visible {
+        color: #0f172a;
+        background: #f8fbff;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(47, 111, 237, .12);
+      }
+      .ds-guide-close svg {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.2;
+        stroke-linecap: round;
+      }
+      .ds-guide-body {
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1.06fr) minmax(300px, .94fr);
+        gap: 20px;
+        padding: 10px 26px 20px;
+        overflow: hidden;
+      }
+      .ds-guide-player,
+      .ds-guide-step-panel {
+        min-width: 0;
+        min-height: 0;
+        border: 1px solid rgba(211, 222, 237, .95);
+        border-radius: 20px;
+        background: rgba(255, 255, 255, .86);
+        box-shadow: 0 16px 44px rgba(23, 37, 84, .06);
+      }
+      .ds-guide-player {
+        padding: 16px;
+        display: grid;
+        align-items: center;
+      }
+      .ds-guide-screen {
+        position: relative;
+        min-height: 340px;
+        overflow: hidden;
+        border: 1px solid rgba(205, 218, 238, .88);
+        border-radius: 18px;
+        background:
+          linear-gradient(155deg, rgba(230, 239, 255, .72) 0 31%, transparent 31%),
+          linear-gradient(154deg, transparent 0 63%, rgba(218, 235, 255, .82) 63%),
+          #f8fbff;
+      }
+      .ds-guide-screen-top {
+        height: 42px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+        background: rgba(255, 255, 255, .9);
+        border-bottom: 1px solid rgba(216, 226, 240, .82);
+      }
+      .ds-guide-screen-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: #cbd5e1;
+      }
+      .ds-guide-screen-title {
+        margin-left: 8px;
+        color: #334155;
+        font-size: 12px;
+        font-weight: 900;
+      }
+      .ds-guide-mock {
+        width: min(88%, 560px);
+        margin: 40px auto 0;
+      }
+      .ds-guide-mock-heading {
+        color: #111827;
+        font-size: 22px;
+        font-weight: 950;
+        text-align: center;
+      }
+      .ds-guide-mock-prompt {
+        position: relative;
+        min-height: 82px;
+        margin-top: 20px;
+        padding: 16px 56px 14px 16px;
+        color: #64748b;
+        font-size: 12.5px;
+        font-weight: 750;
+        line-height: 1.5;
+        background: #fff;
+        border: 1px solid rgba(205, 218, 238, .92);
+        border-radius: 16px;
+        box-shadow: 0 18px 42px rgba(31, 41, 55, .07);
+      }
+      .ds-guide-mock-send {
+        position: absolute;
+        right: 14px;
+        bottom: 14px;
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        border-radius: 12px;
+        background: #79a4fb;
+      }
+      .ds-guide-mock-send svg {
+        width: 19px;
+        height: 19px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.1;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .ds-guide-mock-attach {
+        position: absolute;
+        left: 14px;
+        bottom: 14px;
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        color: #10264f;
+        border: 1px solid rgba(205, 218, 238, .95);
+        border-radius: 11px;
+        background: #fff;
+      }
+      .ds-guide-mock-attach svg {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.1;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .ds-guide-mock-actions {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+        margin: 16px auto 0;
+      }
+      .ds-guide-mock-action {
+        min-height: 78px;
+        display: grid;
+        place-items: center;
+        gap: 5px;
+        padding: 9px 6px;
+        color: #10264f;
+        text-align: center;
+        background: #fff;
+        border: 1px solid rgba(213, 224, 239, .95);
+        border-radius: 14px;
+      }
+      .ds-guide-mock-action i {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        color: #1768ce;
+        font-style: normal;
+        font-size: 12px;
+        font-weight: 950;
+        border-radius: 10px;
+        background: #cfe4ff;
+      }
+      .ds-guide-mock-action span {
+        display: block;
+        font-size: 11.5px;
+        font-weight: 900;
+        line-height: 1.15;
+        white-space: nowrap;
+        word-break: keep-all;
+      }
+      .ds-guide-mock-answer {
+        margin-top: 18px;
+        padding: 13px 14px;
+        color: #334155;
+        font-size: 12.5px;
+        font-weight: 750;
+        line-height: 1.58;
+        background: rgba(255, 255, 255, .88);
+        border: 1px solid rgba(213, 224, 239, .92);
+        border-radius: 16px;
+      }
+      .ds-guide-highlight {
+        position: relative;
+        z-index: 1;
+        outline: 3px solid rgba(47, 111, 237, .55);
+        outline-offset: 3px;
+        box-shadow: 0 0 0 8px rgba(47, 111, 237, .1), 0 18px 38px rgba(47, 111, 237, .14);
+      }
+      .ds-guide-step-panel {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+      }
+      .ds-guide-progress {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .ds-guide-progress button {
+        width: 34px;
+        height: 7px;
+        padding: 0;
+        border: 0;
+        border-radius: 999px;
+        background: #dbe6f4;
+        cursor: pointer;
+      }
+      .ds-guide-progress button[aria-current="step"] {
+        width: 48px;
+        background: #2f6fed;
+      }
+      .ds-guide-step-badge {
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 15px;
+        font-weight: 950;
+        border-radius: 14px;
+        background: linear-gradient(145deg, #2f6fed, #7fa8ff);
+      }
+      .ds-guide-step-title {
+        margin: 14px 0 0;
+        color: #111827;
+        font-size: 21px;
+        font-weight: 950;
+        line-height: 1.28;
+        letter-spacing: 0;
+        word-break: keep-all;
+      }
+      .ds-guide-step-desc {
+        margin: 11px 0 0;
+        color: #475569;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.72;
+        word-break: keep-all;
+      }
+      .ds-guide-hint {
+        margin-top: 16px;
+        padding: 13px 14px;
+        color: #334155;
+        font-size: 13px;
+        font-weight: 750;
+        line-height: 1.62;
+        background: #f4f8ff;
+        border: 1px solid rgba(205, 220, 244, .95);
+        border-radius: 15px;
+        word-break: keep-all;
+      }
+      .ds-guide-step-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: auto;
+        padding-top: 20px;
+      }
+      .ds-guide-step-actions button {
+        min-height: 40px;
+        padding: 0 14px;
+        color: #10264f;
+        font-size: 13px;
+        font-weight: 900;
+        border: 1px solid rgba(203, 213, 225, .95);
+        border-radius: 12px;
+        background: #fff;
+        cursor: pointer;
+      }
+      .ds-guide-step-actions button.primary {
+        color: #fff;
+        border-color: transparent;
+        background: linear-gradient(135deg, #2f6fed, #78a4ff);
+        box-shadow: 0 12px 24px rgba(47, 111, 237, .2);
+      }
+      .ds-guide-step-actions button:disabled {
+        color: #94a3b8;
+        background: #f8fafc;
+        cursor: not-allowed;
+      }
+      .ds-guide-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 26px 22px;
+      }
+      .ds-guide-footer-note {
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 750;
+        line-height: 1.45;
+      }
       @media (max-width: 720px) {
-        .ds-dialog-backdrop, .ds-search-backdrop { padding: 14px; }
+        .ds-dialog-backdrop, .ds-search-backdrop, .ds-guide-backdrop { padding: 14px; }
         .ds-search-card {
           width: min(720px, calc(100vw - 28px));
           height: min(620px, calc(100dvh - 28px));
@@ -1390,6 +1909,39 @@
         }
         .ds-search-result { grid-template-columns: 30px minmax(0, 1fr); }
         .ds-search-result-time { display: none; }
+        .ds-guide-card {
+          width: calc(100vw - 28px);
+          height: calc(100dvh - 28px);
+          min-height: 0;
+          grid-template-columns: 1fr;
+          grid-template-rows: auto minmax(0, 1fr);
+          border-radius: 18px;
+        }
+        .ds-guide-side {
+          padding: 16px;
+          border-right: 0;
+          border-bottom: 1px solid rgba(213, 224, 239, .82);
+        }
+        .ds-guide-nav,
+        .ds-guide-note { display: none; }
+        .ds-guide-main { min-height: 0; overflow-y: auto; }
+        .ds-guide-head { padding: 18px 18px 10px; }
+        .ds-guide-body {
+          grid-template-columns: 1fr;
+          gap: 12px;
+          padding: 8px 18px 16px;
+          overflow: visible;
+        }
+        .ds-guide-screen { min-height: 300px; }
+        .ds-guide-mock {
+          width: min(94%, 520px);
+          margin-top: 26px;
+        }
+        .ds-guide-mock-actions {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .ds-guide-step-panel { min-height: 310px; }
+        .ds-guide-footer { padding: 0 18px 18px; }
       }
     `;
     document.head.appendChild(style);
@@ -2081,7 +2633,10 @@
       handleAgentSubmit();
     });
 
-    document.querySelectorAll(".sidebar-guide-button,.header-button,.task-row").forEach((button) => {
+    document.querySelectorAll(".sidebar-guide-button,.header-button").forEach((button) => {
+      button.addEventListener("click", () => openUsageGuide());
+    });
+    document.querySelectorAll(".task-row").forEach((button) => {
       button.addEventListener("click", () => showToast("해당 기능은 추후 연동 예정입니다."));
     });
     document.addEventListener("click", (event) => {
@@ -3557,6 +4112,194 @@
       document.body.appendChild(backdrop.root);
       window.setTimeout(() => actions.buttons[0]?.focus(), 30);
     });
+  }
+
+  function openUsageGuide(initialStep = 0) {
+    if (state.guideDialog?.root?.isConnected) {
+      state.guideDialog.root.querySelector("[data-guide-close]")?.focus();
+      return;
+    }
+    const stepIndex = Math.max(0, Math.min(QUICK_START_GUIDE_STEPS.length - 1, Number(initialStep) || 0));
+    const root = document.createElement("div");
+    root.className = "ds-guide-backdrop";
+    root.innerHTML = `
+      <section class="ds-guide-card" role="dialog" aria-modal="true" aria-labelledby="dsGuideTitle">
+        <aside class="ds-guide-side" aria-label="가이드 메뉴">
+          <div class="ds-guide-brand">
+            <span class="ds-guide-brand-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4H19v14H7.5A2.5 2.5 0 0 0 5 20.5Z"></path><path d="M5 6.5v14"></path><path d="M9 8h6"></path><path d="M9 11.5h4"></path></svg>
+            </span>
+            <span>
+              <strong>사용 가이드</strong>
+              <span>처음 쓰는 직원도 바로 따라하기</span>
+            </span>
+          </div>
+          <nav class="ds-guide-nav" aria-label="사용 가이드 섹션">
+            <button type="button" aria-current="true">
+              <span class="ds-guide-nav-mark">1</span>
+              <span class="ds-guide-nav-copy"><strong>빠른 시작</strong><span>첫 업무 요청까지 1분</span></span>
+            </button>
+            <button type="button" disabled>
+              <span class="ds-guide-nav-mark">2</span>
+              <span class="ds-guide-nav-copy"><strong>기능별 사용법</strong><span>문서, 파일, 지식 문의</span></span>
+            </button>
+            <button type="button" disabled>
+              <span class="ds-guide-nav-mark">3</span>
+              <span class="ds-guide-nav-copy"><strong>자주 묻는 질문</strong><span>운영 중 문의 정리</span></span>
+            </button>
+          </nav>
+          <p class="ds-guide-note">가이드는 실제 화면을 그대로 조작하기 전에 흐름을 먼저 익히는 공간입니다. 마지막 단계에서 예시 요청을 홈 입력창에 바로 넣어볼 수 있습니다.</p>
+        </aside>
+        <div class="ds-guide-main">
+          <header class="ds-guide-head">
+            <div>
+              <span class="ds-guide-kicker">QUICK START · DS ONE</span>
+              <h2 id="dsGuideTitle" class="ds-guide-title">처음 사용하는 직원을 위한 빠른 시작</h2>
+              <p class="ds-guide-desc">어떤 기능을 눌러야 할지, 질문은 어떻게 써야 할지, 결과는 어떻게 다듬어야 할지 실제 업무 흐름대로 안내합니다.</p>
+            </div>
+            <button class="ds-guide-close" type="button" aria-label="사용 가이드 닫기" data-guide-close>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7l10 10"></path><path d="M17 7 7 17"></path></svg>
+            </button>
+          </header>
+          <div class="ds-guide-body">
+            <div class="ds-guide-player" data-guide-preview></div>
+            <article class="ds-guide-step-panel">
+              <div class="ds-guide-progress" data-guide-progress aria-label="빠른 시작 진행 단계"></div>
+              <span class="ds-guide-step-badge" data-guide-badge></span>
+              <h3 class="ds-guide-step-title" data-guide-step-title></h3>
+              <p class="ds-guide-step-desc" data-guide-step-desc></p>
+              <div class="ds-guide-hint" data-guide-hint></div>
+              <div class="ds-guide-step-actions">
+                <button type="button" data-guide-prev>이전</button>
+                <button type="button" class="primary" data-guide-next>다음</button>
+                <button type="button" data-guide-practice>예시로 따라하기</button>
+              </div>
+            </article>
+          </div>
+          <footer class="ds-guide-footer">
+            <span class="ds-guide-footer-note">가이드는 업무 데이터를 저장하지 않습니다. 실제 요청은 홈 입력창에서 전송할 때 시작됩니다.</span>
+          </footer>
+        </div>
+      </section>`;
+    const close = () => closeUsageGuide();
+    const onKeydown = (event) => {
+      if (event.key === "Escape") close();
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        setUsageGuideStep((state.guideDialog?.step || 0) + 1);
+      }
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        setUsageGuideStep((state.guideDialog?.step || 0) - 1);
+      }
+    };
+    state.guideDialog = { root, step: stepIndex, onKeydown };
+    root.addEventListener("mousedown", (event) => { if (event.target === root) close(); });
+    root.addEventListener("click", (event) => {
+      if (event.target.closest("[data-guide-close]")) { close(); return; }
+      const dot = event.target.closest("[data-guide-step]");
+      if (dot) { setUsageGuideStep(Number(dot.getAttribute("data-guide-step"))); return; }
+      if (event.target.closest("[data-guide-prev]")) { setUsageGuideStep((state.guideDialog?.step || 0) - 1); return; }
+      if (event.target.closest("[data-guide-next]")) {
+        const current = state.guideDialog?.step || 0;
+        if (current >= QUICK_START_GUIDE_STEPS.length - 1) close();
+        else setUsageGuideStep(current + 1);
+        return;
+      }
+      if (event.target.closest("[data-guide-practice]")) applyQuickStartGuideExample();
+    });
+    document.addEventListener("keydown", onKeydown);
+    document.body.appendChild(root);
+    renderUsageGuideStep();
+    window.setTimeout(() => root.querySelector("[data-guide-next]")?.focus(), 30);
+  }
+
+  function closeUsageGuide() {
+    const dialog = state.guideDialog;
+    if (!dialog) return;
+    dialog.root?.remove();
+    if (dialog.onKeydown) document.removeEventListener("keydown", dialog.onKeydown);
+    state.guideDialog = null;
+  }
+
+  function setUsageGuideStep(nextStep) {
+    if (!state.guideDialog) return;
+    const max = QUICK_START_GUIDE_STEPS.length - 1;
+    state.guideDialog.step = Math.max(0, Math.min(max, Number(nextStep) || 0));
+    renderUsageGuideStep();
+  }
+
+  function renderUsageGuideStep() {
+    const dialog = state.guideDialog;
+    if (!dialog?.root) return;
+    const step = QUICK_START_GUIDE_STEPS[dialog.step] || QUICK_START_GUIDE_STEPS[0];
+    const root = dialog.root;
+    const progress = root.querySelector("[data-guide-progress]");
+    const preview = root.querySelector("[data-guide-preview]");
+    const badge = root.querySelector("[data-guide-badge]");
+    const title = root.querySelector("[data-guide-step-title]");
+    const desc = root.querySelector("[data-guide-step-desc]");
+    const hint = root.querySelector("[data-guide-hint]");
+    const prev = root.querySelector("[data-guide-prev]");
+    const next = root.querySelector("[data-guide-next]");
+    if (progress) {
+      progress.innerHTML = QUICK_START_GUIDE_STEPS.map((_, index) => (
+        `<button type="button" data-guide-step="${index}" aria-label="${index + 1}단계로 이동" aria-current="${index === dialog.step ? "step" : "false"}"></button>`
+      )).join("");
+    }
+    if (preview) preview.innerHTML = createGuidePreview(step.highlight);
+    if (badge) badge.textContent = step.badge;
+    if (title) title.textContent = step.title;
+    if (desc) desc.textContent = step.desc;
+    if (hint) hint.textContent = step.hint;
+    if (prev) prev.disabled = dialog.step === 0;
+    if (next) next.textContent = dialog.step >= QUICK_START_GUIDE_STEPS.length - 1 ? "가이드 마치기" : "다음";
+  }
+
+  function createGuidePreview(highlight) {
+    const is = (target) => highlight === target ? " ds-guide-highlight" : "";
+    return `
+      <div class="ds-guide-screen" aria-hidden="true">
+        <div class="ds-guide-screen-top">
+          <span class="ds-guide-screen-dot"></span><span class="ds-guide-screen-dot"></span><span class="ds-guide-screen-dot"></span>
+          <span class="ds-guide-screen-title">DS ONE 업무 AI Agent</span>
+        </div>
+        <div class="ds-guide-mock">
+          <div class="ds-guide-mock-heading">무엇을 도와드릴까요?</div>
+          <div class="ds-guide-mock-prompt${is("prompt")}">
+            회의록을 핵심 요약, 결정사항, 담당자별 할 일로 정리해 주세요.
+            <span class="ds-guide-mock-attach${is("attach")}">
+              <svg viewBox="0 0 24 24"><path d="m21.4 11.6-8.8 8.8a5.2 5.2 0 0 1-7.4-7.4l9.4-9.4a3.5 3.5 0 0 1 5 5l-9.4 9.4a1.8 1.8 0 1 1-2.5-2.5l8.6-8.6"></path></svg>
+            </span>
+            <span class="ds-guide-mock-send">
+              <svg viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4z"></path><path d="M22 2 11 13"></path></svg>
+            </span>
+          </div>
+          <div class="ds-guide-mock-actions${is("actions")}">
+            <span class="ds-guide-mock-action"><i>✎</i><span>문서 작성</span></span>
+            <span class="ds-guide-mock-action"><i>▤</i><span>문서 요약</span></span>
+            <span class="ds-guide-mock-action"><i>A</i><span>문서 번역</span></span>
+            <span class="ds-guide-mock-action"><i>▦</i><span>엑셀 분석</span></span>
+            <span class="ds-guide-mock-action"><i>⌕</i><span>PDF 분석</span></span>
+          </div>
+          <div class="ds-guide-mock-answer${is("answer")}">
+            <strong>답변 활용 예시</strong><br>
+            “표로 정리해줘”, “메일 문체로 바꿔줘”, “임원 보고용으로 더 짧게”처럼 이어서 요청할 수 있습니다.
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function applyQuickStartGuideExample() {
+    closeUsageGuide();
+    applyFeatureMode("agent", { persist: true, silent: true });
+    setMode("home");
+    currentTask = "document_summary";
+    setFileInputAcceptForTask(currentTask);
+    const summaryCard = Array.from(document.querySelectorAll(".action-card")).find((card) => card.dataset.featureTask === currentTask);
+    if (summaryCard) setSelectedActionCard(summaryCard);
+    setHomeInput(QUICK_START_SAMPLE_PROMPT);
+    showToast("빠른 시작 예시를 입력창에 넣었습니다.");
   }
 
   function createDialogShell({ title, desc }) {
