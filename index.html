@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DS ONE 업무 AI Agent 홈</title>
   <link rel="stylesheet" href="style.css?v=20260813_v124_template_cursor">
-  <link rel="stylesheet" href="quick-actions.css?v=20260818_v129_feature_card_compact_balance">
+  <link rel="stylesheet" href="quick-actions.css?v=20260818_v128_feature_card_safe_descriptions">
 </head>
 <body>
   <svg class="sr-only" aria-hidden="true">
@@ -78,18 +78,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="brand" aria-label="DS ONE 업무 AI Agent">
-        <svg class="brand-logo brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-          <defs>
-            <linearGradient id="dsOneMarkGradient" x1="5" y1="6" x2="27" y2="26" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stop-color="#5fb5ff"/>
-              <stop offset="0.55" stop-color="#2f6fed"/>
-              <stop offset="1" stop-color="#1b4ed8"/>
-            </linearGradient>
-          </defs>
-          <path fill="url(#dsOneMarkGradient)" d="M16 2.5 28 9.2v13.6l-12 6.7-12-6.7V9.2L16 2.5Z"/>
-          <path fill="#fff" d="M16 8.5 22.7 12v8L16 23.5 9.3 20v-8L16 8.5Z"/>
-          <path fill="#2f6fed" d="M16 11.4 20 13.5v5L16 20.6l-4-2.1v-5l4-2.1Z"/>
-        </svg>
+        <img src="./DS_ONE_logo.png" alt="" class="brand-logo"/>
         <div class="brand-name">DS ONE</div>
         <div class="brand-divider"></div>
         <div class="product-switch" id="productSwitch">
@@ -137,14 +126,14 @@
           <svg class="icon" aria-hidden="true"><use href="#i-help"></use></svg>
           <span>도움말</span>
         </button>
-        <button class="notification" type="button" aria-label="알림">
+        <!-- <button class="notification" type="button" aria-label="알림">
           <svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg>
           <span class="badge">3</span>
-        </button>
+        </button> -->
         <button class="profile-button" type="button">
-          <span class="avatar" aria-hidden="true">김</span>
-          <strong>김다솔</strong>
-          <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
+          <span class="avatar" aria-hidden="true">홍</span>
+          <strong>홍길동</strong>
+          <!-- <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg> -->
         </button>
       </div>
     </header>
@@ -167,28 +156,39 @@
           <div class="recent-list">
           </div>
           <button class="sidebar-guide-button" type="button">
-            <svg class="icon solid-icon"
-                 viewBox="0 0 512 512"
-                 preserveAspectRatio="xMidYMid meet"
-                 aria-hidden="true"
-                 focusable="false">
-              <path
-                fill-rule="evenodd"
-                clip-rule="evenodd"
-                style="fill: currentColor; stroke: none;"
-                d="M60 11 L48 23 V24 L46 26 L41 36 V38 L39 42 V45 L38 46 V52 L37 53 V459 L38 460 V465 L39 466 V469 L40 470 L41 475 L48 488 L54 494 V495 H55 L60 500 H61 L66 504 L72 507 L77 508 L78 509 H81 L82 510 H87 L88 511 H473 V482 L466 481 L465 480 H463 L459 478 L450 469 L448 465 L447 460 L446 459 V449 L447 448 V446 L448 445 L449 441 L451 439 V438 L458 431 H459 L463 428 L469 427 L470 426 H473 V274 L474 273 V0 H88 L87 1 H82 L81 2 H78 L77 3 L72 4 L66 7 L61 11 Z
+            <svg
+              class="icon"
+              viewBox="0 0 512 512"
+              preserveAspectRatio="xMidYMid meet"
+              aria-hidden="true"
+              fill="none"
+            >
+              <!-- 바깥 원 -->
+              <circle
+                cx="256"
+                cy="256"
+                r="192"
+                stroke="currentColor"
+                stroke-width="42"
+              />
 
-                   M66 451 L67 450 L68 444 L72 437 L80 430 L86 427 H90 L91 426 H423 L424 427 L421 432 V434 L420 435 V437 L418 441 V446 L417 447 V462 L418 463 L419 471 L424 481 L423 482 H90 L89 481 H86 L85 480 L81 479 L79 477 H78 L71 470 L67 462 V458 L66 457 Z
+              <!-- i 상단 점 -->
+              <circle
+                cx="256"
+                cy="170"
+                r="21"
+                fill="currentColor"
+              />
 
-                   M71 41 L78 34 H79 L81 32 L85 31 L86 30 H89 L90 29 H444 L445 30 V396 L444 397 H88 L87 398 H82 L81 399 H78 L72 402 H70 L67 404 L66 403 V54 L67 53 L68 47 Z
-
-                   M249 95 L248 96 H242 L241 97 H236 L235 98 L228 99 L227 100 L219 102 L216 104 H214 L200 111 L198 113 H197 L195 115 L188 119 L184 123 H183 L169 137 V138 L165 142 V143 L160 149 L159 152 L157 154 L150 168 V170 L148 173 V175 L147 176 V178 L145 182 V185 L144 186 V189 L143 190 V194 L142 195 V202 L141 203 V227 L142 228 V234 L143 235 V239 L144 240 V244 L146 248 V251 L147 252 L148 257 L150 260 V262 L156 274 L158 276 L159 279 L161 281 L163 285 L172 295 V296 L180 304 H181 L186 309 H187 L190 312 H191 L199 318 L206 321 L208 323 H210 L220 328 H222 L226 330 H229 L230 331 H233 L234 332 H237 L238 333 H243 L244 334 H253 L254 335 H267 L268 334 H277 L278 333 L288 332 L289 331 H292 L296 329 H299 L302 327 H304 L307 325 H309 L321 319 L323 317 H324 L326 315 L333 311 L337 307 H338 L353 292 V291 L357 287 V286 L363 278 L364 275 L366 273 L371 263 V261 L373 258 V256 L374 255 V253 L375 252 V250 L377 246 L378 238 L379 237 V232 L380 231 V222 L381 221 V209 L380 208 V199 L379 198 L378 188 L377 187 L376 180 L375 179 L374 174 L372 171 V169 L364 153 L362 151 L358 144 L349 134 V133 L343 127 H342 L336 121 H335 L325 113 L322 112 L320 110 L310 105 H308 L300 101 L294 100 L290 98 H286 L285 97 H281 L280 96 H273 L272 95 Z
-
-                   M251 124 H270 L271 125 H277 L278 126 H282 L286 128 H289 L292 130 H294 L297 132 H299 L303 134 L305 136 L308 137 L310 139 L314 141 L317 144 H318 L331 157 V158 L335 162 V163 L339 168 L345 180 V182 L347 185 L348 191 L349 192 V195 L350 196 V200 L351 201 L352 219 L351 220 V228 L350 229 V234 L349 235 V238 L348 239 L346 247 L344 250 V252 L336 266 L329 274 V275 L321 283 H320 L315 288 H314 L309 292 L293 300 H291 L290 301 H288 L284 303 H281 L280 304 H276 L275 305 L256 306 L255 305 H247 L246 304 H242 L241 303 L234 302 L228 299 H226 L214 293 L212 291 L208 289 L205 286 H204 L190 272 V271 L187 268 V267 L181 259 L177 251 V249 L175 246 V244 L173 240 L172 232 L171 231 V226 L170 225 V205 L171 204 V198 L172 197 L173 190 L174 189 L176 181 L182 169 L184 167 L188 160 L200 147 H201 L206 142 H207 L215 136 L225 131 H227 L230 129 H232 L236 127 H239 L240 126 L250 125 Z
-
-                   M248 205 L247 206 V264 H275 V206 L274 205 Z
-
-                   M247 166 L245 170 V172 L244 173 V176 L245 177 V180 L246 182 L250 186 L254 188 H256 L257 189 H265 L266 188 H268 L272 186 L276 182 L277 178 L278 177 V172 L277 171 L276 167 L272 163 L268 162 L267 161 H255 L249 164 Z"/>
+              <!-- i 세로 몸통 -->
+              <rect
+                x="235"
+                y="213"
+                width="42"
+                height="150"
+                rx="21"
+                fill="currentColor"
+              />
             </svg>
             <span>사용 가이드</span>
           </button>
