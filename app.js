@@ -1792,8 +1792,6 @@
         word-break: keep-all;
       }
       .ds-guide-highlight {
-        position: relative;
-        z-index: 1;
         outline: 3px solid rgba(47, 111, 237, .55);
         outline-offset: 3px;
         box-shadow: 0 0 0 8px rgba(47, 111, 237, .1), 0 18px 38px rgba(47, 111, 237, .14);
