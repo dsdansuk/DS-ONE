@@ -65,9 +65,10 @@
     {
       badge: "4",
       title: "답변은 이어서 다듬으면 됩니다",
-      desc: "첫 답변이 끝이 아닙니다. 더 짧게, 표로, 메일 문체로, 보고서 형식으로처럼 이어서 요청하면 결과를 업무용 산출물에 가깝게 만들 수 있습니다.",
-      hint: "복사하기 전에 ‘임원 보고용으로 더 간결하게’ 같은 후속 질문을 한 번 더 해보세요.",
-      highlight: "answer",
+      desc: "첫 답변을 그대로 복사하기보다 목적에 맞게 한 번 더 다듬어 보세요. 형식, 분량, 문체, 대상 독자를 지정하면 실무 산출물에 더 가까워집니다.",
+      hint: "후속 요청 예시를 참고해 답변을 보고서, 메일, 표 형식으로 바로 바꿀 수 있습니다.",
+      examples: ["표로 정리해줘", "메일 문체로 바꿔줘", "임원 보고용으로 더 짧게"],
+      highlight: "prompt",
     },
   ];
 
@@ -1424,7 +1425,7 @@
         backdrop-filter: blur(8px);
       }
       .ds-guide-card {
-        width: min(1080px, calc(100vw - 48px));
+        width: min(1120px, calc(100vw - 48px));
         height: min(720px, calc(100dvh - 48px));
         min-height: min(620px, calc(100dvh - 48px));
         display: grid;
@@ -1620,7 +1621,7 @@
       .ds-guide-body {
         min-height: 0;
         display: grid;
-        grid-template-columns: minmax(0, 1.06fr) minmax(300px, .94fr);
+        grid-template-columns: minmax(410px, 1.08fr) minmax(320px, .92fr);
         gap: 20px;
         padding: 10px 26px 20px;
         overflow: hidden;
@@ -1635,13 +1636,13 @@
         box-shadow: 0 16px 44px rgba(23, 37, 84, .06);
       }
       .ds-guide-player {
-        padding: 16px;
+        padding: 12px;
         display: grid;
         align-items: center;
       }
       .ds-guide-screen {
         position: relative;
-        min-height: 340px;
+        min-height: 390px;
         overflow: hidden;
         border: 1px solid rgba(205, 218, 238, .88);
         border-radius: 18px;
@@ -1672,44 +1673,49 @@
         font-weight: 900;
       }
       .ds-guide-mock {
-        width: min(88%, 560px);
-        margin: 40px auto 0;
+        width: min(96%, 560px);
+        margin: 32px auto 0;
       }
       .ds-guide-mock-heading {
         color: #111827;
-        font-size: 22px;
+        font-size: 21px;
         font-weight: 950;
         text-align: center;
       }
       .ds-guide-mock-prompt {
         position: relative;
-        min-height: 82px;
-        margin-top: 20px;
-        padding: 16px 56px 14px 16px;
+        min-height: 84px;
+        margin-top: 18px;
+        padding: 14px 54px 46px 16px;
         color: #64748b;
-        font-size: 12.5px;
-        font-weight: 750;
-        line-height: 1.5;
+        font-size: 11.75px;
+        font-weight: 800;
+        line-height: 1.45;
         background: #fff;
         border: 1px solid rgba(205, 218, 238, .92);
         border-radius: 16px;
         box-shadow: 0 18px 42px rgba(31, 41, 55, .07);
       }
+      .ds-guide-mock-prompt-text {
+        display: block;
+        max-width: 100%;
+        word-break: keep-all;
+      }
       .ds-guide-mock-send {
         position: absolute;
-        right: 14px;
-        bottom: 14px;
-        width: 36px;
-        height: 36px;
+        right: 13px;
+        bottom: 13px;
+        width: 34px;
+        height: 34px;
         display: grid;
         place-items: center;
         color: #fff;
-        border-radius: 12px;
+        border-radius: 11px;
         background: #79a4fb;
       }
       .ds-guide-mock-send svg {
-        width: 19px;
-        height: 19px;
+        width: 18px;
+        height: 18px;
         fill: none;
         stroke: currentColor;
         stroke-width: 2.1;
@@ -1718,20 +1724,20 @@
       }
       .ds-guide-mock-attach {
         position: absolute;
-        left: 14px;
-        bottom: 14px;
-        width: 34px;
-        height: 34px;
+        left: 13px;
+        bottom: 13px;
+        width: 31px;
+        height: 31px;
         display: grid;
         place-items: center;
         color: #10264f;
         border: 1px solid rgba(205, 218, 238, .95);
-        border-radius: 11px;
+        border-radius: 10px;
         background: #fff;
       }
       .ds-guide-mock-attach svg {
-        width: 18px;
-        height: 18px;
+        width: 17px;
+        height: 17px;
         fill: none;
         stroke: currentColor;
         stroke-width: 2.1;
@@ -1741,51 +1747,49 @@
       .ds-guide-mock-actions {
         display: grid;
         grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: 8px;
+        gap: 7px;
         margin: 16px auto 0;
       }
       .ds-guide-mock-action {
-        min-height: 78px;
+        min-width: 0;
+        min-height: 66px;
         display: grid;
         place-items: center;
-        gap: 5px;
-        padding: 9px 6px;
+        gap: 4px;
+        padding: 8px 4px;
         color: #10264f;
         text-align: center;
         background: #fff;
         border: 1px solid rgba(213, 224, 239, .95);
         border-radius: 14px;
       }
-      .ds-guide-mock-action i {
+      .ds-guide-mock-action-icon {
         width: 30px;
         height: 30px;
         display: grid;
         place-items: center;
         color: #1768ce;
-        font-style: normal;
-        font-size: 12px;
-        font-weight: 950;
         border-radius: 10px;
         background: #cfe4ff;
       }
-      .ds-guide-mock-action span {
+      .ds-guide-mock-action-icon svg {
+        width: 17px;
+        height: 17px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.15;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .ds-guide-mock-action-label {
         display: block;
+        max-width: 100%;
+        color: #10264f;
         font-size: 11.5px;
         font-weight: 900;
-        line-height: 1.15;
+        line-height: 1.2;
         white-space: nowrap;
         word-break: keep-all;
-      }
-      .ds-guide-mock-answer {
-        margin-top: 18px;
-        padding: 13px 14px;
-        color: #334155;
-        font-size: 12.5px;
-        font-weight: 750;
-        line-height: 1.58;
-        background: rgba(255, 255, 255, .88);
-        border: 1px solid rgba(213, 224, 239, .92);
-        border-radius: 16px;
       }
       .ds-guide-highlight {
         position: relative;
@@ -1857,6 +1861,29 @@
         border: 1px solid rgba(205, 220, 244, .95);
         border-radius: 15px;
         word-break: keep-all;
+      }
+      .ds-guide-example-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .ds-guide-example-list[hidden] {
+        display: none;
+      }
+      .ds-guide-example-list span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 11px;
+        color: #123b82;
+        font-size: 12px;
+        font-weight: 850;
+        line-height: 1;
+        white-space: nowrap;
+        background: #eef5ff;
+        border: 1px solid rgba(172, 199, 238, .96);
+        border-radius: 999px;
       }
       .ds-guide-step-actions {
         display: flex;
@@ -1932,13 +1959,13 @@
           padding: 8px 18px 16px;
           overflow: visible;
         }
-        .ds-guide-screen { min-height: 300px; }
+        .ds-guide-screen { min-height: 390px; }
         .ds-guide-mock {
-          width: min(94%, 520px);
-          margin-top: 26px;
+          width: min(96%, 520px);
+          margin-top: 28px;
         }
         .ds-guide-mock-actions {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(5, minmax(0, 1fr));
         }
         .ds-guide-step-panel { min-height: 310px; }
         .ds-guide-footer { padding: 0 18px 18px; }
@@ -4169,6 +4196,7 @@
               <h3 class="ds-guide-step-title" data-guide-step-title></h3>
               <p class="ds-guide-step-desc" data-guide-step-desc></p>
               <div class="ds-guide-hint" data-guide-hint></div>
+              <div class="ds-guide-example-list" data-guide-examples hidden></div>
               <div class="ds-guide-step-actions">
                 <button type="button" data-guide-prev>이전</button>
                 <button type="button" class="primary" data-guide-next>다음</button>
@@ -4240,6 +4268,7 @@
     const title = root.querySelector("[data-guide-step-title]");
     const desc = root.querySelector("[data-guide-step-desc]");
     const hint = root.querySelector("[data-guide-hint]");
+    const examples = root.querySelector("[data-guide-examples]");
     const prev = root.querySelector("[data-guide-prev]");
     const next = root.querySelector("[data-guide-next]");
     if (progress) {
@@ -4252,6 +4281,11 @@
     if (title) title.textContent = step.title;
     if (desc) desc.textContent = step.desc;
     if (hint) hint.textContent = step.hint;
+    if (examples) {
+      const items = Array.isArray(step.examples) ? step.examples.filter(Boolean) : [];
+      examples.hidden = !items.length;
+      examples.innerHTML = items.map((item) => `<span>${escapeHtml(item)}</span>`).join("");
+    }
     if (prev) prev.disabled = dialog.step === 0;
     if (next) next.textContent = dialog.step >= QUICK_START_GUIDE_STEPS.length - 1 ? "가이드 마치기" : "다음";
   }
@@ -4267,7 +4301,7 @@
         <div class="ds-guide-mock">
           <div class="ds-guide-mock-heading">무엇을 도와드릴까요?</div>
           <div class="ds-guide-mock-prompt${is("prompt")}">
-            회의록을 핵심 요약, 결정사항, 담당자별 할 일로 정리해 주세요.
+            <span class="ds-guide-mock-prompt-text">회의록을 핵심 요약, 결정사항, 담당자별 할 일로 정리해 주세요.</span>
             <span class="ds-guide-mock-attach${is("attach")}">
               <svg viewBox="0 0 24 24"><path d="m21.4 11.6-8.8 8.8a5.2 5.2 0 0 1-7.4-7.4l9.4-9.4a3.5 3.5 0 0 1 5 5l-9.4 9.4a1.8 1.8 0 1 1-2.5-2.5l8.6-8.6"></path></svg>
             </span>
@@ -4276,15 +4310,26 @@
             </span>
           </div>
           <div class="ds-guide-mock-actions${is("actions")}">
-            <span class="ds-guide-mock-action"><i>✎</i><span>문서 작성</span></span>
-            <span class="ds-guide-mock-action"><i>▤</i><span>문서 요약</span></span>
-            <span class="ds-guide-mock-action"><i>A</i><span>문서 번역</span></span>
-            <span class="ds-guide-mock-action"><i>▦</i><span>엑셀 분석</span></span>
-            <span class="ds-guide-mock-action"><i>⌕</i><span>PDF 분석</span></span>
-          </div>
-          <div class="ds-guide-mock-answer${is("answer")}">
-            <strong>답변 활용 예시</strong><br>
-            “표로 정리해줘”, “메일 문체로 바꿔줘”, “임원 보고용으로 더 짧게”처럼 이어서 요청할 수 있습니다.
+            <span class="ds-guide-mock-action">
+              <span class="ds-guide-mock-action-icon"><svg viewBox="0 0 24 24"><path d="M12 3H6.8A2.8 2.8 0 0 0 4 5.8v11.4A2.8 2.8 0 0 0 6.8 20H18.2A2.8 2.8 0 0 0 21 17.2V12"></path><path d="M14.2 5.8 17.1 3a1.9 1.9 0 0 1 2.7 2.7l-7.9 7.9-3.4.8.8-3.4 4.9-5.2Z"></path></svg></span>
+              <span class="ds-guide-mock-action-label">문서 작성</span>
+            </span>
+            <span class="ds-guide-mock-action">
+              <span class="ds-guide-mock-action-icon"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"></path><path d="M14 3v5h5"></path><path d="M8.5 13h7"></path><path d="M8.5 16.5h5"></path></svg></span>
+              <span class="ds-guide-mock-action-label">문서 요약</span>
+            </span>
+            <span class="ds-guide-mock-action">
+              <span class="ds-guide-mock-action-icon"><svg viewBox="0 0 24 24"><path d="M4 6h7"></path><path d="M7.5 4v2c0 3.3-1.4 5.8-4 7.5"></path><path d="M4.8 13.5c2.2-.7 4.3-2.4 5.6-5.2"></path><path d="M10.5 13.5c-.9-.4-1.8-1-2.6-1.8"></path><path d="m14 20 3.5-9 3.5 9"></path><path d="M15.2 17h4.6"></path></svg></span>
+              <span class="ds-guide-mock-action-label">문서 번역</span>
+            </span>
+            <span class="ds-guide-mock-action">
+              <span class="ds-guide-mock-action-icon"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2.2"></rect><path d="M4 11h16"></path><path d="M11 4v16"></path></svg></span>
+              <span class="ds-guide-mock-action-label">엑셀 분석</span>
+            </span>
+            <span class="ds-guide-mock-action">
+              <span class="ds-guide-mock-action-icon"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4.2"></path><path d="M14 3v5h5"></path><path d="M19 12v1.1"></path><circle cx="16.4" cy="16.4" r="3.1"></circle><path d="m18.8 18.8 2.2 2.2"></path></svg></span>
+              <span class="ds-guide-mock-action-label">PDF 분석</span>
+            </span>
           </div>
         </div>
       </div>`;
