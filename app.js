@@ -4173,7 +4173,6 @@
               <span class="ds-guide-nav-copy"><strong>자주 묻는 질문</strong><span>운영 중 문의 정리</span></span>
             </button>
           </nav>
-          <p class="ds-guide-note">가이드는 실제 화면을 그대로 조작하기 전에 흐름을 먼저 익히는 공간입니다. 마지막 단계에서 예시 요청을 홈 입력창에 바로 넣어볼 수 있습니다.</p>
         </aside>
         <div class="ds-guide-main">
           <header class="ds-guide-head">
@@ -4203,7 +4202,7 @@
             </article>
           </div>
           <footer class="ds-guide-footer">
-            <span class="ds-guide-footer-note">가이드는 업무 데이터를 저장하지 않습니다. 실제 요청은 홈 입력창에서 전송할 때 시작됩니다.</span>
+            
           </footer>
         </div>
       </section>`;
