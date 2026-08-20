@@ -3362,10 +3362,8 @@
   function getKnowledgeRecommendedQuestions(data, userQuestion, answer) {
     const context = buildKnowledgeRecommendationContext(userQuestion, answer);
     const fromApi = filterAndContextualizeRecommendedQuestions(normalizeRecommendedQuestions(data), context);
-    const shouldRequireKnowledgeId = isSideTalkKnowledgeResponse(data);
-    const actionable = shouldRequireKnowledgeId ? fromApi.filter((item) => item.knowledgeId) : fromApi;
-    if (actionable.length) return actionable;
-    if (shouldRequireKnowledgeId) return [];
+    if (fromApi.length) return fromApi;
+    if (isSideTalkKnowledgeResponse(data)) return [];
     return buildFallbackKnowledgeRecommendedQuestions(context, answer);
   }
 
