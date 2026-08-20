@@ -3018,7 +3018,7 @@
           : await requestAgentAnswer(userText, history);
       thinking.remove();
       const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
-      const recommendedQuestions = requestFeature === "knowledge" ? normalizeRecommendedQuestions(data) : [];
+      const recommendedQuestions = requestFeature === "knowledge" ? getKnowledgeRecommendedQuestions(data, userText, answer) : [];
       addMessage("bot", answer, { recommendedQuestions });
       appendConversationMessage("assistant", answer);
       const titleConversationId = activeConversationId;
@@ -3259,26 +3259,22 @@
       data?.recommended_questions,
       data?.recommendedQuestion,
       data?.recommended,
+      data?.relatedQuestions,
+      data?.related_questions,
+      data?.followUpQuestions,
+      data?.follow_up_questions,
+      data?.result?.recommendedQuestions,
+      data?.result?.recommended_questions,
+      data?.response?.recommendedQuestions,
+      data?.response?.recommended_questions,
       data?.raw?.recommended_questions,
       data?.raw?.recommendedQuestions,
       data?.raw?.metadata?.recommended_questions,
       data?.raw?.metadata?.recommendedQuestions,
     ];
+    collectRecommendedQuestionContainers(data, candidates);
     const normalized = [];
-    candidates.forEach((candidate) => {
-      const list = Array.isArray(candidate) ? candidate : candidate ? [candidate] : [];
-      list.forEach((item) => {
-        if (!item) return;
-        if (typeof item === "string") {
-          const question = item.trim();
-          if (question) normalized.push({ question, knowledgeId: "" });
-          return;
-        }
-        const question = String(item.question || item.text || item.content || item.message || item.title || item.label || item.name || "").trim();
-        const knowledgeId = String(item.knowledgeId || item.knowledge_id || item.knowledgeID || item.knowledge?.id || item.id || item.key || "").trim();
-        if (question) normalized.push({ question, knowledgeId });
-      });
-    });
+    candidates.forEach((candidate) => appendRecommendedQuestionCandidate(candidate, normalized));
     const seen = new Set();
     return normalized.filter((item) => {
       const key = `${item.knowledgeId || ""}|${item.question}`.toLowerCase();
@@ -3286,6 +3282,109 @@
       seen.add(key);
       return true;
     }).slice(0, 3);
+  }
+
+  function collectRecommendedQuestionContainers(value, out, depth = 0) {
+    if (!value || depth > 6 || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      value.forEach((item) => collectRecommendedQuestionContainers(item, out, depth + 1));
+      return;
+    }
+    Object.entries(value).forEach(([key, child]) => {
+      const normalizedKey = key.replace(/[_\-\s]/g, "").toLowerCase();
+      if ([
+        "recommendedquestions",
+        "recommendedquestion",
+        "relatedquestions",
+        "relatedquestion",
+        "followupquestions",
+        "followupquestion",
+        "suggestedquestions",
+        "suggestedquestion",
+      ].includes(normalizedKey)) {
+        out.push(child);
+      }
+      if (["answer", "content", "html", "text"].includes(normalizedKey)) return;
+      collectRecommendedQuestionContainers(child, out, depth + 1);
+    });
+  }
+
+  function appendRecommendedQuestionCandidate(candidate, out) {
+    if (!candidate) return;
+    if (Array.isArray(candidate)) {
+      candidate.forEach((item) => appendRecommendedQuestionCandidate(item, out));
+      return;
+    }
+    if (typeof candidate === "string") {
+      const question = candidate.trim();
+      if (question) out.push({ question, knowledgeId: "" });
+      return;
+    }
+    if (typeof candidate !== "object") return;
+
+    [
+      candidate.items,
+      candidate.list,
+      candidate.data,
+      candidate.questions,
+      candidate.recommended_questions,
+      candidate.recommendedQuestions,
+      candidate.related_questions,
+      candidate.relatedQuestions,
+      candidate.follow_up_questions,
+      candidate.followUpQuestions,
+    ].filter(Boolean).forEach((item) => appendRecommendedQuestionCandidate(item, out));
+
+    const questionList = Array.isArray(candidate.question)
+      ? candidate.question
+      : Array.isArray(candidate.questions)
+        ? candidate.questions
+        : null;
+    if (questionList) {
+      questionList.forEach((questionValue, index) => {
+        const question = String(questionValue || "").trim();
+        const knowledgeId = String(
+          candidate.knowledgeId || candidate.knowledge_id || candidate.knowledgeIds?.[index] || candidate.knowledge_ids?.[index] || candidate.ids?.[index] || "",
+        ).trim();
+        if (question) out.push({ question, knowledgeId });
+      });
+      return;
+    }
+
+    const question = String(candidate.question || candidate.text || candidate.content || candidate.message || candidate.title || candidate.label || candidate.name || "").trim();
+    const knowledgeId = String(candidate.knowledgeId || candidate.knowledge_id || candidate.knowledgeID || candidate.knowledge?.id || candidate.id || candidate.key || "").trim();
+    if (question) out.push({ question, knowledgeId });
+  }
+
+  function getKnowledgeRecommendedQuestions(data, userQuestion, answer) {
+    const fromApi = normalizeRecommendedQuestions(data);
+    if (fromApi.length) return fromApi;
+    return buildFallbackKnowledgeRecommendedQuestions(userQuestion, answer);
+  }
+
+  function buildFallbackKnowledgeRecommendedQuestions(question, answer) {
+    const answerText = String(answer || "");
+    if (!answerText || /확인되지|자료에 없|지식베이스.*없|근거.*없|확인.*어렵|질문을 조금 더/.test(answerText)) return [];
+    const source = normalizeText(`${question || ""} ${answerText}`).toLowerCase();
+    if (/설치|접속|로그인|프로그램|시스템|권한|아이디|계정/.test(source)) {
+      return [
+        { question: "설치 후 오류가 나면 어떻게 처리하나요?", knowledgeId: "" },
+        { question: "사용 권한 요청은 어느 부서에 문의하나요?", knowledgeId: "" },
+        { question: "접속 전 확인해야 할 준비사항은 무엇인가요?", knowledgeId: "" },
+      ];
+    }
+    if (/휴가|근태|연차|복리|복지|식대|출장|정산/.test(source)) {
+      return [
+        { question: "신청 절차를 단계별로 알려주세요.", knowledgeId: "" },
+        { question: "필요한 증빙 자료는 무엇인가요?", knowledgeId: "" },
+        { question: "담당 부서와 문의처를 알려주세요.", knowledgeId: "" },
+      ];
+    }
+    return [
+      { question: "관련 절차를 단계별로 알려주세요.", knowledgeId: "" },
+      { question: "담당 부서와 문의처를 알려주세요.", knowledgeId: "" },
+      { question: "주의사항이나 예외 기준도 알려주세요.", knowledgeId: "" },
+    ];
   }
 
   function normalizeRecommendedQuestionOption(item) {
@@ -3366,7 +3465,7 @@
         const data = await requestKnowledgeAnswer(userText, history, { recommendedQuestion });
         thinking.remove();
         const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
-        const recommendedQuestions = normalizeRecommendedQuestions(data);
+        const recommendedQuestions = getKnowledgeRecommendedQuestions(data, userText, answer);
         addMessage("bot", answer, { recommendedQuestions });
         appendConversationMessage("assistant", answer);
         const titleConversationId = activeConversationId;
