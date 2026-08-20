@@ -3357,34 +3357,139 @@
   }
 
   function getKnowledgeRecommendedQuestions(data, userQuestion, answer) {
-    const fromApi = normalizeRecommendedQuestions(data);
+    const context = buildKnowledgeRecommendationContext(userQuestion, answer);
+    const fromApi = filterAndContextualizeRecommendedQuestions(normalizeRecommendedQuestions(data), context);
     if (fromApi.length) return fromApi;
-    return buildFallbackKnowledgeRecommendedQuestions(userQuestion, answer);
+    return buildFallbackKnowledgeRecommendedQuestions(context, answer);
   }
 
-  function buildFallbackKnowledgeRecommendedQuestions(question, answer) {
+  function buildFallbackKnowledgeRecommendedQuestions(context, answer) {
     const answerText = String(answer || "");
     if (!answerText || /확인되지|자료에 없|지식베이스.*없|근거.*없|확인.*어렵|질문을 조금 더/.test(answerText)) return [];
-    const source = normalizeText(`${question || ""} ${answerText}`).toLowerCase();
+    const source = context.lower;
+    const topic = context.topic;
+    if (!topic) return [];
     if (/설치|접속|로그인|프로그램|시스템|권한|아이디|계정/.test(source)) {
       return [
-        { question: "설치 후 오류가 나면 어떻게 처리하나요?", knowledgeId: "" },
-        { question: "사용 권한 요청은 어느 부서에 문의하나요?", knowledgeId: "" },
-        { question: "접속 전 확인해야 할 준비사항은 무엇인가요?", knowledgeId: "" },
+        { question: `${topic} 설치 후 오류가 나면 어떻게 처리하나요?`, knowledgeId: "" },
+        { question: `${topic} 사용 권한 요청은 어느 부서에 문의하나요?`, knowledgeId: "" },
+        { question: `${topic} 접속 전 확인해야 할 준비사항은 무엇인가요?`, knowledgeId: "" },
       ];
     }
     if (/휴가|근태|연차|복리|복지|식대|출장|정산/.test(source)) {
       return [
-        { question: "신청 절차를 단계별로 알려주세요.", knowledgeId: "" },
-        { question: "필요한 증빙 자료는 무엇인가요?", knowledgeId: "" },
-        { question: "담당 부서와 문의처를 알려주세요.", knowledgeId: "" },
+        { question: `${topic} 신청 절차를 단계별로 알려주세요.`, knowledgeId: "" },
+        { question: `${topic}에 필요한 증빙 자료는 무엇인가요?`, knowledgeId: "" },
+        { question: `${topic} 담당 부서와 문의처를 알려주세요.`, knowledgeId: "" },
       ];
     }
     return [
-      { question: "관련 절차를 단계별로 알려주세요.", knowledgeId: "" },
-      { question: "담당 부서와 문의처를 알려주세요.", knowledgeId: "" },
-      { question: "주의사항이나 예외 기준도 알려주세요.", knowledgeId: "" },
+      { question: `${topic} 관련 절차를 단계별로 알려주세요.`, knowledgeId: "" },
+      { question: `${topic} 담당 부서와 문의처를 알려주세요.`, knowledgeId: "" },
+      { question: `${topic} 주의사항이나 예외 기준도 알려주세요.`, knowledgeId: "" },
     ];
+  }
+
+  function buildKnowledgeRecommendationContext(userQuestion, answer) {
+    const source = normalizeText(`${userQuestion || ""} ${answer || ""}`);
+    const lower = source.toLowerCase();
+    const topic = detectKnowledgeRecommendationTopic(source);
+    return {
+      source,
+      lower,
+      topic,
+      domainKeys: getKnowledgeDomainKeys(source),
+      anchors: buildKnowledgeAnchorTerms(topic, source),
+    };
+  }
+
+  function detectKnowledgeRecommendationTopic(source) {
+    const text = normalizeText(source);
+    if (/클라우드\s*팩스|클라우드팩스|smart\s*fax|smartfax|스마트\s*팩스|스마트팩스/i.test(text)) return "클라우드 팩스";
+    if (/\b(?:erp|epr)\b|이알피/i.test(text)) return "ERP";
+    if (/그룹웨어/i.test(text)) return "그룹웨어";
+    if (/전자\s*결재|전자결재|결재/i.test(text)) return "전자결재";
+    if (/휴가|연차|근태/i.test(text)) return "근태·휴가";
+    if (/출장|정산|영수증|증빙/i.test(text)) return "출장·정산";
+    if (/점심|식단|메뉴/i.test(text)) return "점심 메뉴";
+    const question = normalizeText(String(source || "").split(/[.!?。！？\n]/)[0] || "");
+    const compact = question
+      .replace(/(?:방법|문의|질문|알려줘|알려주세요|어떻게|무엇|인가요|하나요|해주세요|해줘|기준|절차|관련|대한|대해)/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return compact.length >= 2 && compact.length <= 18 ? compact : "";
+  }
+
+  function buildKnowledgeAnchorTerms(topic, source) {
+    const anchors = new Set();
+    if (topic) {
+      anchors.add(topic.toLowerCase());
+      anchors.add(topic.replace(/\s+/g, "").toLowerCase());
+    }
+    if (/클라우드\s*팩스|클라우드팩스|smart\s*fax|smartfax|스마트\s*팩스|스마트팩스/i.test(source)) {
+      ["클라우드 팩스", "클라우드팩스", "smartfax", "smart fax", "스마트팩스", "팩스"].forEach((item) => anchors.add(item.toLowerCase()));
+    }
+    return Array.from(anchors).filter(Boolean);
+  }
+
+  function getKnowledgeDomainKeys(text) {
+    const value = normalizeText(text).toLowerCase();
+    const keys = new Set();
+    if (/클라우드\s*팩스|클라우드팩스|smart\s*fax|smartfax|스마트\s*팩스|스마트팩스|fax|팩스/i.test(value)) keys.add("fax");
+    if (/\b(?:erp|epr)\b|이알피/i.test(value)) keys.add("erp");
+    if (/그룹웨어/i.test(value)) keys.add("groupware");
+    if (/전자\s*결재|전자결재|결재/i.test(value)) keys.add("approval");
+    if (/휴가|연차|근태/i.test(value)) keys.add("attendance");
+    if (/출장|정산|영수증|증빙/i.test(value)) keys.add("expense");
+    if (/점심|식단|메뉴/i.test(value)) keys.add("meal");
+    return keys;
+  }
+
+  function filterAndContextualizeRecommendedQuestions(items, context) {
+    const seen = new Set();
+    return (Array.isArray(items) ? items : [])
+      .map((item) => contextualizeRecommendedQuestion(item, context))
+      .filter((item) => {
+        if (!item.question) return false;
+        if (!isRecommendedQuestionRelevant(item.question, context)) return false;
+        const key = `${item.knowledgeId || ""}|${item.question}`.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 3);
+  }
+
+  function contextualizeRecommendedQuestion(item, context) {
+    const question = normalizeText(item?.question || "");
+    if (!question || !context.topic) return { ...item, question };
+    if (hasKnowledgeAnchor(question, context) || hasUnrelatedKnowledgeDomain(question, context)) return { ...item, question };
+    if (!isGenericKnowledgeFollowup(question)) return { ...item, question };
+    return { ...item, question: `${context.topic} ${question}`.replace(/\s+/g, " ").trim() };
+  }
+
+  function isRecommendedQuestionRelevant(question, context) {
+    if (!question) return false;
+    if (hasUnrelatedKnowledgeDomain(question, context)) return false;
+    if (!context.topic) return true;
+    if (hasKnowledgeAnchor(question, context)) return true;
+    return isGenericKnowledgeFollowup(question);
+  }
+
+  function hasKnowledgeAnchor(question, context) {
+    const value = normalizeText(question).toLowerCase();
+    const compact = value.replace(/\s+/g, "");
+    return context.anchors.some((anchor) => value.includes(anchor) || compact.includes(anchor.replace(/\s+/g, "")));
+  }
+
+  function hasUnrelatedKnowledgeDomain(question, context) {
+    const questionKeys = getKnowledgeDomainKeys(question);
+    if (!questionKeys.size || !context.domainKeys.size) return false;
+    return Array.from(questionKeys).some((key) => !context.domainKeys.has(key));
+  }
+
+  function isGenericKnowledgeFollowup(question) {
+    return /설치|접속|로그인|권한|아이디|계정|오류|처리|문의|준비|사용|설정|위치|다운로드|절차|담당|부서|증빙|주의|예외|기준/.test(question);
   }
 
   function normalizeRecommendedQuestionOption(item) {
