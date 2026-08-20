@@ -734,6 +734,82 @@
         border-color: #d8e6ff;
         outline: none;
       }
+      .ds-recommended-questions {
+        width: min(760px, 100%);
+        margin-top: 12px;
+        padding: 12px 13px;
+        background: linear-gradient(180deg, rgba(248, 251, 255, .95), rgba(244, 248, 255, .95));
+        border: 1px solid rgba(211, 224, 244, .92);
+        border-radius: 16px;
+        box-shadow: 0 10px 26px rgba(37, 48, 77, .05);
+      }
+      .ds-recommended-title {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 9px;
+        color: #52627a;
+        font-size: 12px;
+        font-weight: 900;
+        line-height: 1.2;
+      }
+      .ds-recommended-title::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #2f6fed;
+        box-shadow: 0 0 0 4px rgba(47, 111, 237, .12);
+      }
+      .ds-recommended-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .ds-recommended-question {
+        min-height: 34px;
+        max-width: 100%;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 12px;
+        color: #174ea6;
+        font-size: 13px;
+        font-weight: 850;
+        line-height: 1.28;
+        text-align: left;
+        word-break: keep-all;
+        background: #fff;
+        border: 1px solid #bfd5ff;
+        border-radius: 999px;
+        box-shadow: 0 6px 16px rgba(47, 111, 237, .07);
+        cursor: pointer;
+      }
+      .ds-recommended-question::after {
+        content: "";
+        width: 6px;
+        height: 6px;
+        flex: 0 0 auto;
+        border-right: 1.8px solid currentColor;
+        border-bottom: 1.8px solid currentColor;
+        transform: rotate(-45deg);
+        opacity: .74;
+      }
+      .ds-recommended-question:hover,
+      .ds-recommended-question:focus-visible {
+        color: #123b82;
+        background: #eef5ff;
+        border-color: #8fb3ff;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(47, 111, 237, .12), 0 8px 18px rgba(47, 111, 237, .08);
+      }
+      .ds-recommended-question:disabled {
+        color: #94a3b8;
+        background: #f8fafc;
+        border-color: #e2e8f0;
+        box-shadow: none;
+        cursor: wait;
+      }
       .ds-agent-composer {
         width: min(860px, 100%);
         margin: 0 auto;
@@ -2643,6 +2719,14 @@
         void handleRpaRun(rpaRun);
         return;
       }
+      const recommendedButton = event.target.closest(".ds-recommended-question");
+      if (recommendedButton) {
+        void handleKnowledgeRecommendedQuestion({
+          question: recommendedButton.dataset.question || recommendedButton.textContent || "",
+          knowledgeId: recommendedButton.dataset.knowledgeId || "",
+        }, recommendedButton);
+        return;
+      }
       const button = event.target.closest(".ds-agent-suggestion-btn");
       if (!button) return;
       setAgentInput(button.getAttribute("data-template") || "");
@@ -2934,7 +3018,8 @@
           : await requestAgentAnswer(userText, history);
       thinking.remove();
       const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
-      addMessage("bot", answer);
+      const recommendedQuestions = requestFeature === "knowledge" ? normalizeRecommendedQuestions(data) : [];
+      addMessage("bot", answer, { recommendedQuestions });
       appendConversationMessage("assistant", answer);
       const titleConversationId = activeConversationId;
       void saveRemoteConversationMessage("assistant", answer, { route, task, feature: requestFeature })
@@ -3013,13 +3098,22 @@
     return await sessionRefreshPromise;
   }
 
-  async function requestKnowledgeAnswer(message, history) {
+  async function requestKnowledgeAnswer(message, history, options = {}) {
     const activeToken = await ensureValidSession({ silent: false });
     if (!activeToken) throw new Error("세션 갱신이 필요합니다. 그룹웨어 DS ONE 버튼으로 다시 접속해 주세요.");
+    const recommendedQuestion = normalizeRecommendedQuestionOption(options.recommendedQuestion);
+    const payload = {
+      message,
+      stream: false,
+      task: "knowledge_inquiry",
+      history,
+      recommendedQuestions: true,
+    };
+    if (recommendedQuestion.question || recommendedQuestion.knowledgeId) payload.recommendedQuestion = recommendedQuestion;
     const res = await fetch(AI_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
-      body: JSON.stringify({ message, stream: false, task: "knowledge_inquiry", history }),
+      body: JSON.stringify(payload),
     });
     return readApiResponse(res);
   }
@@ -3157,6 +3251,143 @@
       return `${index + 1}. ${title}${snippet ? ` - ${snippet}` : ""}`;
     });
     return `${answer}\n\n근거 문서\n${lines.join("\n")}`;
+  }
+
+  function normalizeRecommendedQuestions(data) {
+    const candidates = [
+      data?.recommendedQuestions,
+      data?.recommended_questions,
+      data?.recommendedQuestion,
+      data?.recommended,
+      data?.raw?.recommended_questions,
+      data?.raw?.recommendedQuestions,
+      data?.raw?.metadata?.recommended_questions,
+      data?.raw?.metadata?.recommendedQuestions,
+    ];
+    const normalized = [];
+    candidates.forEach((candidate) => {
+      const list = Array.isArray(candidate) ? candidate : candidate ? [candidate] : [];
+      list.forEach((item) => {
+        if (!item) return;
+        if (typeof item === "string") {
+          const question = item.trim();
+          if (question) normalized.push({ question, knowledgeId: "" });
+          return;
+        }
+        const question = String(item.question || item.text || item.content || item.message || item.title || item.label || item.name || "").trim();
+        const knowledgeId = String(item.knowledgeId || item.knowledge_id || item.knowledgeID || item.knowledge?.id || item.id || item.key || "").trim();
+        if (question) normalized.push({ question, knowledgeId });
+      });
+    });
+    const seen = new Set();
+    return normalized.filter((item) => {
+      const key = `${item.knowledgeId || ""}|${item.question}`.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 3);
+  }
+
+  function normalizeRecommendedQuestionOption(item) {
+    if (!item) return { question: "", knowledgeId: "" };
+    return {
+      question: String(item.question || item.text || item.content || item.message || "").trim(),
+      knowledgeId: String(item.knowledgeId || item.knowledge_id || item.knowledgeID || item.knowledge?.id || item.id || item.key || "").trim(),
+    };
+  }
+
+  function appendRecommendedQuestions(parent, questions) {
+    const normalized = normalizeRecommendedQuestions({ recommendedQuestions: questions });
+    if (!parent || !normalized.length) return;
+
+    const wrap = document.createElement("div");
+    wrap.className = "ds-recommended-questions";
+    wrap.setAttribute("role", "group");
+    wrap.setAttribute("aria-label", "추천 질문");
+
+    const title = document.createElement("div");
+    title.className = "ds-recommended-title";
+    title.textContent = "이런 질문은 어떠세요?";
+
+    const list = document.createElement("div");
+    list.className = "ds-recommended-list";
+    normalized.forEach((item) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "ds-recommended-question";
+      button.textContent = item.question;
+      button.dataset.question = item.question;
+      if (item.knowledgeId) button.dataset.knowledgeId = item.knowledgeId;
+      button.setAttribute("aria-label", `추천 질문: ${item.question}`);
+      list.appendChild(button);
+    });
+
+    wrap.append(title, list);
+    parent.appendChild(wrap);
+  }
+
+  async function handleKnowledgeRecommendedQuestion(item, sourceButton = null) {
+    const recommendedQuestion = normalizeRecommendedQuestionOption(item);
+    const userText = recommendedQuestion.question;
+    if (!userText || submitInProgress) return;
+
+    submitInProgress = true;
+    setComposerDisabled(true);
+    if (sourceButton) sourceButton.disabled = true;
+
+    try {
+      const activeToken = await ensureValidSession({ silent: false });
+      if (!activeToken) {
+        addMessage("bot", "세션 갱신이 필요합니다. 기존 채팅 기록은 유지됩니다. 그룹웨어의 DS ONE 버튼으로 다시 접속한 뒤 이어서 사용해 주세요.");
+        return;
+      }
+
+      if (currentFeature !== "knowledge") applyFeatureMode("knowledge", { persist: true, silent: true, resetConversation: false });
+      setMode("doc");
+      selectedFiles = [];
+      renderFileChips();
+
+      const route = "ai-api";
+      const task = "knowledge_inquiry";
+      activeConversationHighlightQuery = "";
+      const history = getRecentHistory();
+      ensureActiveConversation(userText, userText);
+      appendConversationMessage("user", userText);
+      void saveRemoteConversationMessage("user", userText, {
+        route,
+        task,
+        feature: "knowledge",
+        recommendedQuestionKnowledgeId: recommendedQuestion.knowledgeId,
+      });
+      addMessage("user", userText);
+
+      const thinking = addThinkingMessage("사내 지식 확인 중");
+      try {
+        const data = await requestKnowledgeAnswer(userText, history, { recommendedQuestion });
+        thinking.remove();
+        const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
+        const recommendedQuestions = normalizeRecommendedQuestions(data);
+        addMessage("bot", answer, { recommendedQuestions });
+        appendConversationMessage("assistant", answer);
+        const titleConversationId = activeConversationId;
+        void saveRemoteConversationMessage("assistant", answer, { route, task, feature: "knowledge" })
+          .then(() => maybeGenerateConversationTitle(titleConversationId, "knowledge"))
+          .catch(() => {});
+        saveLocalHistory(userText, answer);
+        renderRecentWorkList();
+      } catch (error) {
+        thinking.remove();
+        const errorText = `사내 지식 문의 처리 중 오류가 발생했습니다\n${getErrorMessage(error)}`;
+        addMessage("bot", errorText);
+        appendConversationMessage("assistant", errorText);
+        renderRecentWorkList();
+      }
+    } finally {
+      submitInProgress = false;
+      setComposerDisabled(false);
+      if (sourceButton) sourceButton.disabled = false;
+      state.agentMessageInput?.focus();
+    }
   }
 
   function stripKnowledgeEvidenceNotice(text) {
@@ -3358,7 +3589,7 @@
     }
   }
 
-  function addMessage(role, text) {
+  function addMessage(role, text, options = {}) {
     if (!state.agentBody) return null;
     const emptyCard = state.agentBody.querySelector(".ds-agent-empty-card");
     if (emptyCard) emptyCard.hidden = true;
@@ -3381,6 +3612,7 @@
       const stack = document.createElement("div");
       stack.className = "ds-bot-message-stack";
       stack.appendChild(msg);
+      appendRecommendedQuestions(stack, options.recommendedQuestions);
       addCopyButton(stack, msg);
       row.appendChild(stack);
     } else {
@@ -4173,6 +4405,7 @@
               <span class="ds-guide-nav-copy"><strong>자주 묻는 질문</strong><span>운영 중 문의 정리</span></span>
             </button>
           </nav>
+          <p class="ds-guide-note">가이드는 실제 화면을 그대로 조작하기 전에 흐름을 먼저 익히는 공간입니다. 마지막 단계에서 예시 요청을 홈 입력창에 바로 넣어볼 수 있습니다.</p>
         </aside>
         <div class="ds-guide-main">
           <header class="ds-guide-head">
@@ -4202,7 +4435,7 @@
             </article>
           </div>
           <footer class="ds-guide-footer">
-            
+            <span class="ds-guide-footer-note">가이드는 업무 데이터를 저장하지 않습니다. 실제 요청은 홈 입력창에서 전송할 때 시작됩니다.</span>
           </footer>
         </div>
       </section>`;
