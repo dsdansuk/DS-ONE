@@ -3017,6 +3017,7 @@
           ? await requestFileAnalysis(userText, history)
           : await requestAgentAnswer(userText, history);
       thinking.remove();
+      if (requestFeature === "knowledge") persistSideTalkSessionFromResponse(data);
       const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
       const recommendedQuestions = requestFeature === "knowledge" ? getKnowledgeRecommendedQuestions(data, userText, answer) : [];
       addMessage("bot", answer, { recommendedQuestions });
@@ -3102,6 +3103,7 @@
     const activeToken = await ensureValidSession({ silent: false });
     if (!activeToken) throw new Error("세션 갱신이 필요합니다. 그룹웨어 DS ONE 버튼으로 다시 접속해 주세요.");
     const recommendedQuestion = normalizeRecommendedQuestionOption(options.recommendedQuestion);
+    const sideTalkSessionId = getActiveSideTalkSessionId();
     const payload = {
       message,
       stream: false,
@@ -3110,6 +3112,7 @@
       recommendedQuestions: true,
     };
     if (recommendedQuestion.question || recommendedQuestion.knowledgeId) payload.recommendedQuestion = recommendedQuestion;
+    if (sideTalkSessionId) payload.sideTalkSessionId = sideTalkSessionId;
     const res = await fetch(AI_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
@@ -3359,8 +3362,53 @@
   function getKnowledgeRecommendedQuestions(data, userQuestion, answer) {
     const context = buildKnowledgeRecommendationContext(userQuestion, answer);
     const fromApi = filterAndContextualizeRecommendedQuestions(normalizeRecommendedQuestions(data), context);
-    if (fromApi.length) return fromApi;
+    const shouldRequireKnowledgeId = isSideTalkKnowledgeResponse(data);
+    const actionable = shouldRequireKnowledgeId ? fromApi.filter((item) => item.knowledgeId) : fromApi;
+    if (actionable.length) return actionable;
+    if (shouldRequireKnowledgeId) return [];
     return buildFallbackKnowledgeRecommendedQuestions(context, answer);
+  }
+
+  function isSideTalkKnowledgeResponse(data) {
+    if (!data || typeof data !== "object") return false;
+    return Boolean(
+      data.sideTalkSessionId
+      || data.session_id
+      || data.sessionId
+      || data.chatLogUuid
+      || data.chat_log_uuid
+      || data.provider === "sidetalk"
+      || data.raw?.session_id
+      || data.raw?.sessionId
+      || data.raw?.chat_log_uuid
+      || data.raw?.meta?.sessionId
+    );
+  }
+
+  function getActiveSideTalkSessionId() {
+    const active = getActiveConversation();
+    return String(active?.sideTalkSessionId || active?.sidetalkSessionId || active?.session_id || active?.sessionId || "").trim();
+  }
+
+  function extractSideTalkSessionId(data) {
+    if (!data || typeof data !== "object") return "";
+    return String(
+      data.sideTalkSessionId
+      || data.session_id
+      || data.sessionId
+      || data.raw?.session_id
+      || data.raw?.sessionId
+      || data.raw?.meta?.session_id
+      || data.raw?.meta?.sessionId
+      || "",
+    ).trim();
+  }
+
+  function persistSideTalkSessionFromResponse(data) {
+    if (!activeConversationId) return;
+    const sideTalkSessionId = extractSideTalkSessionId(data);
+    if (!sideTalkSessionId) return;
+    updateRecentWorkItem(activeConversationId, { sideTalkSessionId }, "knowledge");
   }
 
   function buildFallbackKnowledgeRecommendedQuestions(context, answer) {
@@ -3569,6 +3617,7 @@
       try {
         const data = await requestKnowledgeAnswer(userText, history, { recommendedQuestion });
         thinking.remove();
+        persistSideTalkSessionFromResponse(data);
         const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
         const recommendedQuestions = getKnowledgeRecommendedQuestions(data, userText, answer);
         addMessage("bot", answer, { recommendedQuestions });
