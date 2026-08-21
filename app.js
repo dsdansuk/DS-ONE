@@ -3301,17 +3301,12 @@
       data?.result?.recommended_questions,
       data?.response?.recommendedQuestions,
       data?.response?.recommended_questions,
-      data?.raw?.recommended_questions,
-      data?.raw?.recommendedQuestions,
-      data?.raw?.metadata?.recommended_questions,
-      data?.raw?.metadata?.recommendedQuestions,
-      data?.raw?.data?.recommended_questions,
-      data?.raw?.data?.recommendedQuestions,
     ];
     const normalized = [];
     candidates.forEach((candidate) => appendRecommendedQuestionCandidate(candidate, normalized));
     const seen = new Set();
     return normalized.filter((item) => {
+      if (!isPublicRecommendedQuestion(item.question)) return false;
       const key = `${item.knowledgeId || ""}|${item.question}`.toLowerCase();
       if (seen.has(key)) return false;
       seen.add(key);
@@ -3319,31 +3314,19 @@
     }).slice(0, 3);
   }
 
-  function appendRecommendedQuestionCandidate(candidate, out) {
+  function appendRecommendedQuestionCandidate(candidate, out, depth = 0) {
+    if (depth > 4) return;
     if (!candidate) return;
     if (Array.isArray(candidate)) {
-      candidate.forEach((item) => appendRecommendedQuestionCandidate(item, out));
+      candidate.forEach((item) => appendRecommendedQuestionCandidate(item, out, depth + 1));
       return;
     }
     if (typeof candidate === "string") {
       const question = candidate.trim();
-      if (question) out.push({ question, knowledgeId: "" });
+      if (isPublicRecommendedQuestion(question)) out.push({ question, knowledgeId: "" });
       return;
     }
     if (typeof candidate !== "object") return;
-
-    [
-      candidate.items,
-      candidate.list,
-      candidate.data,
-      candidate.questions,
-      candidate.recommended_questions,
-      candidate.recommendedQuestions,
-      candidate.related_questions,
-      candidate.relatedQuestions,
-      candidate.follow_up_questions,
-      candidate.followUpQuestions,
-    ].filter(Boolean).forEach((item) => appendRecommendedQuestionCandidate(item, out));
 
     const questionList = Array.isArray(candidate.question)
       ? candidate.question
@@ -3356,14 +3339,38 @@
         const knowledgeId = String(
           candidate.knowledgeId || candidate.knowledge_id || candidate.knowledgeIds?.[index] || candidate.knowledge_ids?.[index] || candidate.ids?.[index] || "",
         ).trim();
-        if (question) out.push({ question, knowledgeId });
+        if (isPublicRecommendedQuestion(question)) out.push({ question, knowledgeId });
       });
       return;
     }
 
     const question = String(candidate.question || candidate.text || candidate.content || candidate.message || candidate.title || candidate.label || candidate.name || "").trim();
     const knowledgeId = String(candidate.knowledgeId || candidate.knowledge_id || candidate.knowledgeID || candidate.knowledge?.id || candidate.id || candidate.key || "").trim();
-    if (question) out.push({ question, knowledgeId });
+    if (isPublicRecommendedQuestion(question)) {
+      out.push({ question, knowledgeId });
+      return;
+    }
+
+    [
+      candidate.items,
+      candidate.list,
+      candidate.data,
+      candidate.recommended_questions,
+      candidate.recommendedQuestions,
+    ].filter(Boolean).forEach((item) => appendRecommendedQuestionCandidate(item, out, depth + 1));
+  }
+
+  function isPublicRecommendedQuestion(question) {
+    const text = String(question || "").trim();
+    if (!text || text.length > 180) return false;
+    return ![
+      "[원문 우선 검색]",
+      "[검색 보조",
+      "[안전 원칙]",
+      "[질의 전처리]",
+      "검색용 보조 쿼리",
+      "사내 용어 후보",
+    ].some((marker) => text.includes(marker));
   }
 
   function getKnowledgeRecommendedQuestions(data) {
