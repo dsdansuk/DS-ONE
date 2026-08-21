@@ -3148,6 +3148,7 @@
       history,
       recommendedQuestions: true,
     };
+    if (localStorage.getItem("ds_one_debug_recommendations") === "1") payload.debugRecommendations = true;
     if (recommendedQuestion.question || recommendedQuestion.knowledgeId) payload.recommendedQuestion = recommendedQuestion;
     if (sideTalkSessionId) payload.sideTalkSessionId = sideTalkSessionId;
     const res = await fetch(AI_API_URL, {
