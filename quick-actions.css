@@ -183,6 +183,12 @@ body.is-knowledge-feature .action-card .card-mode-icon-knowledge:not([hidden]) {
   stroke-width: 2.2;
 }
 
+.action-card .bar-chart-action-icon,
+.action-card .bar-chart-action-icon * {
+  fill: currentColor !important;
+  stroke: none !important;
+}
+
 .action-card .card-mode-icon-knowledge:not([hidden]) {
   font-size: 14px;
   font-weight: 900;

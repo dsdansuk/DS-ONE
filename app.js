@@ -1865,6 +1865,11 @@
         stroke-linecap: round;
         stroke-linejoin: round;
       }
+      .ds-guide-mock-action-icon svg.ds-guide-bar-chart-icon,
+      .ds-guide-mock-action-icon svg.ds-guide-bar-chart-icon * {
+        fill: currentColor;
+        stroke: none;
+      }
       .ds-guide-mock-action-label {
         display: block;
         max-width: 100%;
@@ -4762,7 +4767,7 @@
               <span class="ds-guide-mock-action-label">엑셀 분석</span>
             </span>
             <span class="ds-guide-mock-action">
-              <span class="ds-guide-mock-action-icon"><svg viewBox="0 0 24 24"><path d="M5 5v14h14"></path><path d="M9 16v-4"></path><path d="M13 16V9"></path><path d="M17 16v-7"></path><path d="m8.5 10.5 3 2.8 4.8-5.8"></path></svg></span>
+              <span class="ds-guide-mock-action-icon"><svg class="ds-guide-bar-chart-icon" viewBox="0 0 24 24"><g fill="currentColor" stroke="none"><rect x="5.2" y="11.2" width="3.5" height="7.6" rx="0.9"></rect><rect x="10.2" y="6.2" width="3.6" height="12.6" rx="0.9"></rect><rect x="15.3" y="9.1" width="3.5" height="9.7" rx="0.9"></rect></g></svg></span>
               <span class="ds-guide-mock-action-label">PDF 분석</span>
             </span>
           </div>
