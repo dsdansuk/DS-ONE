@@ -1,24 +1,26 @@
-/* v129: production quick-action cards
-   Canonical overrides for the home quick-action controls. The historical
-   action-card rules in style.css are intentionally superseded here so future
-   changes can stay scoped to this file. */
+/* v141: compact pill quick actions
+   The quick actions are secondary controls attached to the composer, so they
+   should read lighter than cards and stay stable across agent/knowledge modes. */
 
 :root {
-  --qa-ink: #10264f;
+  --qa-ink: #142543;
   --qa-ink-strong: #0b1d3f;
-  --qa-muted: #78695d;
-  --qa-card-bg: #ffffff;
-  --qa-card-border: #e4e7ec;
-  --qa-card-shadow: 0 1px 1px rgba(16, 24, 40, 0.025);
-  --qa-card-shadow-hover: 0 10px 22px rgba(24, 45, 82, 0.07);
-  --qa-icon-bg: #cfe4ff;
-  --qa-icon-bg-hover: #c5dcfb;
-  --qa-hover-bg: #ffffff;
-  --qa-focus: rgba(47, 111, 237, 0.34);
+  --qa-muted: #6f7785;
+  --qa-pill-bg: rgba(255, 255, 255, 0.9);
+  --qa-pill-border: #d6dde8;
+  --qa-pill-border-hover: #a9c1e8;
+  --qa-pill-bg-hover: #f7faff;
+  --qa-pill-bg-selected: #f2f7ff;
+  --qa-pill-shadow-hover: 0 8px 18px rgba(24, 45, 82, 0.08);
+  --qa-icon: #1d63b7;
+  --qa-focus: rgba(47, 111, 237, 0.32);
+  --qa-knowledge-icon: #1f9d7a;
+  --qa-knowledge-border-hover: #9fd7c8;
+  --qa-knowledge-bg-selected: #f1fbf8;
 }
 
 .prompt-card {
-  margin-bottom: 18px;
+  margin-bottom: clamp(13px, 1.8dvh, 18px);
 }
 
 .action-grid {
@@ -27,10 +29,10 @@
   margin: 0 auto clamp(18px, 2.6dvh, 28px);
   padding: 0;
   display: flex;
-  flex-wrap: nowrap;
-  align-items: stretch;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
-  gap: 11px;
+  gap: 10px 12px;
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -41,24 +43,24 @@
 .action-card {
   position: relative;
   box-sizing: border-box;
-  flex: 1 1 0;
+  flex: 0 1 auto;
   width: auto;
-  min-width: 0;
-  max-width: none;
-  height: auto;
-  min-height: 124px;
-  padding: 14px 12px;
-  display: flex;
-  flex-direction: column;
+  min-width: 126px;
+  max-width: 174px;
+  min-height: 43px;
+  height: 43px;
+  padding: 0 17px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 9px;
   color: var(--qa-ink);
   text-align: center;
-  background: var(--qa-card-bg);
-  border: 1px solid var(--qa-card-border);
-  border-radius: 13px;
-  box-shadow: var(--qa-card-shadow);
-  overflow: visible;
+  background: var(--qa-pill-bg);
+  border: 1px solid var(--qa-pill-border);
+  border-radius: 999px;
+  box-shadow: 0 1px 1px rgba(16, 24, 40, 0.02);
+  overflow: hidden;
   transform: none;
   cursor: pointer;
   transition:
@@ -75,17 +77,28 @@
 
 .action-card:hover {
   color: var(--qa-ink-strong);
-  background: var(--qa-hover-bg);
-  border-color: rgba(162, 187, 222, 0.9);
-  box-shadow: var(--qa-card-shadow-hover);
+  background: var(--qa-pill-bg-hover);
+  border-color: var(--qa-pill-border-hover);
+  box-shadow: var(--qa-pill-shadow-hover);
   transform: translateY(-1px);
 }
 
 .action-card.is-selected {
   color: var(--qa-ink-strong);
-  background: #fff;
-  border-color: rgba(76, 132, 222, 0.76);
-  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.09), var(--qa-card-shadow);
+  background: var(--qa-pill-bg-selected);
+  border-color: rgba(76, 132, 222, 0.72);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.08);
+}
+
+body.is-knowledge-feature .action-card:hover {
+  border-color: var(--qa-knowledge-border-hover);
+  background: #f8fffd;
+}
+
+body.is-knowledge-feature .action-card.is-selected {
+  background: var(--qa-knowledge-bg-selected);
+  border-color: rgba(31, 157, 122, 0.48);
+  box-shadow: 0 0 0 3px rgba(31, 157, 122, 0.08);
 }
 
 .action-card:focus-visible {
@@ -99,30 +112,28 @@
 .action-card.is-disabled,
 .action-card:disabled:hover,
 .action-card.is-disabled:hover {
-  color: #8892a3;
-  background: rgba(246, 248, 251, 0.75);
-  border-color: rgba(218, 224, 233, 0.78);
+  color: #8a93a1;
+  background: rgba(246, 248, 251, 0.78);
+  border-color: rgba(218, 224, 233, 0.9);
   box-shadow: none;
   transform: none;
   cursor: not-allowed;
 }
 
 .card-head {
-  width: 100%;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
+  gap: 8px;
 }
 
 .card-title {
-  width: 100%;
+  min-width: 0;
   color: inherit;
   font-size: 15px;
-  font-weight: 700;
-  line-height: 1.16;
+  font-weight: 800;
+  line-height: 1;
   letter-spacing: 0;
   text-align: center;
   white-space: nowrap;
@@ -131,77 +142,54 @@
 }
 
 .card-desc {
-  display: block !important;
-  width: 100%;
-  margin-top: 5px;
-  color: var(--qa-muted);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.32;
-  letter-spacing: 0;
-  text-align: center;
-  white-space: normal;
-  word-break: keep-all;
-  overflow: visible;
-  text-overflow: clip;
+  display: none !important;
 }
 
-.action-card .card-mode-icon-agent {
-  --qa-icon-scale: 1;
-  --qa-icon-shift-x: 0px;
-  --qa-icon-shift-y: 0px;
-  width: 42px !important;
-  height: 42px !important;
-  flex: 0 0 42px !important;
+.action-card .card-mode-icon-agent,
+.action-card .card-mode-icon-knowledge {
+  width: 18px !important;
+  height: 18px !important;
+  flex: 0 0 18px !important;
   display: grid !important;
   place-items: center;
-  color: #1768ce !important;
-  background: var(--qa-icon-bg) !important;
-  border-radius: 11px !important;
+  color: var(--qa-icon) !important;
+  background: transparent !important;
+  border-radius: 0 !important;
   box-shadow: none !important;
+}
+
+body.is-knowledge-feature .action-card .card-mode-icon-knowledge {
+  color: var(--qa-knowledge-icon) !important;
 }
 
 .action-card .card-mode-icon-agent > svg,
 .action-card .card-mode-icon-agent .quick-action-svg,
-.action-card .card-mode-icon-agent .executive-action-icon {
-  width: 22px !important;
-  height: 22px !important;
+.action-card .card-mode-icon-agent .executive-action-icon,
+.action-card .card-mode-icon-knowledge > svg,
+.action-card .card-mode-icon-knowledge .quick-action-svg,
+.action-card .card-mode-icon-knowledge .executive-action-icon {
+  width: 18px !important;
+  height: 18px !important;
   display: block;
   color: inherit;
-  transform: translate(var(--qa-icon-shift-x), var(--qa-icon-shift-y)) scale(var(--qa-icon-scale));
+  transform: none;
   transform-origin: center;
-}
-
-.action-card .app-icon.summary {
-  --qa-icon-scale: 1;
-}
-
-.action-card .app-icon.doc {
-  --qa-icon-scale: 1;
-}
-
-.action-card .app-icon.file {
-  --qa-icon-scale: 1;
-  --qa-icon-shift-x: 0.1px;
+  stroke-width: 2.2;
 }
 
 .action-card .card-mode-icon-knowledge {
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  border-radius: 11px;
-}
-
-.action-card:hover .card-mode-icon-agent {
-  background: var(--qa-icon-bg-hover) !important;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .card-status {
-  top: 6px;
-  right: 8px;
-  padding: 2px 6px;
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  padding: 1px 5px;
   color: #6f7785;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: 0;
@@ -211,11 +199,16 @@
   border-radius: 999px;
 }
 
+.card-status[hidden] {
+  display: none;
+}
+
 .action-card:disabled .card-mode-icon-agent,
 .action-card.is-disabled .card-mode-icon-agent,
 .action-card:disabled .card-mode-icon-knowledge,
 .action-card.is-disabled .card-mode-icon-knowledge {
   opacity: 0.56;
+  filter: grayscale(0.45);
 }
 
 .recent-work {
@@ -270,25 +263,16 @@
 
 @media (min-width: 1600px) and (min-height: 760px) {
   .action-grid {
-    width: min(810px, calc(100% - 48px));
-    max-width: 810px;
+    width: min(820px, calc(100% - 48px));
+    max-width: 820px;
+    gap: 11px 13px;
   }
 
   .action-card {
-    min-height: 126px;
-  }
-
-  .action-card .card-mode-icon-agent {
-    width: 42px !important;
-    height: 42px !important;
-    flex-basis: 42px !important;
-  }
-
-  .action-card .card-mode-icon-agent > svg,
-  .action-card .card-mode-icon-agent .quick-action-svg,
-  .action-card .card-mode-icon-agent .executive-action-icon {
-    width: 22px !important;
-    height: 22px !important;
+    min-width: 132px;
+    height: 44px;
+    min-height: 44px;
+    padding-inline: 18px;
   }
 }
 
@@ -296,83 +280,58 @@
   .action-grid {
     width: min(760px, calc(100% - 28px));
     max-width: 760px;
-    gap: 9px;
+    gap: 9px 10px;
   }
 
   .action-card {
-    min-height: 118px;
-    padding: 13px 10px;
-  }
-
-  .action-card .card-mode-icon-agent {
-    width: 40px !important;
-    height: 40px !important;
-    flex-basis: 40px !important;
-  }
-
-  .action-card .card-mode-icon-agent > svg,
-  .action-card .card-mode-icon-agent .quick-action-svg,
-  .action-card .card-mode-icon-agent .executive-action-icon {
-    width: 21px !important;
-    height: 21px !important;
+    min-width: 118px;
+    height: 41px;
+    min-height: 41px;
+    padding-inline: 14px;
   }
 
   .card-title {
     font-size: 14px;
   }
 
-  .card-desc {
-    font-size: 12.5px;
+  .action-card .card-mode-icon-agent,
+  .action-card .card-mode-icon-knowledge,
+  .action-card .card-mode-icon-agent > svg,
+  .action-card .card-mode-icon-agent .quick-action-svg,
+  .action-card .card-mode-icon-agent .executive-action-icon,
+  .action-card .card-mode-icon-knowledge > svg {
+    width: 17px !important;
+    height: 17px !important;
+    flex-basis: 17px !important;
   }
 }
 
 @media (max-width: 760px) {
   .action-grid {
-    width: min(100%, 540px);
-    max-width: 540px;
-    flex-wrap: wrap;
-    gap: 9px;
+    width: min(100%, 560px);
+    max-width: 560px;
+    gap: 8px;
+    justify-content: center;
   }
 
   .action-card {
-    flex: 1 1 calc(33.333% - 9px);
-    min-width: 124px;
-    min-height: 114px;
-    padding: 12px 9px;
-  }
-
-  .action-card .card-mode-icon-agent {
-    width: 38px !important;
-    height: 38px !important;
-    flex-basis: 38px !important;
-  }
-
-  .action-card .card-mode-icon-agent > svg,
-  .action-card .card-mode-icon-agent .quick-action-svg,
-  .action-card .card-mode-icon-agent .executive-action-icon {
-    width: 20px !important;
-    height: 20px !important;
-  }
-
-  .card-head {
-    gap: 8px;
+    flex: 1 1 calc(50% - 8px);
+    min-width: min(148px, calc(50% - 8px));
+    max-width: 220px;
+    height: 40px;
+    min-height: 40px;
+    padding-inline: 12px;
   }
 
   .card-title {
     font-size: 13.5px;
   }
-
-  .card-desc {
-    margin-top: 4px;
-    font-size: 12px;
-  }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 420px) {
   .action-card {
-    flex-basis: calc(50% - 5px);
-    min-width: 0;
-    min-height: 112px;
+    flex-basis: 100%;
+    max-width: 260px;
   }
 }
 

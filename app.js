@@ -152,6 +152,14 @@
     guideDialog: null,
   };
 
+  const KNOWLEDGE_CARD_ICONS = {
+    policy: '<svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15"><path d="M7 4h8l3 3v13H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"></path><path d="M15 4v4h4"></path><path d="M8.5 12h7"></path><path d="M8.5 15.5h5"></path></g></svg>',
+    owner: '<svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 19c1.1-3 3.2-4.5 6.5-4.5s5.4 1.5 6.5 4.5"></path><path d="M18.5 8.5h2.2"></path><path d="M19.6 7.4v2.2"></path></g></svg>',
+    system: '<svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15"><rect x="4" y="5" width="16" height="11" rx="2"></rect><path d="M8 20h8"></path><path d="M12 16v4"></path><path d="M9 10h6"></path></g></svg>',
+    security: '<svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15"><path d="M12 3.5 18.5 6v5.2c0 4.1-2.5 7.2-6.5 9.3-4-2.1-6.5-5.2-6.5-9.3V6L12 3.5Z"></path><path d="M9.5 12.2 11.2 14l3.4-4"></path></g></svg>',
+    welfare: '<svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15"><path d="M20 8.5c0 5.5-8 11-8 11s-8-5.5-8-11A4.4 4.4 0 0 1 8.4 4c1.5 0 2.8.7 3.6 1.8A4.4 4.4 0 0 1 15.6 4 4.4 4.4 0 0 1 20 8.5Z"></path><path d="M8.5 11.5h7"></path><path d="M12 8v7"></path></g></svg>',
+  };
+
   const FEATURE_PROFILES = {
     agent: {
       label: "업무 AI Agent",
@@ -180,11 +188,11 @@
       disclaimer: "사내 지식 답변은 SideTalk 지식베이스 기준입니다. 중요한 업무에는 담당 부서와 원문을 확인해 주세요.",
       attachEnabled: false,
       cards: [
-        { iconClass: "knowledge", iconText: "규", title: "규정·기준", desc: "사내 규정과 업무 기준 확인", task: "knowledge_policy", attach: false, template: "아래 사내 규정 또는 기준을 지식베이스 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "담", title: "담당 부서", desc: "업무별 담당 부서와 문의처 확인", task: "knowledge_owner", attach: false, template: "아래 업무의 담당 부서 또는 문의처를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "시", title: "시스템·권한", desc: "시스템 이용 및 권한 기준 확인", task: "knowledge_system_access", attach: false, template: "아래 시스템, 계정 또는 권한 관련 문의를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "보", title: "개인정보", desc: "보안·개인정보 처리 기준 확인", task: "knowledge_security", attach: false, template: "아래 보안, 개인정보 또는 파일 처리 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
-        { iconClass: "knowledge", iconText: "휴", title: "복리후생", desc: "근태·휴가·복리후생 기준 확인", task: "knowledge_welfare", attach: false, template: "아래 근태, 휴가 또는 복리후생 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconSvg: KNOWLEDGE_CARD_ICONS.policy, title: "규정·기준", desc: "사내 규정과 업무 기준 확인", task: "knowledge_policy", attach: false, template: "아래 사내 규정 또는 기준을 지식베이스 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconSvg: KNOWLEDGE_CARD_ICONS.owner, title: "담당 부서", desc: "업무별 담당 부서와 문의처 확인", task: "knowledge_owner", attach: false, template: "아래 업무의 담당 부서 또는 문의처를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconSvg: KNOWLEDGE_CARD_ICONS.system, title: "시스템·권한", desc: "시스템 이용 및 권한 기준 확인", task: "knowledge_system_access", attach: false, template: "아래 시스템, 계정 또는 권한 관련 문의를 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconSvg: KNOWLEDGE_CARD_ICONS.security, title: "개인정보", desc: "보안·개인정보 처리 기준 확인", task: "knowledge_security", attach: false, template: "아래 보안, 개인정보 또는 파일 처리 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
+        { iconClass: "knowledge", iconSvg: KNOWLEDGE_CARD_ICONS.welfare, title: "복리후생", desc: "근태·휴가·복리후생 기준 확인", task: "knowledge_welfare", attach: false, template: "아래 근태, 휴가 또는 복리후생 기준을 사내 기준으로 확인해 주세요.\n\n[질문]\n" },
       ],
     },
   };
@@ -3361,26 +3369,7 @@
 
   function getKnowledgeRecommendedQuestions(data, userQuestion, answer) {
     const context = buildKnowledgeRecommendationContext(userQuestion, answer);
-    const fromApi = filterAndContextualizeRecommendedQuestions(normalizeRecommendedQuestions(data), context);
-    if (fromApi.length) return fromApi;
-    if (isSideTalkKnowledgeResponse(data)) return [];
-    return buildFallbackKnowledgeRecommendedQuestions(context, answer);
-  }
-
-  function isSideTalkKnowledgeResponse(data) {
-    if (!data || typeof data !== "object") return false;
-    return Boolean(
-      data.sideTalkSessionId
-      || data.session_id
-      || data.sessionId
-      || data.chatLogUuid
-      || data.chat_log_uuid
-      || data.provider === "sidetalk"
-      || data.raw?.session_id
-      || data.raw?.sessionId
-      || data.raw?.chat_log_uuid
-      || data.raw?.meta?.sessionId
-    );
+    return filterAndContextualizeRecommendedQuestions(normalizeRecommendedQuestions(data), context);
   }
 
   function getActiveSideTalkSessionId() {
@@ -3407,33 +3396,6 @@
     const sideTalkSessionId = extractSideTalkSessionId(data);
     if (!sideTalkSessionId) return;
     updateRecentWorkItem(activeConversationId, { sideTalkSessionId }, "knowledge");
-  }
-
-  function buildFallbackKnowledgeRecommendedQuestions(context, answer) {
-    const answerText = String(answer || "");
-    if (!answerText || /확인되지|자료에 없|지식베이스.*없|근거.*없|확인.*어렵|질문을 조금 더/.test(answerText)) return [];
-    const source = context.lower;
-    const topic = context.topic;
-    if (!topic) return [];
-    if (/설치|접속|로그인|프로그램|시스템|권한|아이디|계정/.test(source)) {
-      return [
-        { question: `${topic} 설치 후 오류가 나면 어떻게 처리하나요?`, knowledgeId: "" },
-        { question: `${topic} 사용 권한 요청은 어느 부서에 문의하나요?`, knowledgeId: "" },
-        { question: `${topic} 접속 전 확인해야 할 준비사항은 무엇인가요?`, knowledgeId: "" },
-      ];
-    }
-    if (/휴가|근태|연차|복리|복지|식대|출장|정산/.test(source)) {
-      return [
-        { question: `${topic} 신청 절차를 단계별로 알려주세요.`, knowledgeId: "" },
-        { question: `${topic}에 필요한 증빙 자료는 무엇인가요?`, knowledgeId: "" },
-        { question: `${topic} 담당 부서와 문의처를 알려주세요.`, knowledgeId: "" },
-      ];
-    }
-    return [
-      { question: `${topic} 관련 절차를 단계별로 알려주세요.`, knowledgeId: "" },
-      { question: `${topic} 담당 부서와 문의처를 알려주세요.`, knowledgeId: "" },
-      { question: `${topic} 주의사항이나 예외 기준도 알려주세요.`, knowledgeId: "" },
-    ];
   }
 
   function buildKnowledgeRecommendationContext(userQuestion, answer) {
@@ -3494,7 +3456,7 @@
   function filterAndContextualizeRecommendedQuestions(items, context) {
     const seen = new Set();
     return (Array.isArray(items) ? items : [])
-      .map((item) => contextualizeRecommendedQuestion(item, context))
+      .map((item) => normalizeRecommendedQuestionOption(item))
       .filter((item) => {
         if (!item.question) return false;
         if (!isRecommendedQuestionRelevant(item.question, context)) return false;
@@ -3504,14 +3466,6 @@
         return true;
       })
       .slice(0, 3);
-  }
-
-  function contextualizeRecommendedQuestion(item, context) {
-    const question = normalizeText(item?.question || "");
-    if (!question || !context.topic) return { ...item, question };
-    if (hasKnowledgeAnchor(question, context) || hasUnrelatedKnowledgeDomain(question, context)) return { ...item, question };
-    if (!isGenericKnowledgeFollowup(question)) return { ...item, question };
-    return { ...item, question: `${context.topic} ${question}`.replace(/\s+/g, " ").trim() };
   }
 
   function isRecommendedQuestionRelevant(question, context) {
