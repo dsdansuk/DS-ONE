@@ -154,7 +154,7 @@
 
   const KNOWLEDGE_CARD_ICONS = {
     policy: '<svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"><rect x="5" y="4" width="14" height="16" rx="2.4"></rect><path d="m8.3 9.8 1.4 1.4 2.7-3"></path><path d="M14 10h2"></path><path d="M8.5 15h7"></path></g></svg>',
-    owner: '<svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 19c1.1-3 3.2-4.5 6.5-4.5s5.4 1.5 6.5 4.5"></path><path d="M18.5 8.5h2.2"></path><path d="M19.6 7.4v2.2"></path></g></svg>',
+    owner: '<svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"><circle cx="12" cy="8" r="3.3"></circle><path d="M5.5 19c1.3-3 3.5-4.5 6.5-4.5s5.2 1.5 6.5 4.5"></path></g></svg>',
     system: '<svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15"><rect x="4" y="5" width="16" height="11" rx="2"></rect><path d="M8 20h8"></path><path d="M12 16v4"></path><path d="M9 10h6"></path></g></svg>',
     security: '<svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15"><path d="M12 3.5 18.5 6v5.2c0 4.1-2.5 7.2-6.5 9.3-4-2.1-6.5-5.2-6.5-9.3V6L12 3.5Z"></path><path d="M9.5 12.2 11.2 14l3.4-4"></path></g></svg>',
     welfare: '<svg aria-hidden="true" class="quick-action-svg" focusable="false" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15"><path d="M20 8.5c0 5.5-8 11-8 11s-8-5.5-8-11A4.4 4.4 0 0 1 8.4 4c1.5 0 2.8.7 3.6 1.8A4.4 4.4 0 0 1 15.6 4 4.4 4.4 0 0 1 20 8.5Z"></path><path d="M8.5 11.5h7"></path><path d="M12 8v7"></path></g></svg>',
@@ -4754,7 +4754,7 @@
               <span class="ds-guide-mock-action-label">문서 요약</span>
             </span>
             <span class="ds-guide-mock-action">
-              <span class="ds-guide-mock-action-icon"><svg viewBox="0 0 24 24"><path d="M4.5 6.5h7.5"></path><path d="M8.25 4.5v2"></path><path d="M6 12.5c2.1-.9 3.5-3 4.1-6"></path><path d="M5 15l5.3-5.3"></path><path d="M14 19.5 16.8 12l2.8 7.5"></path><path d="M15.1 16.8h3.4"></path></svg></span>
+              <span class="ds-guide-mock-action-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M4.5 12h15"></path><path d="M12 4c2.1 2.2 3.2 5 3.2 8s-1.1 5.8-3.2 8"></path><path d="M12 4c-2.1 2.2-3.2 5-3.2 8s1.1 5.8 3.2 8"></path></svg></span>
               <span class="ds-guide-mock-action-label">문서 번역</span>
             </span>
             <span class="ds-guide-mock-action">
@@ -4762,7 +4762,7 @@
               <span class="ds-guide-mock-action-label">엑셀 분석</span>
             </span>
             <span class="ds-guide-mock-action">
-              <span class="ds-guide-mock-action-icon"><svg viewBox="0 0 24 24"><path d="M6 4h8l4 4v11H6Z"></path><path d="M14 4v4h4"></path><circle cx="15" cy="15" r="3"></circle><path d="m17.2 17.2 2.3 2.3"></path></svg></span>
+              <span class="ds-guide-mock-action-icon"><svg viewBox="0 0 24 24"><path d="M5 5v14h14"></path><path d="M9 16v-4"></path><path d="M13 16V9"></path><path d="M17 16v-7"></path><path d="m8.5 10.5 3 2.8 4.8-5.8"></path></svg></span>
               <span class="ds-guide-mock-action-label">PDF 분석</span>
             </span>
           </div>
