@@ -1542,17 +1542,19 @@
         height: 38px;
         display: grid;
         place-items: center;
-        color: #fff;
+        color: #2f6fed;
         border-radius: 13px;
-        background: linear-gradient(145deg, #2f6fed, #84adff);
-        box-shadow: 0 14px 28px rgba(47, 111, 237, .24);
+        background: linear-gradient(145deg, #eaf3ff, #dbeafe);
+        border: 1px solid rgba(177, 202, 242, .9);
+        box-shadow: 0 12px 24px rgba(47, 111, 237, .12);
       }
       .ds-guide-brand-icon svg {
-        width: 21px;
-        height: 21px;
+        width: 22px;
+        height: 22px;
+        display: block;
         fill: none;
         stroke: currentColor;
-        stroke-width: 2.2;
+        stroke-width: 2.25;
         stroke-linecap: round;
         stroke-linejoin: round;
       }
@@ -1829,36 +1831,42 @@
         stroke-linejoin: round;
       }
       .ds-guide-mock-actions {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: center;
         gap: 7px;
         margin: 16px auto 0;
       }
       .ds-guide-mock-action {
         min-width: 0;
-        min-height: 66px;
-        display: grid;
-        place-items: center;
-        gap: 4px;
-        padding: 8px 4px;
+        height: 38px;
+        min-height: 38px;
+        flex: 1 1 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 0 8px;
         color: #10264f;
         text-align: center;
         background: #fff;
         border: 1px solid rgba(213, 224, 239, .95);
-        border-radius: 14px;
+        border-radius: 999px;
       }
       .ds-guide-mock-action-icon {
-        width: 30px;
-        height: 30px;
+        width: 16px;
+        height: 16px;
+        flex: 0 0 16px;
         display: grid;
         place-items: center;
         color: #1768ce;
-        border-radius: 10px;
-        background: #cfe4ff;
+        border-radius: 0;
+        background: transparent;
       }
       .ds-guide-mock-action-icon svg {
-        width: 17px;
-        height: 17px;
+        width: 16px;
+        height: 16px;
         fill: none;
         stroke: currentColor;
         stroke-width: 2.15;
@@ -1874,10 +1882,12 @@
         display: block;
         max-width: 100%;
         color: #10264f;
-        font-size: 11.5px;
+        font-size: 11.4px;
         font-weight: 900;
-        line-height: 1.2;
+        line-height: 1;
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
         word-break: keep-all;
       }
       .ds-guide-highlight {
@@ -2052,7 +2062,21 @@
           margin-top: 28px;
         }
         .ds-guide-mock-actions {
-          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 6px;
+        }
+        .ds-guide-mock-action {
+          height: 36px;
+          min-height: 36px;
+          padding-inline: 7px;
+        }
+        .ds-guide-mock-action-icon,
+        .ds-guide-mock-action-icon svg {
+          width: 15px;
+          height: 15px;
+          flex-basis: 15px;
+        }
+        .ds-guide-mock-action-label {
+          font-size: 10.9px;
         }
         .ds-guide-step-panel { min-height: 310px; }
         .ds-guide-footer { padding: 0 18px 18px; }
@@ -4594,7 +4618,7 @@
         <aside class="ds-guide-side" aria-label="가이드 메뉴">
           <div class="ds-guide-brand">
             <span class="ds-guide-brand-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4H19v14H7.5A2.5 2.5 0 0 0 5 20.5Z"></path><path d="M5 6.5v14"></path><path d="M9 8h6"></path><path d="M9 11.5h4"></path></svg>
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"></circle><circle cx="12" cy="8.15" r="1.05" fill="currentColor" stroke="none"></circle><rect x="10.95" y="10.75" width="2.1" height="6.4" rx="1.05" fill="currentColor" stroke="none"></rect></svg>
             </span>
             <span>
               <strong>사용 가이드</strong>
