@@ -5446,12 +5446,11 @@
               <h3 class="ds-guide-step-title" data-guide-step-title></h3>
               <div class="ds-guide-feature-menu" data-guide-feature-menu hidden></div>
               <p class="ds-guide-step-desc" data-guide-step-desc></p>
-              <div class="ds-guide-hint" data-guide-hint></div>
+              <div data-guide-hint-slot></div>
               <div class="ds-guide-example-list" data-guide-examples hidden></div>
               <div class="ds-guide-step-actions">
                 <button type="button" data-guide-prev>이전</button>
                 <button type="button" class="primary" data-guide-next>다음</button>
-                <button type="button" data-guide-practice>예시로 따라하기</button>
               </div>
             </article>
           </div>
@@ -5479,7 +5478,6 @@
       if (dot) { setUsageGuideStep(Number(dot.getAttribute("data-guide-step"))); return; }
       if (event.target.closest("[data-guide-prev]")) { goUsageGuidePrev(); return; }
       if (event.target.closest("[data-guide-next]")) { goUsageGuideNext(); return; }
-      if (event.target.closest("[data-guide-practice]")) applyQuickStartGuideExample();
     });
     document.addEventListener("keydown", onKeydown);
     document.body.appendChild(root);
@@ -5549,12 +5547,11 @@
     const badge = root.querySelector("[data-guide-badge]");
     const title = root.querySelector("[data-guide-step-title]");
     const desc = root.querySelector("[data-guide-step-desc]");
-    const hint = root.querySelector("[data-guide-hint]");
+    const hintSlot = root.querySelector("[data-guide-hint-slot]");
     const featureMenu = root.querySelector("[data-guide-feature-menu]");
     const examples = root.querySelector("[data-guide-examples]");
     const prev = root.querySelector("[data-guide-prev]");
     const next = root.querySelector("[data-guide-next]");
-    const practice = root.querySelector("[data-guide-practice]");
     root.querySelector(".ds-guide-step-panel")?.classList.toggle("is-guide-intro", !isQuickStart);
     root.querySelectorAll("[data-guide-section]").forEach((button) => {
       button.setAttribute("aria-current", button.getAttribute("data-guide-section") === (isQuickStart ? "quick" : "intro") ? "true" : "false");
@@ -5577,15 +5574,26 @@
       featureMenu.innerHTML = isQuickStart ? "" : createUsageGuideFeatureMenu();
     }
     if (desc) desc.textContent = step.desc;
-    if (hint) hint.textContent = step.hint;
+    if (hintSlot) {
+      hintSlot.innerHTML = "";
+      if (isQuickStart && step.hint) {
+        const hint = document.createElement("div");
+        hint.className = "ds-guide-hint";
+        hint.setAttribute("data-guide-hint", "");
+        hint.textContent = step.hint;
+        hintSlot.appendChild(hint);
+      }
+    }
     if (examples) {
       const items = Array.isArray(step.examples) ? step.examples.filter(Boolean) : [];
       examples.hidden = !items.length;
       examples.innerHTML = items.map((item) => `<span>${escapeHtml(item)}</span>`).join("");
     }
-    if (prev) prev.disabled = !isQuickStart;
+    if (prev) {
+      prev.hidden = !isQuickStart;
+      prev.disabled = !isQuickStart;
+    }
     if (next) next.textContent = !isQuickStart ? "빠른 시작 보기" : (dialog.step >= QUICK_START_GUIDE_STEPS.length - 1 ? "가이드 마치기" : "다음");
-    if (practice) practice.hidden = step.practice === false;
   }
 
   function createUsageGuideFeatureMenu() {
