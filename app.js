@@ -2006,8 +2006,8 @@
         background: #79a4fb;
       }
       .ds-guide-mock-send svg {
-        width: 21px;
-        height: 21px;
+        width: 18px;
+        height: 18px;
         fill: none;
         stroke: currentColor;
         stroke-width: 2.1;
