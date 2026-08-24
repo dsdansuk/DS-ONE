@@ -92,7 +92,6 @@
           padding: 7,
           title: "자주 쓰는 업무는 버튼으로 시작하세요",
           desc: "문서 작성, 요약, 번역처럼 목적이 분명할 때 버튼을 쓰면 입력 양식이 준비됩니다.",
-          nextLabel: "예시로 눌러보기",
           nextAction: "applyExample",
         },
         {
@@ -132,7 +131,6 @@
           padding: 7,
           title: "질문 유형을 버튼으로 좁혀보세요",
           desc: "규정·기준, 담당 부서, 시스템·권한 같은 버튼을 누르면 질문 양식이 준비됩니다.",
-          nextLabel: "예시로 눌러보기",
           nextAction: "applyExample",
         },
         {
@@ -3156,6 +3154,10 @@
   }
 
   function submitFromHome() {
+    if (state.onboardingTour) {
+      state.homePromptInput?.focus();
+      return;
+    }
     const message = String(state.homePromptInput?.value || "").trim();
     if (!message && !selectedFiles.length) {
       state.homePromptInput?.focus();
@@ -4908,6 +4910,12 @@
         </section>`;
       const onKeydown = (event) => {
         if (!state.onboardingTour) return;
+        if (isPlainEnterSubmitEvent(event) && isOnboardingInputTarget(event.target)) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+          return;
+        }
         if (event.key === "Escape") {
           event.preventDefault();
           finishOnboardingTour({ completed: false });
@@ -4937,7 +4945,7 @@
       };
       root.addEventListener("click", handleOnboardingTourClick);
       root.addEventListener("change", handleOnboardingTourChange);
-      document.addEventListener("keydown", onKeydown);
+      document.addEventListener("keydown", onKeydown, true);
       window.addEventListener("scroll", onReposition, true);
       document.body.appendChild(root);
       document.body.classList.add("ds-onboarding-active");
@@ -5173,7 +5181,7 @@
     if (!tour) return;
     tour.root?.removeEventListener("click", handleOnboardingTourClick);
     tour.root?.removeEventListener("change", handleOnboardingTourChange);
-    if (tour.onKeydown) document.removeEventListener("keydown", tour.onKeydown);
+    if (tour.onKeydown) document.removeEventListener("keydown", tour.onKeydown, true);
     if (tour.onReposition) window.removeEventListener("scroll", tour.onReposition, true);
     tour.root?.remove();
     document.body.classList.remove("ds-onboarding-active");
@@ -5187,6 +5195,13 @@
 
   function prefersReducedMotion() {
     try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; }
+  }
+
+  function isOnboardingInputTarget(target) {
+    if (!target || typeof target.matches !== "function") return false;
+    return target === state.homePromptInput
+      || target === state.agentMessageInput
+      || target.matches(".prompt-card textarea, #dsAgentMessageInput");
   }
 
   function handleOnboardingTourActionCardClick(event) {
