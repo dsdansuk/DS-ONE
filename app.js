@@ -71,6 +71,38 @@
       highlight: "prompt",
     },
   ];
+  const ONBOARDING_TOUR_STORAGE_PREFIX = STORAGE.onboardingTourStoragePrefix || "ds_one_onboarding_tour_v2_";
+  const ONBOARDING_TOUR_SESSION_PREFIX = "ds_one_onboarding_tour_session_v2_";
+  const ONBOARDING_TOUR_STEPS = [
+    {
+      selector: ".prompt-card",
+      placement: "bottom",
+      padding: 8,
+      title: "궁금한 업무를 그대로 입력하세요",
+      desc: "회의록 요약, 메일 작성처럼 하려는 일을 한 문장으로 적으면 됩니다.",
+    },
+    {
+      selector: ".action-grid",
+      placement: "top",
+      padding: 7,
+      title: "자주 쓰는 업무는 버튼으로 시작하세요",
+      desc: "버튼을 누르면 목적에 맞는 입력 양식이 자동으로 준비됩니다.",
+    },
+    {
+      selector: ".recent-list",
+      placement: "right",
+      padding: 6,
+      title: "이전 작업은 여기서 다시 엽니다",
+      desc: "요청과 답변이 쌓이면 제목과 시간으로 빠르게 찾을 수 있습니다.",
+    },
+    {
+      selector: ".sidebar-guide-button",
+      placement: "right",
+      padding: 6,
+      title: "막히면 여기서 다시 볼 수 있어요",
+      desc: "언제든 사용 가이드를 눌러 이 둘러보기를 다시 시작할 수 있습니다.",
+    },
+  ];
 
   const ALLOWED_EXTENSIONS = (FILE_POLICY.allowedExtensions || ["txt", "md", "csv", "json", "docx", "xlsx", "pdf"])
     .map((value) => String(value || "").toLowerCase().replace(/^\./, ""))
@@ -105,6 +137,7 @@
   let rpaAccessPromise = null;
   let rpaPanelRefreshTimer = 0;
   let rpaWorkspaceSeq = 0;
+  let onboardingTourAutoScheduled = false;
   const CHAT_SEARCH_DEBOUNCE_MS = 420;
   const rpaAccessState = {
     checked: false,
@@ -150,6 +183,7 @@
     actionCards: [],
     agentDisclaimer: null,
     guideDialog: null,
+    onboardingTour: null,
   };
 
   const KNOWLEDGE_CARD_ICONS = {
@@ -220,6 +254,7 @@
     attachToExistingHome();
     createRuntimeAgentWorkspace();
     initializeFeatureSwitcher();
+    window.setTimeout(maybeStartFirstRunOnboardingTour, 1400);
     bindUiEvents();
     void refreshRpaAccess({ force: true, silent: true });
     migrateLegacyRecentWorkByFeature();
@@ -229,6 +264,7 @@
     authBootstrapPromise.finally(() => {
       scheduleRemoteRecentRefresh(120);
       void refreshRpaAccess({ force: true, silent: true });
+      maybeStartFirstRunOnboardingTour();
     });
     normalizeHomeComposerLayout();
     resizeTextarea(state.agentMessageInput);
@@ -2024,6 +2060,222 @@
         font-weight: 750;
         line-height: 1.45;
       }
+      .ds-onboarding-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 10040;
+        pointer-events: none;
+      }
+      .ds-onboarding-spotlight {
+        position: fixed;
+        z-index: 10041;
+        border: 2px solid rgba(255, 255, 255, .98);
+        border-radius: 18px;
+        box-shadow:
+          0 0 0 9999px rgba(15, 23, 42, .48),
+          0 0 0 4px rgba(47, 111, 237, .24),
+          0 18px 44px rgba(15, 23, 42, .2);
+        transition: top .2s ease, left .2s ease, width .2s ease, height .2s ease, border-radius .2s ease;
+        pointer-events: none;
+      }
+      .ds-onboarding-card {
+        position: fixed;
+        z-index: 10042;
+        width: min(336px, calc(100vw - 32px));
+        padding: 15px 16px 14px;
+        color: #10264f;
+        background: rgba(255, 255, 255, .98);
+        border: 1px solid rgba(198, 213, 234, .95);
+        border-radius: 16px;
+        box-shadow: 0 24px 64px rgba(15, 23, 42, .24);
+        backdrop-filter: blur(16px);
+        pointer-events: auto;
+        transition: top .2s ease, left .2s ease;
+      }
+      .ds-onboarding-card::before {
+        content: "";
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background: inherit;
+        border: inherit;
+        transform: rotate(45deg);
+      }
+      .ds-onboarding-card[data-placement="bottom"]::before {
+        top: -7px;
+        left: var(--ds-onboarding-arrow-left, 28px);
+        border-right: 0;
+        border-bottom: 0;
+      }
+      .ds-onboarding-card[data-placement="top"]::before {
+        bottom: -7px;
+        left: var(--ds-onboarding-arrow-left, 28px);
+        border-left: 0;
+        border-top: 0;
+      }
+      .ds-onboarding-card[data-placement="right"]::before {
+        left: -7px;
+        top: var(--ds-onboarding-arrow-top, 24px);
+        border-right: 0;
+        border-top: 0;
+      }
+      .ds-onboarding-card[data-placement="left"]::before {
+        right: -7px;
+        top: var(--ds-onboarding-arrow-top, 24px);
+        border-left: 0;
+        border-bottom: 0;
+      }
+      .ds-onboarding-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .ds-onboarding-count {
+        color: #2f6fed;
+        font-size: 12px;
+        font-weight: 950;
+        line-height: 1;
+      }
+      .ds-onboarding-close {
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        color: #64748b;
+        background: transparent;
+        border-radius: 9px;
+        cursor: pointer;
+      }
+      .ds-onboarding-close:hover,
+      .ds-onboarding-close:focus-visible {
+        color: #0f172a;
+        background: #f1f6ff;
+        outline: none;
+      }
+      .ds-onboarding-close svg {
+        width: 16px;
+        height: 16px;
+        display: block;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.2;
+        stroke-linecap: round;
+      }
+      .ds-onboarding-title {
+        margin: 0;
+        color: #111827;
+        font-size: 16px;
+        font-weight: 950;
+        line-height: 1.35;
+        letter-spacing: 0;
+        word-break: keep-all;
+      }
+      .ds-onboarding-desc {
+        margin: 7px 0 0;
+        color: #475569;
+        font-size: 13px;
+        font-weight: 750;
+        line-height: 1.55;
+        word-break: keep-all;
+      }
+      .ds-onboarding-option {
+        min-height: 28px;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 12px;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 750;
+        line-height: 1.2;
+        cursor: pointer;
+      }
+      .ds-onboarding-option input {
+        width: 15px;
+        height: 15px;
+        margin: 0;
+        accent-color: #2f6fed;
+      }
+      .ds-onboarding-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 12px;
+      }
+      .ds-onboarding-dots {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .ds-onboarding-dots button {
+        width: 18px;
+        height: 18px;
+        display: grid;
+        place-items: center;
+        padding: 0;
+        background: transparent;
+        border: 0;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      .ds-onboarding-dots button::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: #cbd7ea;
+        transition: width .16s ease, background .16s ease;
+      }
+      .ds-onboarding-dots button[aria-current="step"]::before {
+        width: 18px;
+        background: #2f6fed;
+      }
+      .ds-onboarding-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .ds-onboarding-actions button {
+        min-height: 34px;
+        padding: 0 11px;
+        color: #334155;
+        font-size: 12px;
+        font-weight: 900;
+        line-height: 1;
+        background: #fff;
+        border: 1px solid rgba(203, 213, 225, .95);
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      .ds-onboarding-actions button:hover,
+      .ds-onboarding-actions button:focus-visible {
+        color: #174ea6;
+        background: #f4f8ff;
+        border-color: #bfd5ff;
+        outline: none;
+      }
+      .ds-onboarding-actions button.primary {
+        color: #fff;
+        background: linear-gradient(135deg, #2f6fed, #78a4ff);
+        border-color: transparent;
+        box-shadow: 0 10px 20px rgba(47, 111, 237, .2);
+      }
+      .ds-onboarding-actions button:disabled {
+        color: #94a3b8;
+        background: #f8fafc;
+        border-color: #e2e8f0;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .ds-onboarding-spotlight,
+        .ds-onboarding-card {
+          transition: none;
+        }
+      }
       @media (max-width: 720px) {
         .ds-dialog-backdrop, .ds-search-backdrop, .ds-guide-backdrop { padding: 14px; }
         .ds-search-card {
@@ -2779,8 +3031,8 @@
       handleAgentSubmit();
     });
 
-    document.querySelectorAll(".sidebar-guide-button,.header-button").forEach((button) => {
-      button.addEventListener("click", () => openUsageGuide());
+    document.querySelectorAll(".sidebar-guide-button,.header-button,.guide-button").forEach((button) => {
+      button.addEventListener("click", () => startOnboardingTour({ manual: true }));
     });
     document.querySelectorAll(".task-row").forEach((button) => {
       button.addEventListener("click", () => showToast("해당 기능은 추후 연동 예정입니다."));
@@ -2793,6 +3045,7 @@
       closeRecentContextMenu();
       resizeTextarea(state.homePromptInput);
       resizeTextarea(state.agentMessageInput);
+      updateOnboardingTourPosition();
     });
   }
 
@@ -4514,6 +4767,361 @@
     });
   }
 
+  function getOnboardingTourStorageKey() {
+    return `${ONBOARDING_TOUR_STORAGE_PREFIX}${getStorageUserKey()}`;
+  }
+
+  function getOnboardingTourSessionKey() {
+    return `${ONBOARDING_TOUR_SESSION_PREFIX}${getStorageUserKey()}`;
+  }
+
+  function readOnboardingTourPreference() {
+    try {
+      const raw = localStorage.getItem(getOnboardingTourStorageKey());
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function persistOnboardingTourPreference(patch = {}) {
+    try {
+      const next = {
+        ...readOnboardingTourPreference(),
+        ...patch,
+        updatedAt: Date.now(),
+      };
+      localStorage.setItem(getOnboardingTourStorageKey(), JSON.stringify(next));
+    } catch {}
+  }
+
+  function markOnboardingTourSeenThisSession() {
+    try { sessionStorage.setItem(getOnboardingTourSessionKey(), String(Date.now())); } catch {}
+  }
+
+  function wasOnboardingTourSeenThisSession() {
+    try { return Boolean(sessionStorage.getItem(getOnboardingTourSessionKey())); } catch { return false; }
+  }
+
+  function maybeStartFirstRunOnboardingTour() {
+    if (isEmbeddedInIframe() || state.onboardingTour) return;
+    const preference = readOnboardingTourPreference();
+    if (preference.completed === true || preference.dismissed === true) return;
+    if (onboardingTourAutoScheduled) return;
+    onboardingTourAutoScheduled = true;
+    window.setTimeout(() => {
+      if (state.onboardingTour) return;
+      markOnboardingTourSeenThisSession();
+      startOnboardingTour({ auto: true });
+    }, 360);
+  }
+
+  function startOnboardingTour(options = {}) {
+    if (isEmbeddedInIframe()) return;
+    closeUsageGuide();
+    destroyOnboardingTour({ restoreFocus: false });
+    if (currentMode !== "home") setMode("home");
+
+    window.setTimeout(() => {
+      const steps = getAvailableOnboardingTourSteps();
+      if (!steps.length) return;
+      const initialStep = Math.max(0, Math.min(steps.length - 1, Number(options.initialStep) || 0));
+      const root = document.createElement("div");
+      root.className = "ds-onboarding-layer";
+      root.setAttribute("role", "presentation");
+      root.innerHTML = `
+        <div class="ds-onboarding-spotlight" data-onboarding-spotlight aria-hidden="true"></div>
+        <section class="ds-onboarding-card" role="dialog" aria-modal="false" aria-labelledby="dsOnboardingTitle" aria-describedby="dsOnboardingDesc" data-onboarding-card>
+          <div class="ds-onboarding-head">
+            <span class="ds-onboarding-count" data-onboarding-count></span>
+            <button class="ds-onboarding-close" type="button" aria-label="둘러보기 닫기" data-onboarding-close>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7l10 10"></path><path d="M17 7 7 17"></path></svg>
+            </button>
+          </div>
+          <h2 id="dsOnboardingTitle" class="ds-onboarding-title" data-onboarding-title></h2>
+          <p id="dsOnboardingDesc" class="ds-onboarding-desc" data-onboarding-desc></p>
+          <label class="ds-onboarding-option">
+            <input type="checkbox" data-onboarding-hide>
+            <span>다시 보지 않기</span>
+          </label>
+          <div class="ds-onboarding-footer">
+            <div class="ds-onboarding-dots" data-onboarding-dots aria-label="둘러보기 단계"></div>
+            <div class="ds-onboarding-actions">
+              <button type="button" data-onboarding-skip>건너뛰기</button>
+              <button type="button" data-onboarding-prev>이전</button>
+              <button type="button" class="primary" data-onboarding-next>다음</button>
+            </div>
+          </div>
+        </section>`;
+      const onKeydown = (event) => {
+        if (!state.onboardingTour) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          finishOnboardingTour({ completed: false });
+          return;
+        }
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          setOnboardingTourStep((state.onboardingTour.step || 0) + 1);
+          return;
+        }
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          setOnboardingTourStep((state.onboardingTour.step || 0) - 1);
+        }
+      };
+      const onReposition = () => updateOnboardingTourPosition();
+      state.onboardingTour = {
+        root,
+        step: initialStep,
+        steps,
+        doNotShow: false,
+        lastFocus: document.activeElement,
+        onKeydown,
+        onReposition,
+      };
+      root.addEventListener("click", handleOnboardingTourClick);
+      root.addEventListener("change", handleOnboardingTourChange);
+      document.addEventListener("keydown", onKeydown);
+      window.addEventListener("scroll", onReposition, true);
+      document.body.appendChild(root);
+      document.body.classList.add("ds-onboarding-active");
+      renderOnboardingTourStep();
+      window.setTimeout(() => root.querySelector("[data-onboarding-next]")?.focus(), 30);
+    }, 0);
+  }
+
+  function handleOnboardingTourClick(event) {
+    if (!state.onboardingTour) return;
+    if (event.target.closest("[data-onboarding-close], [data-onboarding-skip]")) {
+      finishOnboardingTour({ completed: false });
+      return;
+    }
+    const dot = event.target.closest("[data-onboarding-step]");
+    if (dot) {
+      setOnboardingTourStep(Number(dot.getAttribute("data-onboarding-step")));
+      return;
+    }
+    if (event.target.closest("[data-onboarding-prev]")) {
+      setOnboardingTourStep((state.onboardingTour.step || 0) - 1);
+      return;
+    }
+    if (event.target.closest("[data-onboarding-next]")) {
+      const current = state.onboardingTour.step || 0;
+      if (current >= state.onboardingTour.steps.length - 1) finishOnboardingTour({ completed: true });
+      else setOnboardingTourStep(current + 1);
+    }
+  }
+
+  function handleOnboardingTourChange(event) {
+    const checkbox = event.target.closest("[data-onboarding-hide]");
+    if (!checkbox || !state.onboardingTour) return;
+    state.onboardingTour.doNotShow = checkbox.checked === true;
+  }
+
+  function getAvailableOnboardingTourSteps() {
+    return ONBOARDING_TOUR_STEPS
+      .map((step) => ({ ...step, target: getVisibleOnboardingTarget(step.selector) }))
+      .filter((step) => step.target);
+  }
+
+  function getVisibleOnboardingTarget(selector) {
+    return Array.from(document.querySelectorAll(selector)).find((element) => isElementVisibleForTour(element)) || null;
+  }
+
+  function isElementVisibleForTour(element) {
+    if (!element || !element.isConnected) return false;
+    const style = window.getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden") return false;
+    const rect = element.getBoundingClientRect();
+    return rect.width >= 8 && rect.height >= 8 && rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth;
+  }
+
+  function setOnboardingTourStep(nextStep) {
+    const tour = state.onboardingTour;
+    if (!tour) return;
+    const max = tour.steps.length - 1;
+    tour.step = Math.max(0, Math.min(max, Number(nextStep) || 0));
+    try {
+      tour.steps[tour.step]?.target?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+    } catch {}
+    renderOnboardingTourStep();
+  }
+
+  function renderOnboardingTourStep() {
+    const tour = state.onboardingTour;
+    if (!tour?.root) return;
+    const step = tour.steps[tour.step] || tour.steps[0];
+    if (!step) return;
+    const root = tour.root;
+    root.querySelector("[data-onboarding-count]").textContent = `${tour.step + 1} / ${tour.steps.length}`;
+    root.querySelector("[data-onboarding-title]").textContent = step.title;
+    root.querySelector("[data-onboarding-desc]").textContent = step.desc;
+    const checkbox = root.querySelector("[data-onboarding-hide]");
+    if (checkbox) checkbox.checked = tour.doNotShow === true;
+    const dots = root.querySelector("[data-onboarding-dots]");
+    if (dots) {
+      dots.innerHTML = tour.steps.map((_, index) => (
+        `<button type="button" data-onboarding-step="${index}" aria-label="${index + 1}단계로 이동" aria-current="${index === tour.step ? "step" : "false"}"></button>`
+      )).join("");
+    }
+    const prev = root.querySelector("[data-onboarding-prev]");
+    const next = root.querySelector("[data-onboarding-next]");
+    if (prev) prev.disabled = tour.step === 0;
+    if (next) next.textContent = tour.step >= tour.steps.length - 1 ? "완료" : "다음";
+    updateOnboardingTourPosition();
+  }
+
+  function updateOnboardingTourPosition() {
+    const tour = state.onboardingTour;
+    if (!tour?.root) return;
+    const step = tour.steps[tour.step] || tour.steps[0];
+    if (!step || !isElementVisibleForTour(step.target)) {
+      tour.steps = getAvailableOnboardingTourSteps();
+      if (!tour.steps.length) {
+        destroyOnboardingTour();
+        return;
+      }
+      tour.step = Math.min(tour.step, tour.steps.length - 1);
+      renderOnboardingTourStep();
+      return;
+    }
+    const root = tour.root;
+    const spotlight = root.querySelector("[data-onboarding-spotlight]");
+    const card = root.querySelector("[data-onboarding-card]");
+    if (!spotlight || !card) return;
+    const rect = getOnboardingSpotlightRect(step);
+    const radius = getOnboardingSpotlightRadius(step.target, step.padding || 0);
+    spotlight.style.top = `${rect.top}px`;
+    spotlight.style.left = `${rect.left}px`;
+    spotlight.style.width = `${rect.width}px`;
+    spotlight.style.height = `${rect.height}px`;
+    spotlight.style.borderRadius = `${radius}px`;
+
+    const position = getOnboardingCardPosition(card, rect, step.placement);
+    card.style.top = `${position.top}px`;
+    card.style.left = `${position.left}px`;
+    card.dataset.placement = position.placement;
+    card.style.setProperty("--ds-onboarding-arrow-left", `${position.arrowLeft}px`);
+    card.style.setProperty("--ds-onboarding-arrow-top", `${position.arrowTop}px`);
+  }
+
+  function getOnboardingSpotlightRect(step) {
+    const targetRect = step.target.getBoundingClientRect();
+    const padding = Number(step.padding || 0);
+    const viewportMargin = 8;
+    const left = Math.max(viewportMargin, targetRect.left - padding);
+    const top = Math.max(viewportMargin, targetRect.top - padding);
+    const right = Math.min(window.innerWidth - viewportMargin, targetRect.right + padding);
+    const bottom = Math.min(window.innerHeight - viewportMargin, targetRect.bottom + padding);
+    return {
+      left,
+      top,
+      right,
+      bottom,
+      width: Math.max(12, right - left),
+      height: Math.max(12, bottom - top),
+    };
+  }
+
+  function getOnboardingSpotlightRadius(target, padding) {
+    const styles = window.getComputedStyle(target);
+    const radius = Number.parseFloat(styles.borderTopLeftRadius || styles.borderRadius || "14");
+    return Math.max(12, Math.min(24, (Number.isFinite(radius) ? radius : 14) + Number(padding || 0)));
+  }
+
+  function getOnboardingCardPosition(card, rect, preferredPlacement = "bottom") {
+    const gap = 16;
+    const margin = 16;
+    const cardWidth = card.offsetWidth || 336;
+    const cardHeight = card.offsetHeight || 190;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    let placement = preferredPlacement;
+    let left = centerX - cardWidth / 2;
+    let top = rect.bottom + gap;
+
+    const canFitRight = rect.right + gap + cardWidth <= viewportWidth - margin;
+    const canFitLeft = rect.left - gap - cardWidth >= margin;
+    const canFitBottom = rect.bottom + gap + cardHeight <= viewportHeight - margin;
+    const canFitTop = rect.top - gap - cardHeight >= margin;
+
+    if (rect.left < 280 && rect.width < 320) {
+      placement = "right";
+    } else if (placement === "right") {
+      placement = canFitRight ? "right" : canFitLeft ? "left" : canFitBottom ? "bottom" : "top";
+    } else if (placement === "left") {
+      placement = canFitLeft ? "left" : canFitRight ? "right" : canFitBottom ? "bottom" : "top";
+    } else if (placement === "top") {
+      placement = canFitTop ? "top" : canFitBottom ? "bottom" : canFitRight ? "right" : "left";
+    } else {
+      placement = canFitBottom ? "bottom" : canFitTop ? "top" : canFitRight ? "right" : "left";
+    }
+
+    if (placement === "right") {
+      left = rect.right + gap;
+      top = centerY - cardHeight / 2;
+    } else if (placement === "left") {
+      left = rect.left - gap - cardWidth;
+      top = centerY - cardHeight / 2;
+    } else if (placement === "top") {
+      left = centerX - cardWidth / 2;
+      top = rect.top - gap - cardHeight;
+    } else {
+      left = centerX - cardWidth / 2;
+      top = rect.bottom + gap;
+    }
+
+    left = Math.max(margin, Math.min(left, viewportWidth - cardWidth - margin));
+    top = Math.max(margin, Math.min(top, viewportHeight - cardHeight - margin));
+    return {
+      left,
+      top,
+      placement,
+      arrowLeft: Math.max(20, Math.min(cardWidth - 28, centerX - left - 6)),
+      arrowTop: Math.max(18, Math.min(cardHeight - 28, centerY - top - 6)),
+    };
+  }
+
+  function finishOnboardingTour({ completed = false } = {}) {
+    const tour = state.onboardingTour;
+    if (!tour) return;
+    const preference = readOnboardingTourPreference();
+    markOnboardingTourSeenThisSession();
+    if (completed || tour.doNotShow) {
+      persistOnboardingTourPreference({
+        completed: completed ? true : preference.completed === true,
+        dismissed: completed ? false : true,
+        completedAt: completed ? Date.now() : preference.completedAt || 0,
+        dismissedAt: !completed && tour.doNotShow ? Date.now() : preference.dismissedAt || 0,
+      });
+    }
+    destroyOnboardingTour();
+  }
+
+  function destroyOnboardingTour(options = {}) {
+    const tour = state.onboardingTour;
+    if (!tour) return;
+    tour.root?.removeEventListener("click", handleOnboardingTourClick);
+    tour.root?.removeEventListener("change", handleOnboardingTourChange);
+    if (tour.onKeydown) document.removeEventListener("keydown", tour.onKeydown);
+    if (tour.onReposition) window.removeEventListener("scroll", tour.onReposition, true);
+    tour.root?.remove();
+    document.body.classList.remove("ds-onboarding-active");
+    state.onboardingTour = null;
+    if (options.restoreFocus !== false && tour.lastFocus && typeof tour.lastFocus.focus === "function") {
+      window.setTimeout(() => {
+        try { tour.lastFocus.focus({ preventScroll: true }); } catch {}
+      }, 0);
+    }
+  }
+
+  function prefersReducedMotion() {
+    try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; }
+  }
+
   function openUsageGuide(initialStep = 0) {
     if (state.guideDialog?.root?.isConnected) {
       state.guideDialog.root.querySelector("[data-guide-close]")?.focus();
@@ -5041,7 +5649,7 @@
     if (Array.isArray(items) && items.length) return "";
     if (currentFeature === "knowledge") return "아직 사내 지식 문의 기록이 없습니다.\n질문을 입력하면 자동으로 쌓입니다.";
     if (recentRemoteRefreshInProgress && !recentRemoteEverLoaded) return "저장된 업무 대화를 불러오는 중입니다.\n잠시만 기다려 주세요.";
-    return "아직 최근 작업이 없습니다.\n업무를 요청하면 자동으로 쌓입니다.";
+    return "이전에 요청한 작업이 여기에 쌓입니다.\n나중에 결과를 다시 열어볼 수 있습니다.";
   }
 
   function renderSidebarRecentList(items) {
