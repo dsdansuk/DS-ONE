@@ -1997,8 +1997,8 @@
         position: absolute;
         right: 16px;
         bottom: 16px;
-        width: 40px;
-        height: 40px;
+        width: 34px;
+        height: 34px;
         display: grid;
         place-items: center;
         color: #fff;
