@@ -1607,7 +1607,7 @@
         height: min(720px, calc(100dvh - 48px));
         min-height: min(620px, calc(100dvh - 48px));
         display: grid;
-        grid-template-columns: 286px minmax(0, 1fr);
+        grid-template-columns: 232px minmax(0, 1fr);
         overflow: hidden;
         color: #10264f;
         background: #fff;
@@ -1620,7 +1620,7 @@
         display: flex;
         flex-direction: column;
         gap: 18px;
-        padding: 24px 18px 20px;
+        padding: 24px 14px 20px;
         background:
           radial-gradient(circle at 20% 0%, rgba(47, 111, 237, .13), transparent 34%),
           linear-gradient(180deg, #f8fbff 0%, #f4f8ff 100%);
@@ -1674,8 +1674,8 @@
         width: 100%;
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 12px 12px;
+        gap: 9px;
+        padding: 11px 10px;
         color: #334155;
         text-align: left;
         background: transparent;
@@ -1801,9 +1801,9 @@
       .ds-guide-body {
         min-height: 0;
         display: grid;
-        grid-template-columns: minmax(410px, 1.08fr) minmax(320px, .92fr);
-        gap: 20px;
-        padding: 10px 26px 20px;
+        grid-template-columns: minmax(0, 1.18fr) minmax(300px, .82fr);
+        gap: 18px;
+        padding: 10px 24px 20px;
         overflow: hidden;
       }
       .ds-guide-player,
@@ -1947,7 +1947,7 @@
         background: rgba(239, 246, 255, .92);
       }
       .ds-guide-mock {
-        width: min(96%, 560px);
+        width: min(100%, 620px);
         margin: 32px auto 0;
       }
       .ds-guide-mock-heading {
@@ -2019,23 +2019,21 @@
         stroke-linejoin: round;
       }
       .ds-guide-mock-actions {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         align-items: center;
-        justify-content: center;
-        gap: 7px;
+        gap: 5px;
         margin: 16px auto 0;
       }
       .ds-guide-mock-action {
-        min-width: 88px;
-        height: 38px;
-        min-height: 38px;
-        flex: 0 1 auto;
+        min-width: 0;
+        height: 36px;
+        min-height: 36px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 5px;
-        padding: 0 8px;
+        gap: 4px;
+        padding: 0 6px;
         color: #10264f;
         text-align: center;
         background: #fff;
@@ -2043,9 +2041,9 @@
         border-radius: 999px;
       }
       .ds-guide-mock-action-icon {
-        width: 16px;
-        height: 16px;
-        flex: 0 0 16px;
+        width: 14px;
+        height: 14px;
+        flex: 0 0 14px;
         display: grid;
         place-items: center;
         color: #1768ce;
@@ -2053,8 +2051,8 @@
         background: transparent;
       }
       .ds-guide-mock-action-icon svg {
-        width: 16px;
-        height: 16px;
+        width: 14px;
+        height: 14px;
         fill: none;
         stroke: currentColor;
         stroke-width: 2.15;
@@ -2071,7 +2069,7 @@
         flex: 0 0 auto;
         max-width: 100%;
         color: #10264f;
-        font-size: 11.4px;
+        font-size: 10.8px;
         font-weight: 900;
         line-height: 1;
         white-space: nowrap;
@@ -2483,21 +2481,22 @@
           margin-top: 28px;
         }
         .ds-guide-mock-actions {
-          gap: 6px;
+          gap: 4px;
         }
         .ds-guide-mock-action {
-          height: 36px;
-          min-height: 36px;
-          padding-inline: 7px;
+          height: 34px;
+          min-height: 34px;
+          gap: 3px;
+          padding-inline: 4px;
         }
         .ds-guide-mock-action-icon,
         .ds-guide-mock-action-icon svg {
-          width: 15px;
-          height: 15px;
-          flex-basis: 15px;
+          width: 12px;
+          height: 12px;
+          flex-basis: 12px;
         }
         .ds-guide-mock-action-label {
-          font-size: 10.9px;
+          font-size: 9.4px;
         }
         .ds-guide-step-panel { min-height: 310px; }
         .ds-guide-footer { padding: 0 18px 18px; }
@@ -5397,15 +5396,8 @@
               <span class="ds-guide-nav-mark">1</span>
               <span class="ds-guide-nav-copy"><strong>빠른 시작</strong><span>첫 업무 요청까지 1분</span></span>
             </button>
-            <button type="button" disabled>
-              <span class="ds-guide-nav-mark">2</span>
-              <span class="ds-guide-nav-copy"><strong>기능별 사용법</strong><span>문서, 파일, 지식 문의</span></span>
-            </button>
-            <button type="button" disabled>
-              <span class="ds-guide-nav-mark">3</span>
-              <span class="ds-guide-nav-copy"><strong>자주 묻는 질문</strong><span>운영 중 문의 정리</span></span>
-            </button>
           </nav>
+          <p class="ds-guide-note">사용 가이드는 DS ONE의 역할과 기본 흐름을 정리한 공간입니다. 처음 둘러보기가 필요하면 빠른 시작 단계를 따라가면 됩니다.</p>
         </aside>
         <div class="ds-guide-main">
           <header class="ds-guide-head">
@@ -5435,7 +5427,7 @@
             </article>
           </div>
           <footer class="ds-guide-footer">
-            
+            <span class="ds-guide-footer-note">가이드는 업무 데이터를 저장하지 않습니다. 실제 요청은 홈 입력창에서 전송할 때 시작됩니다.</span>
           </footer>
         </div>
       </section>`;
