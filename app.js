@@ -1870,98 +1870,204 @@
         box-shadow: 0 16px 44px rgba(23, 37, 84, .06);
       }
       .ds-guide-intro {
+        position: relative;
         min-height: 100%;
         display: grid;
-        align-content: center;
-        gap: 16px;
-        padding: 28px;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        justify-items: center;
+        align-content: start;
+        gap: 10px;
+        padding: 34px 28px 24px;
+        text-align: center;
+        isolation: isolate;
+      }
+      .ds-guide-intro::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 164px;
+        width: 86%;
+        height: 150px;
+        transform: translateX(-50%);
+        border-radius: 999px;
+        background: radial-gradient(ellipse at center, rgba(47, 111, 237, .13), transparent 66%);
+        filter: blur(.2px);
+        z-index: -1;
       }
       .ds-guide-intro-brand {
-        display: inline-flex;
+        display: flex;
         align-items: center;
+        justify-content: center;
         gap: 12px;
       }
       .ds-guide-intro-logo {
-        width: 44px;
-        height: 44px;
+        width: 42px;
+        height: 42px;
         display: grid;
         place-items: center;
         color: #fff;
         font-size: 13px;
         font-weight: 950;
-        border-radius: 14px;
-        background: linear-gradient(145deg, #235fc4, #6f9cff);
+        border-radius: 13px;
+        background: linear-gradient(145deg, #2f6fed, #7da8ff);
         box-shadow: 0 14px 28px rgba(47, 111, 237, .22);
       }
       .ds-guide-intro-brand strong {
         display: block;
         color: #111827;
-        font-size: 18px;
+        font-size: 24px;
         font-weight: 950;
         letter-spacing: 0;
-      }
-      .ds-guide-intro-brand span span {
-        display: block;
-        margin-top: 3px;
-        color: #64748b;
-        font-size: 12px;
-        font-weight: 800;
+        line-height: 1;
       }
       .ds-guide-intro h3 {
-        margin: 0;
-        max-width: 430px;
+        margin: 10px 0 0;
+        max-width: 420px;
         color: #111827;
-        font-size: 23px;
+        font-size: 24px;
         font-weight: 950;
         line-height: 1.28;
         letter-spacing: 0;
         word-break: keep-all;
       }
       .ds-guide-intro p {
-        margin: 8px 0 0;
-        max-width: 480px;
+        margin: 2px 0 0;
+        max-width: 430px;
         color: #475569;
-        font-size: 13px;
-        font-weight: 750;
+        font-size: 12.5px;
+        font-weight: 800;
         line-height: 1.62;
         word-break: keep-all;
       }
-      .ds-guide-intro-grid {
+      .ds-guide-intro-orbit {
+        position: relative;
+        width: min(100%, 400px);
+        min-height: 246px;
+        margin-top: 4px;
+      }
+      .ds-guide-intro-orbit::before,
+      .ds-guide-intro-orbit::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 112px;
+        width: 94%;
+        height: 132px;
+        transform: translateX(-50%);
+        border-radius: 999px;
+        border: 1px solid rgba(159, 190, 236, .5);
+      }
+      .ds-guide-intro-orbit::after {
+        top: 132px;
+        width: 78%;
+        height: 82px;
+        border-color: rgba(47, 111, 237, .18);
+      }
+      .ds-guide-intro-hub {
+        position: absolute;
+        left: 50%;
+        top: 50px;
+        width: 96px;
+        height: 96px;
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-      }
-      .ds-guide-intro-card,
-      .ds-guide-intro-note {
-        min-width: 0;
-        padding: 14px;
-        background: rgba(255, 255, 255, .86);
-        border: 1px solid rgba(205, 218, 238, .92);
-        border-radius: 16px;
-        box-shadow: 0 14px 30px rgba(31, 41, 55, .06);
-      }
-      .ds-guide-intro-card strong {
-        display: block;
-        color: #123b82;
-        font-size: 13px;
+        place-items: center;
+        transform: translateX(-50%);
+        color: #2f6fed;
+        font-size: 25px;
         font-weight: 950;
+        border-radius: 999px;
+        background:
+          radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 1), rgba(232, 242, 255, .92) 46%, rgba(180, 211, 255, .85) 100%);
+        border: 1px solid rgba(190, 214, 247, .88);
+        box-shadow: 0 24px 42px rgba(47, 111, 237, .18), inset 0 6px 20px rgba(255, 255, 255, .88);
+        z-index: 3;
       }
-      .ds-guide-intro-card span {
-        display: block;
-        margin-top: 6px;
-        color: #475569;
-        font-size: 12px;
-        font-weight: 750;
-        line-height: 1.45;
+      .ds-guide-intro-hub-base {
+        position: absolute;
+        left: 50%;
+        top: 132px;
+        width: 134px;
+        height: 44px;
+        transform: translateX(-50%);
+        border-radius: 999px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, .86), rgba(182, 213, 255, .5)),
+          linear-gradient(90deg, #2f6fed, #7da8ff);
+        border: 1px solid rgba(154, 190, 241, .72);
+        box-shadow: 0 20px 34px rgba(47, 111, 237, .18);
+        z-index: 2;
+      }
+      .ds-guide-intro-hub-base::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: 5px;
+        width: 92px;
+        height: 12px;
+        transform: translateX(-50%);
+        border-radius: 999px;
+        background: #2f6fed;
+        box-shadow: 0 7px 16px rgba(47, 111, 237, .22);
+      }
+      .ds-guide-intro-node {
+        position: absolute;
+        width: 116px;
+        display: grid;
+        justify-items: center;
+        gap: 7px;
+        color: #111827;
+        font-size: 11.5px;
+        font-weight: 950;
+        line-height: 1.25;
         word-break: keep-all;
+        z-index: 4;
       }
-      .ds-guide-intro-note {
-        grid-column: 1 / -1;
-        color: #334155;
-        font-size: 12px;
-        font-weight: 850;
-        line-height: 1.45;
-        background: rgba(239, 246, 255, .92);
+      .ds-guide-intro-node.agent {
+        left: 0;
+        top: 72px;
+      }
+      .ds-guide-intro-node.knowledge {
+        right: 0;
+        top: 72px;
+      }
+      .ds-guide-intro-node.rpa {
+        left: 50%;
+        bottom: 0;
+        transform: translateX(-50%);
+      }
+      .ds-guide-intro-node-icon {
+        width: 52px;
+        height: 52px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .74);
+        border: 1px solid rgba(191, 213, 248, .82);
+        box-shadow: 0 16px 30px rgba(47, 111, 237, .13);
+      }
+      .ds-guide-intro-node-icon svg {
+        width: 22px;
+        height: 22px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.25;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .ds-guide-intro-node-icon-inner {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 11px;
+        background: linear-gradient(145deg, #2f6fed, #7da8ff);
+      }
+      .ds-guide-intro-node.knowledge .ds-guide-intro-node-icon-inner {
+        background: linear-gradient(145deg, #0f9f79, #53d2b1);
+      }
+      .ds-guide-intro-node.rpa .ds-guide-intro-node-icon-inner {
+        background: linear-gradient(145deg, #405f95, #7489b5);
       }
       .ds-guide-mock {
         width: min(96%, 720px);
@@ -2545,11 +2651,38 @@
           min-height: 348px;
           padding: 22px;
         }
-        .ds-guide-intro-grid {
-          grid-template-columns: 1fr;
+        .ds-guide-intro-brand strong {
+          font-size: 21px;
         }
-        .ds-guide-intro-note {
-          grid-column: auto;
+        .ds-guide-intro h3 {
+          font-size: 20px;
+        }
+        .ds-guide-intro-orbit {
+          width: min(100%, 340px);
+          min-height: 220px;
+        }
+        .ds-guide-intro-hub {
+          width: 82px;
+          height: 82px;
+          top: 52px;
+          font-size: 22px;
+        }
+        .ds-guide-intro-hub-base {
+          top: 122px;
+          width: 116px;
+          height: 38px;
+        }
+        .ds-guide-intro-node {
+          width: 96px;
+          font-size: 10.5px;
+        }
+        .ds-guide-intro-node-icon {
+          width: 44px;
+          height: 44px;
+        }
+        .ds-guide-intro-node-icon-inner {
+          width: 30px;
+          height: 30px;
         }
         .ds-guide-mock {
           width: min(96%, 520px);
@@ -5685,23 +5818,38 @@
         <div class="ds-guide-intro">
           <div class="ds-guide-intro-brand">
             <span class="ds-guide-intro-logo">DS</span>
-            <span>
-              <strong>DS ONE</strong>
-              <span>사내 AI 에이전트 플랫폼</span>
-            </span>
+            <strong>DS ONE</strong>
           </div>
           <div>
-            <h3>업무와 사내 지식을 한곳에서 시작합니다</h3>
-            <p>문서 업무는 업무 AI Agent에서, 회사 기준 질문은 사내 지식 문의에서 처리합니다.</p>
+            <h3>업무의 시작을 더 스마트하게</h3>
+            <p>AI와 사내 지식, 자동화가 하나로 연결된 업무 환경</p>
           </div>
-          <div class="ds-guide-intro-grid">
-            <span class="ds-guide-intro-card">
-              <strong>업무 AI Agent</strong>
-              <span>문서 작성, 요약, 번역, PDF와 엑셀 분석</span>
+          <div class="ds-guide-intro-orbit">
+            <span class="ds-guide-intro-hub">DS</span>
+            <span class="ds-guide-intro-hub-base"></span>
+            <span class="ds-guide-intro-node agent">
+              <span class="ds-guide-intro-node-icon">
+                <span class="ds-guide-intro-node-icon-inner">
+                  <svg viewBox="0 0 24 24" focusable="false"><use href="#i-agent-briefcase"></use></svg>
+                </span>
+              </span>
+              <span>업무 AI Agent</span>
             </span>
-            <span class="ds-guide-intro-card">
-              <strong>사내 지식 문의</strong>
-              <span>규정, 절차, 담당 부서, 시스템 사용 문의</span>
+            <span class="ds-guide-intro-node knowledge">
+              <span class="ds-guide-intro-node-icon">
+                <span class="ds-guide-intro-node-icon-inner">
+                  <svg viewBox="0 0 24 24" focusable="false"><use href="#i-knowledge-search"></use></svg>
+                </span>
+              </span>
+              <span>사내 지식 문의</span>
+            </span>
+            <span class="ds-guide-intro-node rpa">
+              <span class="ds-guide-intro-node-icon">
+                <span class="ds-guide-intro-node-icon-inner">
+                  <svg viewBox="0 0 24 24" focusable="false"><use href="#i-rpa-run"></use></svg>
+                </span>
+              </span>
+              <span>RPA 실행</span>
             </span>
           </div>
         </div>
