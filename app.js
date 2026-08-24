@@ -73,36 +73,88 @@
   ];
   const ONBOARDING_TOUR_STORAGE_PREFIX = STORAGE.onboardingTourStoragePrefix || "ds_one_onboarding_tour_v2_";
   const ONBOARDING_TOUR_SESSION_PREFIX = "ds_one_onboarding_tour_session_v2_";
-  const ONBOARDING_TOUR_STEPS = [
-    {
-      selector: ".prompt-card",
-      placement: "bottom",
-      padding: 8,
-      title: "궁금한 업무를 그대로 입력하세요",
-      desc: "회의록 요약, 메일 작성처럼 하려는 일을 한 문장으로 적으면 됩니다.",
+  const ONBOARDING_TOUR_PROFILES = {
+    agent: {
+      exampleTask: "document_draft",
+      steps: [
+        {
+          id: "prompt",
+          selector: ".prompt-card",
+          placement: "bottom",
+          padding: 8,
+          title: "궁금한 업무를 그대로 입력하세요",
+          desc: "회의록 요약, 메일 작성처럼 하려는 일을 한 문장으로 적으면 됩니다.",
+        },
+        {
+          id: "quick-actions",
+          selector: ".action-grid",
+          placement: "top",
+          padding: 7,
+          title: "자주 쓰는 업무는 버튼으로 시작하세요",
+          desc: "문서 작성, 요약, 번역처럼 목적이 분명할 때 버튼을 쓰면 입력 양식이 준비됩니다.",
+          nextLabel: "예시로 눌러보기",
+          nextAction: "applyExample",
+        },
+        {
+          id: "prepared-input",
+          selector: ".prompt-card",
+          placement: "bottom",
+          padding: 8,
+          title: "입력 양식이 자동으로 준비됐어요",
+          desc: "필요한 내용만 채우면 됩니다. 예시는 전송되지 않고 입력창에만 들어갑니다.",
+          requiresExample: true,
+        },
+        {
+          id: "history-guide",
+          selector: ".recent-work",
+          placement: "right",
+          padding: 8,
+          title: "다시 찾을 곳만 기억하세요",
+          desc: "완료한 작업은 최근 작업에 쌓이고, 사용 가이드에서 이 둘러보기를 다시 볼 수 있습니다.",
+        },
+      ],
     },
-    {
-      selector: ".action-grid",
-      placement: "top",
-      padding: 7,
-      title: "자주 쓰는 업무는 버튼으로 시작하세요",
-      desc: "버튼을 누르면 목적에 맞는 입력 양식이 자동으로 준비됩니다.",
+    knowledge: {
+      exampleTask: "knowledge_policy",
+      steps: [
+        {
+          id: "prompt",
+          selector: ".prompt-card",
+          placement: "bottom",
+          padding: 8,
+          title: "사내 규정과 절차를 질문하세요",
+          desc: "출장비 기준, 권한 신청, 담당 부서처럼 회사 기준이 필요한 질문을 그대로 적으면 됩니다.",
+        },
+        {
+          id: "quick-actions",
+          selector: ".action-grid",
+          placement: "top",
+          padding: 7,
+          title: "질문 유형을 버튼으로 좁혀보세요",
+          desc: "규정·기준, 담당 부서, 시스템·권한 같은 버튼을 누르면 질문 양식이 준비됩니다.",
+          nextLabel: "예시로 눌러보기",
+          nextAction: "applyExample",
+        },
+        {
+          id: "prepared-input",
+          selector: ".prompt-card",
+          placement: "bottom",
+          padding: 8,
+          title: "지식 문의 양식이 준비됐어요",
+          desc: "확인하려는 제도나 상황만 채우면 됩니다. 답변은 사내 지식베이스 기준으로 제공됩니다.",
+          requiresExample: true,
+        },
+        {
+          id: "history-guide",
+          selector: ".recent-work",
+          placement: "right",
+          padding: 8,
+          title: "기록과 가이드는 여기서 찾습니다",
+          desc: "문의 기록은 최근 작업에 남고, 사용 가이드에서 이 둘러보기를 다시 시작할 수 있습니다.",
+        },
+      ],
     },
-    {
-      selector: ".recent-list",
-      placement: "right",
-      padding: 6,
-      title: "이전 작업은 여기서 다시 엽니다",
-      desc: "요청과 답변이 쌓이면 제목과 시간으로 빠르게 찾을 수 있습니다.",
-    },
-    {
-      selector: ".sidebar-guide-button",
-      placement: "right",
-      padding: 6,
-      title: "막히면 여기서 다시 볼 수 있어요",
-      desc: "언제든 사용 가이드를 눌러 이 둘러보기를 다시 시작할 수 있습니다.",
-    },
-  ];
+  };
 
   const ALLOWED_EXTENSIONS = (FILE_POLICY.allowedExtensions || ["txt", "md", "csv", "json", "docx", "xlsx", "pdf"])
     .map((value) => String(value || "").toLowerCase().replace(/^\./, ""))
@@ -2944,6 +2996,7 @@
 
   function bindUiEvents() {
     bindFeatureSwitcherEvents();
+    document.addEventListener("click", handleOnboardingTourActionCardClick, true);
     document.querySelectorAll(".menu-item").forEach((button) => {
       const label = button.textContent.trim();
       if (label.includes("새 대화")) {
@@ -4875,6 +4928,8 @@
         root,
         step: initialStep,
         steps,
+        feature: normalizeFeatureMode(currentFeature),
+        exampleApplied: false,
         doNotShow: false,
         lastFocus: document.activeElement,
         onKeydown,
@@ -4908,6 +4963,12 @@
     }
     if (event.target.closest("[data-onboarding-next]")) {
       const current = state.onboardingTour.step || 0;
+      const step = state.onboardingTour.steps[current] || {};
+      if (step.nextAction === "applyExample") {
+        applyOnboardingTourExample();
+        setOnboardingTourStep(current + 1);
+        return;
+      }
       if (current >= state.onboardingTour.steps.length - 1) finishOnboardingTour({ completed: true });
       else setOnboardingTourStep(current + 1);
     }
@@ -4920,9 +4981,14 @@
   }
 
   function getAvailableOnboardingTourSteps() {
-    return ONBOARDING_TOUR_STEPS
+    return getOnboardingTourStepDefinitions()
       .map((step) => ({ ...step, target: getVisibleOnboardingTarget(step.selector) }))
       .filter((step) => step.target);
+  }
+
+  function getOnboardingTourStepDefinitions() {
+    const mode = normalizeFeatureMode(state.onboardingTour?.feature || currentFeature);
+    return ONBOARDING_TOUR_PROFILES[mode]?.steps || ONBOARDING_TOUR_PROFILES.agent.steps;
   }
 
   function getVisibleOnboardingTarget(selector) {
@@ -4942,6 +5008,7 @@
     if (!tour) return;
     const max = tour.steps.length - 1;
     tour.step = Math.max(0, Math.min(max, Number(nextStep) || 0));
+    if (tour.steps[tour.step]?.requiresExample) applyOnboardingTourExample();
     try {
       tour.steps[tour.step]?.target?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
     } catch {}
@@ -4968,7 +5035,7 @@
     const prev = root.querySelector("[data-onboarding-prev]");
     const next = root.querySelector("[data-onboarding-next]");
     if (prev) prev.disabled = tour.step === 0;
-    if (next) next.textContent = tour.step >= tour.steps.length - 1 ? "완료" : "다음";
+    if (next) next.textContent = tour.step >= tour.steps.length - 1 ? "완료" : (step.nextLabel || "다음");
     updateOnboardingTourPosition();
   }
 
@@ -5120,6 +5187,49 @@
 
   function prefersReducedMotion() {
     try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; }
+  }
+
+  function handleOnboardingTourActionCardClick(event) {
+    const tour = state.onboardingTour;
+    if (!tour) return;
+    const card = event.target.closest?.(".action-card");
+    if (!card || card.disabled || card.dataset.featureDisabled === "true") return;
+    const step = tour.steps[tour.step] || {};
+    if (step.id !== "quick-actions") return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+    applyOnboardingTourExample(card);
+    setOnboardingTourStep(tour.step + 1);
+  }
+
+  function applyOnboardingTourExample(sourceCard = null) {
+    const tour = state.onboardingTour;
+    if (!tour || tour.exampleApplied) return;
+    const mode = normalizeFeatureMode(tour.feature || currentFeature);
+    const profile = ONBOARDING_TOUR_PROFILES[mode] || ONBOARDING_TOUR_PROFILES.agent;
+    if (mode !== currentFeature) applyFeatureMode(mode, { persist: true, silent: true, resetConversation: false });
+    const card = sourceCard?.isConnected && sourceCard.dataset.featureMode === mode
+      ? sourceCard
+      : findOnboardingExampleCard(profile.exampleTask);
+    const meta = getCardTemplate(card);
+    const task = meta.task || profile.exampleTask || "";
+    currentTask = task;
+    setFileInputAcceptForTask(currentTask);
+    if (mode === "knowledge" && selectedFiles.length) {
+      selectedFiles = [];
+      renderFileChips();
+    }
+    if (card) setSelectedActionCard(card);
+    if (meta.template) setHomeInput(meta.template);
+    tour.exampleApplied = true;
+  }
+
+  function findOnboardingExampleCard(task) {
+    const cards = state.actionCards && state.actionCards.length ? state.actionCards : Array.from(document.querySelectorAll(".action-card"));
+    return cards.find((card) => !card.hidden && !card.disabled && card.dataset.featureTask === task)
+      || cards.find((card) => !card.hidden && !card.disabled && card.dataset.featureDisabled !== "true")
+      || null;
   }
 
   function openUsageGuide(initialStep = 0) {
