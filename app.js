@@ -1616,36 +1616,54 @@
         box-shadow: 0 28px 80px rgba(15, 23, 42, .24);
       }
       .ds-guide-side {
+        position: relative;
         min-width: 0;
         display: flex;
         flex-direction: column;
         gap: 18px;
         padding: 24px 14px 20px;
         background:
-          radial-gradient(circle at 20% 0%, rgba(47, 111, 237, .13), transparent 34%),
-          linear-gradient(180deg, #f8fbff 0%, #f4f8ff 100%);
-        border-right: 1px solid rgba(213, 224, 239, .82);
+          radial-gradient(circle at 16% -8%, rgba(126, 168, 255, .34), transparent 34%),
+          linear-gradient(180deg, #10264f 0%, #173a67 52%, #102a55 100%);
+        border-right: 1px solid rgba(16, 38, 79, .24);
+        box-shadow: inset -1px 0 0 rgba(255, 255, 255, .08);
+      }
+      .ds-guide-side::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 4px;
+        background: linear-gradient(180deg, #7da8ff, #2f6fed 45%, #59c7ad);
+        opacity: .92;
       }
       .ds-guide-brand {
+        position: relative;
         display: flex;
         align-items: center;
         gap: 11px;
+        padding: 0 4px;
       }
       .ds-guide-brand-icon {
         width: 38px;
         height: 38px;
-        display: grid;
+        display: inline-grid;
         place-items: center;
-        color: #2f6fed;
+        align-items: center;
+        justify-items: center;
+        flex: 0 0 38px;
+        margin: 0;
+        color: #174ea6;
+        line-height: 0;
         border-radius: 13px;
-        background: linear-gradient(145deg, #eaf3ff, #dbeafe);
-        border: 1px solid rgba(177, 202, 242, .9);
-        box-shadow: 0 12px 24px rgba(47, 111, 237, .12);
+        background: rgba(255, 255, 255, .94);
+        border: 1px solid rgba(196, 216, 245, .78);
+        box-shadow: 0 14px 28px rgba(8, 19, 44, .18);
       }
       .ds-guide-brand-icon svg {
         width: 22px;
         height: 22px;
         display: block;
+        margin: auto;
         fill: none;
         stroke: currentColor;
         stroke-width: 2.25;
@@ -1654,19 +1672,26 @@
       }
       .ds-guide-brand strong {
         display: block;
-        color: #111827;
+        color: #ffffff;
         font-size: 16px;
         font-weight: 950;
         letter-spacing: 0;
       }
-      .ds-guide-brand span {
+      .ds-guide-brand > span:not(.ds-guide-brand-icon) {
         display: block;
-        margin-top: 2px;
-        color: #64748b;
+        min-width: 0;
+        margin-top: 0;
+      }
+      .ds-guide-brand > span:not(.ds-guide-brand-icon) > span {
+        display: block;
+        margin-top: 3px;
+        color: rgba(221, 233, 250, .88);
         font-size: 12px;
         font-weight: 750;
+        line-height: 1.25;
       }
       .ds-guide-nav {
+        position: relative;
         display: grid;
         gap: 8px;
       }
@@ -1676,18 +1701,27 @@
         align-items: center;
         gap: 9px;
         padding: 11px 10px;
-        color: #334155;
+        color: rgba(232, 241, 255, .88);
         text-align: left;
-        background: transparent;
-        border: 1px solid transparent;
+        background: rgba(255, 255, 255, .055);
+        border: 1px solid rgba(255, 255, 255, .095);
         border-radius: 14px;
         cursor: pointer;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+        transition: color .16s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+      }
+      .ds-guide-nav button:hover,
+      .ds-guide-nav button:focus-visible {
+        color: #fff;
+        background: rgba(255, 255, 255, .1);
+        border-color: rgba(255, 255, 255, .18);
+        outline: none;
       }
       .ds-guide-nav button[aria-current="true"] {
-        color: #123b82;
-        background: #eaf2ff;
-        border-color: rgba(77, 130, 226, .28);
-        box-shadow: inset 0 0 0 1px rgba(47, 111, 237, .04);
+        color: #10264f;
+        background: linear-gradient(135deg, #ffffff, #edf5ff);
+        border-color: rgba(202, 219, 246, .92);
+        box-shadow: 0 16px 34px rgba(8, 19, 44, .22), inset 3px 0 0 #2f6fed;
       }
       .ds-guide-nav button:disabled {
         color: #94a3b8;
@@ -1699,11 +1733,18 @@
         flex: 0 0 28px;
         display: grid;
         place-items: center;
-        color: #2f6fed;
+        color: #f8fbff;
         font-size: 12px;
         font-weight: 950;
         border-radius: 10px;
-        background: #dcecff;
+        background: rgba(255, 255, 255, .14);
+        border: 1px solid rgba(255, 255, 255, .1);
+      }
+      .ds-guide-nav button[aria-current="true"] .ds-guide-nav-mark {
+        color: #fff;
+        background: linear-gradient(145deg, #2f6fed, #7da8ff);
+        border-color: transparent;
+        box-shadow: 0 8px 18px rgba(47, 111, 237, .22);
       }
       .ds-guide-nav-copy strong {
         display: block;
@@ -1716,6 +1757,10 @@
         margin-top: 2px;
         font-size: 11.5px;
         font-weight: 750;
+        color: rgba(220, 232, 250, .78);
+      }
+      .ds-guide-nav button[aria-current="true"] .ds-guide-nav-copy span {
+        color: #315074;
       }
       .ds-guide-main {
         min-width: 0;
