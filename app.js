@@ -42,6 +42,15 @@
   const QUICK_START_SAMPLE_PROMPT = "아래 회의 내용을 핵심만 요약하고, 해야 할 일을 담당자별로 정리해 주세요.\n\n[요약할 내용]\n";
   const QUICK_START_GUIDE_STEPS = [
     {
+      badge: "0",
+      title: "DS ONE은 무엇을 도와주나요?",
+      desc: "DS ONE은 업무 AI Agent와 사내 지식 문의를 한 화면에서 시작하도록 돕는 사내 AI 에이전트 플랫폼입니다.",
+      hint: "문서 작성, 요약, 번역, 파일 분석처럼 산출물이 필요한 일은 업무 AI Agent에서 시작하고, 규정이나 절차처럼 회사 기준이 필요한 질문은 사내 지식 문의에서 확인하세요.",
+      examples: ["업무 AI Agent", "사내 지식 문의", "최근 작업"],
+      highlight: "intro",
+      practice: false,
+    },
+    {
       badge: "1",
       title: "업무 유형을 먼저 고르세요",
       desc: "문서 작성, 요약, 번역, 엑셀 분석, PDF 분석 중 가장 가까운 버튼을 선택하면 입력창에 맞춤 양식이 자동으로 준비됩니다.",
@@ -1844,6 +1853,100 @@
         font-size: 12px;
         font-weight: 900;
       }
+      .ds-guide-intro {
+        min-height: 348px;
+        display: grid;
+        align-content: center;
+        gap: 16px;
+        padding: 28px;
+      }
+      .ds-guide-intro-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .ds-guide-intro-logo {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 950;
+        border-radius: 14px;
+        background: linear-gradient(145deg, #235fc4, #6f9cff);
+        box-shadow: 0 14px 28px rgba(47, 111, 237, .22);
+      }
+      .ds-guide-intro-brand strong {
+        display: block;
+        color: #111827;
+        font-size: 18px;
+        font-weight: 950;
+        letter-spacing: 0;
+      }
+      .ds-guide-intro-brand span span {
+        display: block;
+        margin-top: 3px;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .ds-guide-intro h3 {
+        margin: 0;
+        max-width: 430px;
+        color: #111827;
+        font-size: 23px;
+        font-weight: 950;
+        line-height: 1.28;
+        letter-spacing: 0;
+        word-break: keep-all;
+      }
+      .ds-guide-intro p {
+        margin: 8px 0 0;
+        max-width: 480px;
+        color: #475569;
+        font-size: 13px;
+        font-weight: 750;
+        line-height: 1.62;
+        word-break: keep-all;
+      }
+      .ds-guide-intro-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .ds-guide-intro-card,
+      .ds-guide-intro-note {
+        min-width: 0;
+        padding: 14px;
+        background: rgba(255, 255, 255, .86);
+        border: 1px solid rgba(205, 218, 238, .92);
+        border-radius: 16px;
+        box-shadow: 0 14px 30px rgba(31, 41, 55, .06);
+      }
+      .ds-guide-intro-card strong {
+        display: block;
+        color: #123b82;
+        font-size: 13px;
+        font-weight: 950;
+      }
+      .ds-guide-intro-card span {
+        display: block;
+        margin-top: 6px;
+        color: #475569;
+        font-size: 12px;
+        font-weight: 750;
+        line-height: 1.45;
+        word-break: keep-all;
+      }
+      .ds-guide-intro-note {
+        grid-column: 1 / -1;
+        color: #334155;
+        font-size: 12px;
+        font-weight: 850;
+        line-height: 1.45;
+        background: rgba(239, 246, 255, .92);
+      }
       .ds-guide-mock {
         width: min(96%, 560px);
         margin: 32px auto 0;
@@ -1918,17 +2021,17 @@
       }
       .ds-guide-mock-actions {
         display: flex;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: center;
         gap: 7px;
         margin: 16px auto 0;
       }
       .ds-guide-mock-action {
-        min-width: 0;
+        min-width: 88px;
         height: 38px;
         min-height: 38px;
-        flex: 1 1 0;
+        flex: 0 1 auto;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -1966,14 +2069,15 @@
       }
       .ds-guide-mock-action-label {
         display: block;
+        flex: 0 0 auto;
         max-width: 100%;
         color: #10264f;
         font-size: 11.4px;
         font-weight: 900;
         line-height: 1;
         white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        overflow: visible;
+        text-overflow: clip;
         word-break: keep-all;
       }
       .ds-guide-highlight {
@@ -2096,6 +2200,9 @@
         color: #94a3b8;
         background: #f8fafc;
         cursor: not-allowed;
+      }
+      .ds-guide-step-actions button[hidden] {
+        display: none;
       }
       .ds-guide-footer {
         display: flex;
@@ -2359,6 +2466,16 @@
           overflow: visible;
         }
         .ds-guide-screen { min-height: 390px; }
+        .ds-guide-intro {
+          min-height: 348px;
+          padding: 22px;
+        }
+        .ds-guide-intro-grid {
+          grid-template-columns: 1fr;
+        }
+        .ds-guide-intro-note {
+          grid-column: auto;
+        }
         .ds-guide-mock {
           width: min(96%, 520px);
           margin-top: 28px;
@@ -3083,7 +3200,7 @@
     });
 
     document.querySelectorAll(".sidebar-guide-button,.header-button,.guide-button").forEach((button) => {
-      button.addEventListener("click", () => startOnboardingTour({ manual: true }));
+      button.addEventListener("click", () => openUsageGuide(0));
     });
     document.querySelectorAll(".task-row").forEach((button) => {
       button.addEventListener("click", () => showToast("해당 기능은 추후 연동 예정입니다."));
@@ -5269,6 +5386,10 @@
           </div>
           <nav class="ds-guide-nav" aria-label="사용 가이드 섹션">
             <button type="button" aria-current="true">
+              <span class="ds-guide-nav-mark">0</span>
+              <span class="ds-guide-nav-copy"><strong>DS ONE 소개</strong><span>플랫폼을 먼저 이해하기</span></span>
+            </button>
+            <button type="button" disabled>
               <span class="ds-guide-nav-mark">1</span>
               <span class="ds-guide-nav-copy"><strong>빠른 시작</strong><span>첫 업무 요청까지 1분</span></span>
             </button>
@@ -5281,14 +5402,14 @@
               <span class="ds-guide-nav-copy"><strong>자주 묻는 질문</strong><span>운영 중 문의 정리</span></span>
             </button>
           </nav>
-          <p class="ds-guide-note">가이드는 실제 화면을 그대로 조작하기 전에 흐름을 먼저 익히는 공간입니다. 마지막 단계에서 예시 요청을 홈 입력창에 바로 넣어볼 수 있습니다.</p>
+          <p class="ds-guide-note">사용 가이드는 DS ONE의 역할과 기본 흐름을 정리한 공간입니다. 처음 둘러보기가 필요하면 빠른 시작 단계를 따라가면 됩니다.</p>
         </aside>
         <div class="ds-guide-main">
           <header class="ds-guide-head">
             <div>
-              <span class="ds-guide-kicker">QUICK START · DS ONE</span>
-              <h2 id="dsGuideTitle" class="ds-guide-title">처음 사용하는 직원을 위한 빠른 시작</h2>
-              <p class="ds-guide-desc">어떤 기능을 눌러야 할지, 질문은 어떻게 써야 할지, 결과는 어떻게 다듬어야 할지 실제 업무 흐름대로 안내합니다.</p>
+              <span class="ds-guide-kicker">GUIDE · DS ONE</span>
+              <h2 id="dsGuideTitle" class="ds-guide-title">DS ONE 사용 가이드</h2>
+              <p class="ds-guide-desc">DS ONE이 어떤 업무를 도와주는지 먼저 확인하고, 다음 단계에서 첫 업무 요청 흐름을 따라갑니다.</p>
             </div>
             <button class="ds-guide-close" type="button" aria-label="사용 가이드 닫기" data-guide-close>
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7l10 10"></path><path d="M17 7 7 17"></path></svg>
@@ -5377,10 +5498,12 @@
     const examples = root.querySelector("[data-guide-examples]");
     const prev = root.querySelector("[data-guide-prev]");
     const next = root.querySelector("[data-guide-next]");
+    const practice = root.querySelector("[data-guide-practice]");
     if (progress) {
-      progress.innerHTML = QUICK_START_GUIDE_STEPS.map((_, index) => (
-        `<button type="button" data-guide-step="${index}" aria-label="${index + 1}단계로 이동" aria-current="${index === dialog.step ? "step" : "false"}"></button>`
-      )).join("");
+      progress.innerHTML = QUICK_START_GUIDE_STEPS.map((guideStep, index) => {
+        const label = index === 0 ? "DS ONE 소개로 이동" : `${guideStep.badge}단계로 이동`;
+        return `<button type="button" data-guide-step="${index}" aria-label="${label}" aria-current="${index === dialog.step ? "step" : "false"}"></button>`;
+      }).join("");
     }
     if (preview) preview.innerHTML = createGuidePreview(step.highlight);
     if (badge) badge.textContent = step.badge;
@@ -5394,10 +5517,44 @@
     }
     if (prev) prev.disabled = dialog.step === 0;
     if (next) next.textContent = dialog.step >= QUICK_START_GUIDE_STEPS.length - 1 ? "가이드 마치기" : "다음";
+    if (practice) practice.hidden = step.practice === false;
   }
 
   function createGuidePreview(highlight) {
     const is = (target) => highlight === target ? " ds-guide-highlight" : "";
+    if (highlight === "intro") {
+      return `
+      <div class="ds-guide-screen" aria-hidden="true">
+        <div class="ds-guide-screen-top">
+          <span class="ds-guide-screen-dot"></span><span class="ds-guide-screen-dot"></span><span class="ds-guide-screen-dot"></span>
+          <span class="ds-guide-screen-title">DS ONE 플랫폼</span>
+        </div>
+        <div class="ds-guide-intro">
+          <div class="ds-guide-intro-brand">
+            <span class="ds-guide-intro-logo">DS</span>
+            <span>
+              <strong>DS ONE</strong>
+              <span>사내 AI 에이전트 플랫폼</span>
+            </span>
+          </div>
+          <div>
+            <h3>업무 요청과 사내 지식을 한곳에서 시작합니다</h3>
+            <p>반복 업무는 AI Agent가 초안을 만들고, 회사 기준이 필요한 질문은 사내 지식 문의로 확인할 수 있습니다.</p>
+          </div>
+          <div class="ds-guide-intro-grid">
+            <span class="ds-guide-intro-card">
+              <strong>업무 AI Agent</strong>
+              <span>문서 작성, 요약, 번역, PDF와 엑셀 분석</span>
+            </span>
+            <span class="ds-guide-intro-card">
+              <strong>사내 지식 문의</strong>
+              <span>규정, 절차, 담당 부서, 시스템 사용 문의</span>
+            </span>
+            <span class="ds-guide-intro-note">완료한 요청은 최근 작업에서 다시 열 수 있습니다.</span>
+          </div>
+        </div>
+      </div>`;
+    }
     return `
       <div class="ds-guide-screen" aria-hidden="true">
         <div class="ds-guide-screen-top">
