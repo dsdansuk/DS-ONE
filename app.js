@@ -1717,22 +1717,11 @@
         font-size: 11.5px;
         font-weight: 750;
       }
-      .ds-guide-note {
-        margin-top: auto;
-        padding: 13px 14px;
-        color: #475569;
-        font-size: 12px;
-        font-weight: 700;
-        line-height: 1.55;
-        background: rgba(255, 255, 255, .72);
-        border: 1px solid rgba(213, 224, 239, .8);
-        border-radius: 16px;
-      }
       .ds-guide-main {
         min-width: 0;
         min-height: 0;
         display: grid;
-        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-rows: auto minmax(0, 1fr);
         background:
           radial-gradient(circle at 88% 2%, rgba(47, 111, 237, .09), transparent 28%),
           linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
@@ -1802,11 +1791,10 @@
         min-height: 0;
         display: grid;
         grid-template-columns: minmax(0, 1.18fr) minmax(300px, .82fr);
-        gap: 18px;
-        padding: 10px 24px 20px;
+        gap: 20px;
+        padding: 8px 24px 24px;
         overflow: hidden;
       }
-      .ds-guide-player,
       .ds-guide-step-panel {
         min-width: 0;
         min-height: 0;
@@ -1816,44 +1804,27 @@
         box-shadow: 0 16px 44px rgba(23, 37, 84, .06);
       }
       .ds-guide-player {
-        padding: 12px;
+        min-width: 0;
+        min-height: 0;
         display: grid;
-        align-items: center;
+        align-items: stretch;
       }
       .ds-guide-screen {
         position: relative;
-        min-height: 390px;
+        min-height: 100%;
+        display: grid;
+        align-items: center;
         overflow: hidden;
-        border: 1px solid rgba(205, 218, 238, .88);
-        border-radius: 18px;
+        border: 0;
+        border-radius: 0;
         background:
-          linear-gradient(155deg, rgba(230, 239, 255, .72) 0 31%, transparent 31%),
-          linear-gradient(154deg, transparent 0 63%, rgba(218, 235, 255, .82) 63%),
+          radial-gradient(ellipse at 20% 22%, rgba(222, 235, 255, .8) 0 24%, transparent 45%),
+          linear-gradient(149deg, rgba(229, 239, 255, .78) 0 33%, transparent 33%),
+          linear-gradient(154deg, transparent 0 67%, rgba(218, 235, 255, .9) 67%),
           #f8fbff;
       }
-      .ds-guide-screen-top {
-        height: 42px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 0 14px;
-        background: rgba(255, 255, 255, .9);
-        border-bottom: 1px solid rgba(216, 226, 240, .82);
-      }
-      .ds-guide-screen-dot {
-        width: 9px;
-        height: 9px;
-        border-radius: 999px;
-        background: #cbd5e1;
-      }
-      .ds-guide-screen-title {
-        margin-left: 8px;
-        color: #334155;
-        font-size: 12px;
-        font-weight: 900;
-      }
       .ds-guide-intro {
-        min-height: 348px;
+        min-height: 100%;
         display: grid;
         align-content: center;
         gap: 16px;
@@ -1947,22 +1918,23 @@
         background: rgba(239, 246, 255, .92);
       }
       .ds-guide-mock {
-        width: min(100%, 620px);
-        margin: 32px auto 0;
+        width: min(96%, 720px);
+        margin: 0 auto;
       }
       .ds-guide-mock-heading {
         color: #111827;
-        font-size: 21px;
+        font-size: 28px;
         font-weight: 950;
+        line-height: 1.2;
         text-align: center;
       }
       .ds-guide-mock-prompt {
         position: relative;
-        min-height: 84px;
-        margin-top: 18px;
-        padding: 14px 54px 46px 16px;
+        min-height: 122px;
+        margin-top: 28px;
+        padding: 18px 68px 64px 18px;
         color: #64748b;
-        font-size: 11.75px;
+        font-size: 12.4px;
         font-weight: 800;
         line-height: 1.45;
         background: #fff;
@@ -1977,19 +1949,19 @@
       }
       .ds-guide-mock-send {
         position: absolute;
-        right: 13px;
-        bottom: 13px;
-        width: 34px;
-        height: 34px;
+        right: 16px;
+        bottom: 16px;
+        width: 40px;
+        height: 40px;
         display: grid;
         place-items: center;
         color: #fff;
-        border-radius: 11px;
+        border-radius: 12px;
         background: #79a4fb;
       }
       .ds-guide-mock-send svg {
-        width: 18px;
-        height: 18px;
+        width: 21px;
+        height: 21px;
         fill: none;
         stroke: currentColor;
         stroke-width: 2.1;
@@ -1998,10 +1970,10 @@
       }
       .ds-guide-mock-attach {
         position: absolute;
-        left: 13px;
-        bottom: 13px;
-        width: 31px;
-        height: 31px;
+        left: 16px;
+        bottom: 16px;
+        width: 36px;
+        height: 36px;
         display: grid;
         place-items: center;
         color: #10264f;
@@ -2023,6 +1995,7 @@
         grid-template-columns: repeat(5, minmax(0, 1fr));
         align-items: center;
         gap: 5px;
+        width: min(86%, 580px);
         margin: 16px auto 0;
       }
       .ds-guide-mock-action {
@@ -2203,19 +2176,6 @@
       }
       .ds-guide-step-actions button[hidden] {
         display: none;
-      }
-      .ds-guide-footer {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 0 26px 22px;
-      }
-      .ds-guide-footer-note {
-        color: #64748b;
-        font-size: 12px;
-        font-weight: 750;
-        line-height: 1.45;
       }
       .ds-onboarding-layer {
         position: fixed;
@@ -2455,8 +2415,7 @@
           border-right: 0;
           border-bottom: 1px solid rgba(213, 224, 239, .82);
         }
-        .ds-guide-nav,
-        .ds-guide-note { display: none; }
+        .ds-guide-nav { display: none; }
         .ds-guide-main { min-height: 0; overflow-y: auto; }
         .ds-guide-head { padding: 18px 18px 10px; }
         .ds-guide-body {
@@ -2499,7 +2458,6 @@
           font-size: 9.4px;
         }
         .ds-guide-step-panel { min-height: 310px; }
-        .ds-guide-footer { padding: 0 18px 18px; }
       }
     `;
     document.head.appendChild(style);
@@ -5397,7 +5355,6 @@
               <span class="ds-guide-nav-copy"><strong>빠른 시작</strong><span>첫 업무 요청까지 1분</span></span>
             </button>
           </nav>
-          <p class="ds-guide-note">사용 가이드는 DS ONE의 역할과 기본 흐름을 정리한 공간입니다. 처음 둘러보기가 필요하면 빠른 시작 단계를 따라가면 됩니다.</p>
         </aside>
         <div class="ds-guide-main">
           <header class="ds-guide-head">
@@ -5426,9 +5383,6 @@
               </div>
             </article>
           </div>
-          <footer class="ds-guide-footer">
-            <span class="ds-guide-footer-note">가이드는 업무 데이터를 저장하지 않습니다. 실제 요청은 홈 입력창에서 전송할 때 시작됩니다.</span>
-          </footer>
         </div>
       </section>`;
     const close = () => closeUsageGuide();
@@ -5557,11 +5511,7 @@
     const is = (target) => highlight === target ? " ds-guide-highlight" : "";
     if (highlight === "intro") {
       return `
-      <div class="ds-guide-screen" aria-hidden="true">
-        <div class="ds-guide-screen-top">
-          <span class="ds-guide-screen-dot"></span><span class="ds-guide-screen-dot"></span><span class="ds-guide-screen-dot"></span>
-          <span class="ds-guide-screen-title">DS ONE 플랫폼</span>
-        </div>
+      <div class="ds-guide-screen ds-guide-screen-intro" aria-hidden="true">
         <div class="ds-guide-intro">
           <div class="ds-guide-intro-brand">
             <span class="ds-guide-intro-logo">DS</span>
@@ -5588,11 +5538,7 @@
       </div>`;
     }
     return `
-      <div class="ds-guide-screen" aria-hidden="true">
-        <div class="ds-guide-screen-top">
-          <span class="ds-guide-screen-dot"></span><span class="ds-guide-screen-dot"></span><span class="ds-guide-screen-dot"></span>
-          <span class="ds-guide-screen-title">DS ONE 업무 AI Agent</span>
-        </div>
+      <div class="ds-guide-screen ds-guide-screen-home" aria-hidden="true">
         <div class="ds-guide-mock">
           <div class="ds-guide-mock-heading">무엇을 도와드릴까요?</div>
           <div class="ds-guide-mock-prompt${is("prompt")}">
