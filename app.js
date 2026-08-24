@@ -1869,6 +1869,21 @@
           #f8fbff;
         box-shadow: 0 16px 44px rgba(23, 37, 84, .06);
       }
+      .ds-guide-screen-intro {
+        min-height: 0;
+        aspect-ratio: 1 / 1;
+        place-items: center;
+        padding: 0;
+        background: #f8fbff;
+        border: 1px solid rgba(190, 210, 238, .92);
+      }
+      .ds-guide-intro-image {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: contain;
+        border-radius: inherit;
+      }
       .ds-guide-intro {
         position: relative;
         min-height: 100%;
@@ -2647,6 +2662,10 @@
           overflow: visible;
         }
         .ds-guide-screen { min-height: 390px; }
+        .ds-guide-screen-intro {
+          min-height: 0;
+          aspect-ratio: 1 / 1;
+        }
         .ds-guide-intro {
           min-height: 348px;
           padding: 22px;
@@ -5815,44 +5834,7 @@
     if (highlight === "intro") {
       return `
       <div class="ds-guide-screen ds-guide-screen-intro" aria-hidden="true">
-        <div class="ds-guide-intro">
-          <div class="ds-guide-intro-brand">
-            <span class="ds-guide-intro-logo">DS</span>
-            <strong>DS ONE</strong>
-          </div>
-          <div>
-            <h3>업무의 시작을 더 스마트하게</h3>
-            <p>AI와 사내 지식, 자동화가 하나로 연결된 업무 환경</p>
-          </div>
-          <div class="ds-guide-intro-orbit">
-            <span class="ds-guide-intro-hub">DS</span>
-            <span class="ds-guide-intro-hub-base"></span>
-            <span class="ds-guide-intro-node agent">
-              <span class="ds-guide-intro-node-icon">
-                <span class="ds-guide-intro-node-icon-inner">
-                  <svg viewBox="0 0 24 24" focusable="false"><use href="#i-agent-briefcase"></use></svg>
-                </span>
-              </span>
-              <span>업무 AI Agent</span>
-            </span>
-            <span class="ds-guide-intro-node knowledge">
-              <span class="ds-guide-intro-node-icon">
-                <span class="ds-guide-intro-node-icon-inner">
-                  <svg viewBox="0 0 24 24" focusable="false"><use href="#i-knowledge-search"></use></svg>
-                </span>
-              </span>
-              <span>사내 지식 문의</span>
-            </span>
-            <span class="ds-guide-intro-node rpa">
-              <span class="ds-guide-intro-node-icon">
-                <span class="ds-guide-intro-node-icon-inner">
-                  <svg viewBox="0 0 24 24" focusable="false"><use href="#i-rpa-run"></use></svg>
-                </span>
-              </span>
-              <span>RPA 실행</span>
-            </span>
-          </div>
-        </div>
+        <img class="ds-guide-intro-image" src="ds-one-guide-intro.png" alt="">
       </div>`;
     }
     return `
