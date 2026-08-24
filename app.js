@@ -1853,6 +1853,7 @@
         min-height: 0;
         display: grid;
         align-items: stretch;
+        overflow: hidden;
       }
       .ds-guide-screen {
         position: relative;
@@ -1870,8 +1871,14 @@
         box-shadow: 0 16px 44px rgba(23, 37, 84, .06);
       }
       .ds-guide-screen-intro {
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        height: auto;
         min-height: 0;
         aspect-ratio: 1 / 1;
+        align-self: start;
+        justify-self: stretch;
         place-items: center;
         padding: 0;
         background: #f8fbff;
@@ -1880,6 +1887,8 @@
       .ds-guide-intro-image {
         width: 100%;
         height: 100%;
+        max-width: 100%;
+        max-height: 100%;
         display: block;
         object-fit: contain;
         border-radius: inherit;
