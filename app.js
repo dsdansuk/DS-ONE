@@ -40,16 +40,15 @@
   const RPA_ACCESS_CACHE_KEY = STORAGE.rpaAccessCacheKey || "ds_one_rpa_access_cache_v1";
   const RPA_ACCESS_CACHE_TTL_MS = Number(STORAGE.rpaAccessCacheTtlMs || 6 * 60 * 60 * 1000);
   const QUICK_START_SAMPLE_PROMPT = "아래 회의 내용을 핵심만 요약하고, 해야 할 일을 담당자별로 정리해 주세요.\n\n[요약할 내용]\n";
+  const USAGE_GUIDE_INTRO = {
+    badge: "0",
+    title: "DS ONE 소개",
+    desc: "DS ONE은 사내 업무 요청과 지식 문의를 한곳에서 시작하는 AI 에이전트 플랫폼입니다.",
+    hint: "업무 AI Agent는 문서 작성, 요약, 번역, 파일 분석을 돕고, 사내 지식 문의는 규정, 절차, 담당 부서 확인을 돕습니다.",
+    highlight: "intro",
+    practice: false,
+  };
   const QUICK_START_GUIDE_STEPS = [
-    {
-      badge: "0",
-      title: "DS ONE은 무엇을 도와주나요?",
-      desc: "DS ONE은 업무 AI Agent와 사내 지식 문의를 한 화면에서 시작하도록 돕는 사내 AI 에이전트 플랫폼입니다.",
-      hint: "문서 작성, 요약, 번역, 파일 분석처럼 산출물이 필요한 일은 업무 AI Agent에서 시작하고, 규정이나 절차처럼 회사 기준이 필요한 질문은 사내 지식 문의에서 확인하세요.",
-      examples: ["업무 AI Agent", "사내 지식 문의", "최근 작업"],
-      highlight: "intro",
-      practice: false,
-    },
     {
       badge: "1",
       title: "업무 유형을 먼저 고르세요",
@@ -2095,6 +2094,9 @@
         align-items: center;
         gap: 8px;
         margin-bottom: 16px;
+      }
+      .ds-guide-progress[hidden] {
+        display: none;
       }
       .ds-guide-progress button {
         width: 34px;
@@ -5369,7 +5371,9 @@
       state.guideDialog.root.querySelector("[data-guide-close]")?.focus();
       return;
     }
-    const stepIndex = Math.max(0, Math.min(QUICK_START_GUIDE_STEPS.length - 1, Number(initialStep) || 0));
+    const requestedStep = Math.max(0, Number(initialStep) || 0);
+    const initialSection = requestedStep > 0 ? "quick" : "intro";
+    const stepIndex = initialSection === "quick" ? Math.min(QUICK_START_GUIDE_STEPS.length - 1, requestedStep - 1) : 0;
     const root = document.createElement("div");
     root.className = "ds-guide-backdrop";
     root.innerHTML = `
@@ -5385,11 +5389,11 @@
             </span>
           </div>
           <nav class="ds-guide-nav" aria-label="사용 가이드 섹션">
-            <button type="button" aria-current="true">
+            <button type="button" data-guide-section="intro" aria-current="true">
               <span class="ds-guide-nav-mark">0</span>
               <span class="ds-guide-nav-copy"><strong>DS ONE 소개</strong><span>플랫폼을 먼저 이해하기</span></span>
             </button>
-            <button type="button" disabled>
+            <button type="button" data-guide-section="quick" aria-current="false">
               <span class="ds-guide-nav-mark">1</span>
               <span class="ds-guide-nav-copy"><strong>빠른 시작</strong><span>첫 업무 요청까지 1분</span></span>
             </button>
@@ -5441,26 +5445,23 @@
       if (event.key === "Escape") close();
       if (event.key === "ArrowRight") {
         event.preventDefault();
-        setUsageGuideStep((state.guideDialog?.step || 0) + 1);
+        goUsageGuideNext();
       }
       if (event.key === "ArrowLeft") {
         event.preventDefault();
-        setUsageGuideStep((state.guideDialog?.step || 0) - 1);
+        goUsageGuidePrev();
       }
     };
-    state.guideDialog = { root, step: stepIndex, onKeydown };
+    state.guideDialog = { root, section: initialSection, step: stepIndex, onKeydown };
     root.addEventListener("mousedown", (event) => { if (event.target === root) close(); });
     root.addEventListener("click", (event) => {
       if (event.target.closest("[data-guide-close]")) { close(); return; }
+      const section = event.target.closest("[data-guide-section]");
+      if (section) { setUsageGuideSection(section.getAttribute("data-guide-section")); return; }
       const dot = event.target.closest("[data-guide-step]");
       if (dot) { setUsageGuideStep(Number(dot.getAttribute("data-guide-step"))); return; }
-      if (event.target.closest("[data-guide-prev]")) { setUsageGuideStep((state.guideDialog?.step || 0) - 1); return; }
-      if (event.target.closest("[data-guide-next]")) {
-        const current = state.guideDialog?.step || 0;
-        if (current >= QUICK_START_GUIDE_STEPS.length - 1) close();
-        else setUsageGuideStep(current + 1);
-        return;
-      }
+      if (event.target.closest("[data-guide-prev]")) { goUsageGuidePrev(); return; }
+      if (event.target.closest("[data-guide-next]")) { goUsageGuideNext(); return; }
       if (event.target.closest("[data-guide-practice]")) applyQuickStartGuideExample();
     });
     document.addEventListener("keydown", onKeydown);
@@ -5480,14 +5481,51 @@
   function setUsageGuideStep(nextStep) {
     if (!state.guideDialog) return;
     const max = QUICK_START_GUIDE_STEPS.length - 1;
+    state.guideDialog.section = "quick";
     state.guideDialog.step = Math.max(0, Math.min(max, Number(nextStep) || 0));
     renderUsageGuideStep();
+  }
+
+  function setUsageGuideSection(section, step = 0) {
+    if (!state.guideDialog) return;
+    const nextSection = section === "quick" ? "quick" : "intro";
+    state.guideDialog.section = nextSection;
+    state.guideDialog.step = nextSection === "quick"
+      ? Math.max(0, Math.min(QUICK_START_GUIDE_STEPS.length - 1, Number(step) || 0))
+      : 0;
+    renderUsageGuideStep();
+  }
+
+  function goUsageGuideNext() {
+    const dialog = state.guideDialog;
+    if (!dialog) return;
+    if (dialog.section !== "quick") {
+      setUsageGuideSection("quick", 0);
+      return;
+    }
+    if (dialog.step >= QUICK_START_GUIDE_STEPS.length - 1) {
+      closeUsageGuide();
+      return;
+    }
+    setUsageGuideStep(dialog.step + 1);
+  }
+
+  function goUsageGuidePrev() {
+    const dialog = state.guideDialog;
+    if (!dialog) return;
+    if (dialog.section !== "quick") return;
+    if (dialog.step <= 0) {
+      setUsageGuideSection("intro");
+      return;
+    }
+    setUsageGuideStep(dialog.step - 1);
   }
 
   function renderUsageGuideStep() {
     const dialog = state.guideDialog;
     if (!dialog?.root) return;
-    const step = QUICK_START_GUIDE_STEPS[dialog.step] || QUICK_START_GUIDE_STEPS[0];
+    const isQuickStart = dialog.section === "quick";
+    const step = isQuickStart ? (QUICK_START_GUIDE_STEPS[dialog.step] || QUICK_START_GUIDE_STEPS[0]) : USAGE_GUIDE_INTRO;
     const root = dialog.root;
     const progress = root.querySelector("[data-guide-progress]");
     const preview = root.querySelector("[data-guide-preview]");
@@ -5499,11 +5537,15 @@
     const prev = root.querySelector("[data-guide-prev]");
     const next = root.querySelector("[data-guide-next]");
     const practice = root.querySelector("[data-guide-practice]");
+    root.querySelectorAll("[data-guide-section]").forEach((button) => {
+      button.setAttribute("aria-current", button.getAttribute("data-guide-section") === (isQuickStart ? "quick" : "intro") ? "true" : "false");
+    });
     if (progress) {
-      progress.innerHTML = QUICK_START_GUIDE_STEPS.map((guideStep, index) => {
-        const label = index === 0 ? "DS ONE 소개로 이동" : `${guideStep.badge}단계로 이동`;
+      progress.hidden = !isQuickStart;
+      progress.innerHTML = isQuickStart ? QUICK_START_GUIDE_STEPS.map((guideStep, index) => {
+        const label = `빠른 시작 ${guideStep.badge}단계로 이동`;
         return `<button type="button" data-guide-step="${index}" aria-label="${label}" aria-current="${index === dialog.step ? "step" : "false"}"></button>`;
-      }).join("");
+      }).join("") : "";
     }
     if (preview) preview.innerHTML = createGuidePreview(step.highlight);
     if (badge) badge.textContent = step.badge;
@@ -5515,8 +5557,8 @@
       examples.hidden = !items.length;
       examples.innerHTML = items.map((item) => `<span>${escapeHtml(item)}</span>`).join("");
     }
-    if (prev) prev.disabled = dialog.step === 0;
-    if (next) next.textContent = dialog.step >= QUICK_START_GUIDE_STEPS.length - 1 ? "가이드 마치기" : "다음";
+    if (prev) prev.disabled = !isQuickStart;
+    if (next) next.textContent = !isQuickStart ? "빠른 시작 보기" : (dialog.step >= QUICK_START_GUIDE_STEPS.length - 1 ? "가이드 마치기" : "다음");
     if (practice) practice.hidden = step.practice === false;
   }
 
@@ -5538,8 +5580,8 @@
             </span>
           </div>
           <div>
-            <h3>업무 요청과 사내 지식을 한곳에서 시작합니다</h3>
-            <p>반복 업무는 AI Agent가 초안을 만들고, 회사 기준이 필요한 질문은 사내 지식 문의로 확인할 수 있습니다.</p>
+            <h3>업무와 사내 지식을 한곳에서 시작합니다</h3>
+            <p>문서 업무는 업무 AI Agent에서, 회사 기준 질문은 사내 지식 문의에서 처리합니다.</p>
           </div>
           <div class="ds-guide-intro-grid">
             <span class="ds-guide-intro-card">
@@ -5550,7 +5592,6 @@
               <strong>사내 지식 문의</strong>
               <span>규정, 절차, 담당 부서, 시스템 사용 문의</span>
             </span>
-            <span class="ds-guide-intro-note">완료한 요청은 최근 작업에서 다시 열 수 있습니다.</span>
           </div>
         </div>
       </div>`;
