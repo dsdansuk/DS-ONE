@@ -1815,13 +1815,14 @@
         display: grid;
         align-items: center;
         overflow: hidden;
-        border: 0;
-        border-radius: 0;
+        border: 1px solid rgba(205, 218, 238, .92);
+        border-radius: 20px;
         background:
           radial-gradient(ellipse at 20% 22%, rgba(222, 235, 255, .8) 0 24%, transparent 45%),
           linear-gradient(149deg, rgba(229, 239, 255, .78) 0 33%, transparent 33%),
           linear-gradient(154deg, transparent 0 67%, rgba(218, 235, 255, .9) 67%),
           #f8fbff;
+        box-shadow: 0 16px 44px rgba(23, 37, 84, .06);
       }
       .ds-guide-intro {
         min-height: 100%;
@@ -2060,6 +2061,9 @@
         display: flex;
         flex-direction: column;
       }
+      .ds-guide-step-panel.is-guide-intro .ds-guide-step-title {
+        margin-top: 0;
+      }
       .ds-guide-progress {
         display: flex;
         align-items: center;
@@ -2093,6 +2097,9 @@
         border-radius: 14px;
         background: linear-gradient(145deg, #2f6fed, #7fa8ff);
       }
+      .ds-guide-step-badge[hidden] {
+        display: none;
+      }
       .ds-guide-step-title {
         margin: 14px 0 0;
         color: #111827;
@@ -2120,6 +2127,70 @@
         background: #f4f8ff;
         border: 1px solid rgba(205, 220, 244, .95);
         border-radius: 15px;
+        word-break: keep-all;
+      }
+      .ds-guide-feature-menu {
+        display: grid;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .ds-guide-feature-menu[hidden] {
+        display: none;
+      }
+      .ds-guide-feature-menu-item {
+        width: 100%;
+        min-height: 58px;
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        color: #182133;
+        text-align: left;
+        background: #fff;
+        border: 1px solid rgba(205, 218, 238, .95);
+        border-radius: 14px;
+        box-shadow: 0 10px 24px rgba(31, 41, 55, .05);
+      }
+      .ds-guide-feature-menu-icon {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        border-radius: 10px;
+        background: linear-gradient(145deg, #2f6fed, #7da8ff);
+        box-shadow: inset 0 -2px 5px rgba(0, 0, 0, .08);
+      }
+      .ds-guide-feature-menu-icon.knowledge {
+        background: linear-gradient(145deg, #0f9f79, #53d2b1);
+      }
+      .ds-guide-feature-menu-icon.rpa {
+        background: linear-gradient(145deg, #405f95, #7489b5);
+      }
+      .ds-guide-feature-menu-icon svg {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.25;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .ds-guide-feature-menu-copy strong {
+        display: block;
+        color: #10264f;
+        font-size: 13px;
+        font-weight: 950;
+        letter-spacing: 0;
+      }
+      .ds-guide-feature-menu-copy span {
+        display: block;
+        margin-top: 3px;
+        color: #64748b;
+        font-size: 11.6px;
+        font-weight: 750;
+        line-height: 1.35;
         word-break: keep-all;
       }
       .ds-guide-example-list {
@@ -5373,6 +5444,7 @@
               <div class="ds-guide-progress" data-guide-progress aria-label="빠른 시작 진행 단계"></div>
               <span class="ds-guide-step-badge" data-guide-badge></span>
               <h3 class="ds-guide-step-title" data-guide-step-title></h3>
+              <div class="ds-guide-feature-menu" data-guide-feature-menu hidden></div>
               <p class="ds-guide-step-desc" data-guide-step-desc></p>
               <div class="ds-guide-hint" data-guide-hint></div>
               <div class="ds-guide-example-list" data-guide-examples hidden></div>
@@ -5478,10 +5550,12 @@
     const title = root.querySelector("[data-guide-step-title]");
     const desc = root.querySelector("[data-guide-step-desc]");
     const hint = root.querySelector("[data-guide-hint]");
+    const featureMenu = root.querySelector("[data-guide-feature-menu]");
     const examples = root.querySelector("[data-guide-examples]");
     const prev = root.querySelector("[data-guide-prev]");
     const next = root.querySelector("[data-guide-next]");
     const practice = root.querySelector("[data-guide-practice]");
+    root.querySelector(".ds-guide-step-panel")?.classList.toggle("is-guide-intro", !isQuickStart);
     root.querySelectorAll("[data-guide-section]").forEach((button) => {
       button.setAttribute("aria-current", button.getAttribute("data-guide-section") === (isQuickStart ? "quick" : "intro") ? "true" : "false");
     });
@@ -5493,8 +5567,15 @@
       }).join("") : "";
     }
     if (preview) preview.innerHTML = createGuidePreview(step.highlight);
-    if (badge) badge.textContent = step.badge;
+    if (badge) {
+      badge.hidden = !isQuickStart;
+      badge.textContent = isQuickStart ? step.badge : "";
+    }
     if (title) title.textContent = step.title;
+    if (featureMenu) {
+      featureMenu.hidden = isQuickStart;
+      featureMenu.innerHTML = isQuickStart ? "" : createUsageGuideFeatureMenu();
+    }
     if (desc) desc.textContent = step.desc;
     if (hint) hint.textContent = step.hint;
     if (examples) {
@@ -5505,6 +5586,42 @@
     if (prev) prev.disabled = !isQuickStart;
     if (next) next.textContent = !isQuickStart ? "빠른 시작 보기" : (dialog.step >= QUICK_START_GUIDE_STEPS.length - 1 ? "가이드 마치기" : "다음");
     if (practice) practice.hidden = step.practice === false;
+  }
+
+  function createUsageGuideFeatureMenu() {
+    const rpaButton = document.querySelector("[data-rpa-menu-action]");
+    const items = [
+      {
+        key: "agent",
+        icon: "i-agent-briefcase",
+        title: "업무 AI Agent",
+        desc: "작성·요약·번역·분석",
+      },
+      {
+        key: "knowledge",
+        icon: "i-knowledge-search",
+        title: "사내 지식 문의",
+        desc: "규정·절차·담당 부서 확인",
+      },
+    ];
+    if (rpaButton && !rpaButton.hasAttribute("hidden")) {
+      items.push({
+        key: "rpa",
+        icon: "i-rpa-run",
+        title: "RPA 실행",
+        desc: "권한 있는 자동화 업무 실행",
+      });
+    }
+    return items.map((item) => `
+      <div class="ds-guide-feature-menu-item">
+        <span class="ds-guide-feature-menu-icon ${item.key}" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false"><use href="#${item.icon}"></use></svg>
+        </span>
+        <span class="ds-guide-feature-menu-copy">
+          <strong>${escapeHtml(item.title)}</strong>
+          <span>${escapeHtml(item.desc)}</span>
+        </span>
+      </div>`).join("");
   }
 
   function createGuidePreview(highlight) {
