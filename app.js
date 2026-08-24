@@ -1874,19 +1874,23 @@
         box-sizing: border-box;
         width: 100%;
         max-width: 100%;
-        height: auto;
-        min-height: 0;
-        aspect-ratio: 1 / 1;
-        align-self: start;
+        height: 100%;
+        min-height: 100%;
+        aspect-ratio: auto;
+        align-self: stretch;
         justify-self: stretch;
         place-items: center;
         padding: 0;
-        background: #f8fbff;
+        background:
+          radial-gradient(ellipse at 18% 16%, rgba(224, 237, 255, .86) 0 26%, transparent 48%),
+          linear-gradient(149deg, rgba(231, 240, 255, .78) 0 35%, transparent 35%),
+          linear-gradient(154deg, transparent 0 66%, rgba(218, 235, 255, .9) 66%),
+          #f8fbff;
         border: 1px solid rgba(190, 210, 238, .92);
       }
       .ds-guide-intro-image {
-        width: 100%;
-        height: 100%;
+        width: auto;
+        height: auto;
         max-width: 100%;
         max-height: 100%;
         display: block;
@@ -2672,7 +2676,8 @@
         }
         .ds-guide-screen { min-height: 390px; }
         .ds-guide-screen-intro {
-          min-height: 0;
+          height: auto;
+          min-height: min(390px, calc(100vw - 64px));
           aspect-ratio: 1 / 1;
         }
         .ds-guide-intro {
