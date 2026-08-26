@@ -3790,9 +3790,16 @@
       const recommendedQuestions = requestFeature === "knowledge" ? getKnowledgeRecommendedQuestions(data, userText, answer) : [];
       const knowledgeRedirect = getKnowledgeRedirectAction(data, userText);
       addMessage("bot", answer, { recommendedQuestions, knowledgeRedirect });
-      appendConversationMessage("assistant", answer);
+      appendConversationMessage("assistant", answer, { knowledgeRedirect });
       const titleConversationId = activeConversationId;
-      void saveRemoteConversationMessage("assistant", answer, { route, task, feature: requestFeature })
+      const assistantMetadata = { route, task, feature: requestFeature };
+      if (knowledgeRedirect) {
+        assistantMetadata.responseAction = "knowledge_redirect";
+        assistantMetadata.redirectFeature = "knowledge";
+        assistantMetadata.redirectQuestion = knowledgeRedirect.question || userText;
+        assistantMetadata.redirectLabel = knowledgeRedirect.label || "사내 지식 문의로 이동";
+      }
+      void saveRemoteConversationMessage("assistant", answer, assistantMetadata)
         .then(() => maybeGenerateConversationTitle(titleConversationId, requestFeature))
         .catch(() => {});
       saveLocalHistory(userText, answer);
@@ -4049,9 +4056,62 @@
     const shouldRedirect = redirectFeature === "knowledge" || route === "knowledge_redirect" || task === "knowledge_redirect";
     if (!shouldRedirect) return null;
     return {
+      type: "knowledge_redirect",
+      feature: "knowledge",
       label: String(data.redirectLabel || data.redirect_label || "사내 지식 문의로 이동").trim(),
       question: String(data.redirectQuestion || data.redirect_question || data.question || fallbackQuestion || "").trim(),
     };
+  }
+
+  function normalizeKnowledgeRedirectAction(action) {
+    if (!action || typeof action !== "object") return null;
+    const feature = String(action.feature || action.redirectFeature || action.redirect_feature || "").trim();
+    const type = String(action.type || action.responseAction || action.response_action || action.task || action.route || "").trim();
+    const shouldRedirect = feature === "knowledge" || type === "knowledge_redirect";
+    if (!shouldRedirect) return null;
+    return {
+      type: "knowledge_redirect",
+      feature: "knowledge",
+      label: String(action.label || action.redirectLabel || action.redirect_label || "사내 지식 문의로 이동").trim(),
+      question: String(action.question || action.redirectQuestion || action.redirect_question || "").trim(),
+    };
+  }
+
+  function getSavedMessageRenderOptions(message, fallbackQuestion = "", contentText = "") {
+    const metadata = message?.metadata && typeof message.metadata === "object" ? message.metadata : {};
+    const knowledgeRedirect = normalizeKnowledgeRedirectAction(message?.knowledgeRedirect)
+      || normalizeKnowledgeRedirectAction(metadata)
+      || getKnowledgeRedirectAction({
+        redirectFeature: message?.redirectFeature || metadata.redirectFeature,
+        redirect_feature: message?.redirect_feature || metadata.redirect_feature,
+        route: message?.route || metadata.route || metadata.responseAction,
+        task: message?.task || metadata.task || metadata.responseAction,
+        redirectLabel: message?.redirectLabel || metadata.redirectLabel,
+        redirect_label: message?.redirect_label || metadata.redirect_label,
+        redirectQuestion: message?.redirectQuestion || metadata.redirectQuestion,
+        redirect_question: message?.redirect_question || metadata.redirect_question,
+      }, "");
+    if (knowledgeRedirect) {
+      if (!knowledgeRedirect.question && fallbackQuestion) knowledgeRedirect.question = fallbackQuestion;
+      return { knowledgeRedirect };
+    }
+
+    const text = normalizeText(contentText || message?.content || message?.text || "");
+    const looksLikeRedirectAnswer = text.includes("사내 지식 문의")
+      && (text.includes("아래 버튼") || text.includes("같은 질문") || text.includes("지식베이스 기준"));
+    if (!looksLikeRedirectAnswer) return {};
+    return {
+      knowledgeRedirect: {
+        type: "knowledge_redirect",
+        feature: "knowledge",
+        label: "사내 지식 문의로 이동",
+        question: String(fallbackQuestion || "").trim(),
+      },
+    };
+  }
+
+  function isKnowledgeRedirectMessage(message) {
+    return Boolean(getSavedMessageRenderOptions(message).knowledgeRedirect);
   }
 
   function normalizeRecommendedQuestions(data) {
@@ -6291,7 +6351,7 @@
     return activeConversationId;
   }
 
-  function appendConversationMessage(role, text) {
+  function appendConversationMessage(role, text, options = {}) {
     if (!activeConversationId) return;
     const now = Date.now();
     const items = loadRecentWorkItems();
@@ -6299,7 +6359,22 @@
     if (index < 0) return;
     const item = { ...items[index] };
     const messages = Array.isArray(item.messages) ? item.messages.slice(-MAX_STORED_CONVERSATION_MESSAGES) : [];
-    messages.push({ role, text: String(text || ""), at: now });
+    const nextMessage = { role, text: String(text || ""), at: now };
+    const metadata = options.metadata && typeof options.metadata === "object" ? { ...options.metadata } : {};
+    const knowledgeRedirect = normalizeKnowledgeRedirectAction(options.knowledgeRedirect);
+    if (knowledgeRedirect) {
+      nextMessage.knowledgeRedirect = knowledgeRedirect;
+      nextMessage.metadata = {
+        ...metadata,
+        responseAction: "knowledge_redirect",
+        redirectFeature: "knowledge",
+        redirectQuestion: knowledgeRedirect.question,
+        redirectLabel: knowledgeRedirect.label,
+      };
+    } else if (Object.keys(metadata).length) {
+      nextMessage.metadata = metadata;
+    }
+    messages.push(nextMessage);
     item.messages = messages.slice(-MAX_STORED_CONVERSATION_MESSAGES);
     item.updatedAt = now;
     if (role === "user") item.preview = createConversationPreview(text);
@@ -6470,13 +6545,30 @@
       try {
         const data = await agentStateRequest({ action: "load_session", sessionId: remoteId });
         const messages = Array.isArray(data.messages) ? data.messages : [];
-        if (messages.some((message) => isKnowledgeTask(message?.metadata?.task || message?.metadata?.feature || message?.route || ""))) {
+        if (messages.some((message) => !isKnowledgeRedirectMessage(message) && isKnowledgeTask(message?.metadata?.task || message?.metadata?.feature || message?.route || ""))) {
           applyFeatureMode("knowledge", { persist: true, silent: true });
         }
-        messages.forEach((message) => addMessage(message.role === "assistant" ? "bot" : "user", message.content || message.text || ""));
+        let lastUserText = "";
+        messages.forEach((message) => {
+          const role = message.role === "assistant" ? "bot" : "user";
+          const text = message.content || message.text || "";
+          addMessage(role, text, role === "bot" ? getSavedMessageRenderOptions(message, lastUserText, text) : {});
+          if (role === "user") lastUserText = String(text || "");
+        });
         if (messages.length) {
           item.feature = getConversationFeature(item);
-          item.messages = messages.map((message) => ({ role: message.role === "assistant" ? "assistant" : "user", text: message.content || message.text || "", at: Date.now() })).slice(-MAX_STORED_CONVERSATION_MESSAGES);
+          let cacheLastUserText = "";
+          item.messages = messages.map((message) => {
+            const role = message.role === "assistant" ? "assistant" : "user";
+            const text = message.content || message.text || "";
+            const next = { role: message.role === "assistant" ? "assistant" : "user", text: message.content || message.text || "", at: Date.now() };
+            const metadata = message?.metadata && typeof message.metadata === "object" ? message.metadata : null;
+            const knowledgeRedirect = role === "assistant" ? getSavedMessageRenderOptions(message, cacheLastUserText, text).knowledgeRedirect : null;
+            if (metadata) next.metadata = metadata;
+            if (knowledgeRedirect) next.knowledgeRedirect = knowledgeRedirect;
+            if (role === "user") cacheLastUserText = String(text || "");
+            return next;
+          }).slice(-MAX_STORED_CONVERSATION_MESSAGES);
           upsertRecentWorkItem(item);
         }
       } catch {
@@ -6506,7 +6598,13 @@
 
   function renderLocalConversationMessages(item) {
     const messages = Array.isArray(item?.messages) ? item.messages : [];
-    messages.forEach((message) => addMessage(message.role === "assistant" ? "bot" : "user", message.text || ""));
+    let lastUserText = "";
+    messages.forEach((message) => {
+      const role = message.role === "assistant" ? "bot" : "user";
+      const text = message.text || message.content || "";
+      addMessage(role, text, role === "bot" ? getSavedMessageRenderOptions(message, lastUserText, text) : {});
+      if (role === "user") lastUserText = String(text || "");
+    });
   }
 
   async function renameRecentConversation(conversationId) {
