@@ -44,6 +44,7 @@
     badge: "0",
     title: "DS ONE 소개",
     desc: "DS ONE은 사내 업무 요청과 지식 문의를 한곳에서 시작하는 AI 에이전트 플랫폼입니다.",
+    permissionNote: "RPA 실행 메뉴는 자동화 업무 실행 권한이 있는 사용자에게만 표시됩니다.",
     hint: "업무 AI Agent는 문서 작성, 요약, 번역, 파일 분석을 돕고, 사내 지식 문의는 규정, 절차, 담당 부서 확인을 돕습니다.",
     highlight: "intro",
     practice: false,
@@ -2303,6 +2304,22 @@
         border: 1px solid rgba(205, 220, 244, .95);
         border-radius: 15px;
         word-break: keep-all;
+      }
+      .ds-guide-permission-note {
+        margin-top: 12px;
+        padding: 11px 13px;
+        color: #40506a;
+        font-size: 12.6px;
+        font-weight: 800;
+        line-height: 1.55;
+        background: #f7faff;
+        border: 1px solid rgba(209, 222, 241, .95);
+        border-radius: 13px;
+        word-break: keep-all;
+      }
+      .ds-guide-permission-note strong {
+        color: #174a9c;
+        font-weight: 950;
       }
       .ds-guide-feature-menu {
         display: grid;
@@ -5789,6 +5806,12 @@
         hint.setAttribute("data-guide-hint", "");
         hint.textContent = step.hint;
         hintSlot.appendChild(hint);
+      } else if (!isQuickStart && step.permissionNote) {
+        const note = document.createElement("div");
+        note.className = "ds-guide-permission-note";
+        note.setAttribute("data-guide-permission-note", "");
+        note.innerHTML = escapeHtml(step.permissionNote).replace("RPA 실행", "<strong>RPA 실행</strong>");
+        hintSlot.appendChild(note);
       }
     }
     if (examples) {
@@ -5804,7 +5827,6 @@
   }
 
   function createUsageGuideFeatureMenu() {
-    const rpaButton = document.querySelector("[data-rpa-menu-action]");
     const items = [
       {
         key: "agent",
@@ -5818,15 +5840,13 @@
         title: "사내 지식 문의",
         desc: "규정·절차·담당 부서 확인",
       },
-    ];
-    if (rpaButton && !rpaButton.hasAttribute("hidden")) {
-      items.push({
+      {
         key: "rpa",
         icon: "i-rpa-run",
         title: "RPA 실행",
         desc: "권한 있는 자동화 업무 실행",
-      });
-    }
+      },
+    ];
     return items.map((item) => `
       <div class="ds-guide-feature-menu-item">
         <span class="ds-guide-feature-menu-icon ${item.key}" aria-hidden="true">
