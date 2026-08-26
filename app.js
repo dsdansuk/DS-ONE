@@ -34,6 +34,7 @@
   const AUTO_TITLE_MAX_INITIAL_MESSAGES = 2;
   const TEMPLATE_CURSOR_MARKERS = ["[작성할 내용]", "[요약할 내용]", "[번역할 내용]", "[정리할 내용]", "[질문]"];
   const REMOTE_SESSION_REFRESH_DEBOUNCE_MS = 700;
+  const REMOTE_SESSION_REQUEST_TIMEOUT_MS = Number(STORAGE.remoteSessionRequestTimeoutMs || 8000);
   const REMOTE_SESSION_LIST_LIMIT = Math.max(MAX_RECENT_WORK, 20);
   const RPA_TASK = "rpa_run";
   const RPA_ACCESS_REFRESH_MS = 3 * 60 * 1000;
@@ -3951,6 +3952,21 @@
     return data;
   }
 
+  async function fetchWithTimeout(url, options = {}, timeoutMs = 0) {
+    const ms = Number(timeoutMs || 0);
+    if (!ms || typeof AbortController === "undefined") return fetch(url, options);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), ms);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (error) {
+      if (error?.name === "AbortError") throw new Error("요청 시간이 초과되었습니다.");
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
   function normalizeTask(task) {
     const value = String(task || "").trim();
     if (!value || value === "document_draft") return "";
@@ -6498,12 +6514,12 @@
     recentRemoteRefreshInProgress = true;
     renderRecentWorkList();
     try {
-      let data = await agentStateRequest({ action: "list_sessions", limit: REMOTE_SESSION_LIST_LIMIT, featureMode: currentFeature, includeLegacy: currentFeature === "agent" });
+      let data = await agentStateRequest({ action: "list_sessions", limit: REMOTE_SESSION_LIST_LIMIT, featureMode: currentFeature, includeLegacy: currentFeature === "agent" }, { timeoutMs: REMOTE_SESSION_REQUEST_TIMEOUT_MS });
       let remote = Array.isArray(data.sessions) ? data.sessions : [];
       if (!remote.length && currentFeature === "agent") {
         // 일부 배포 환경에서 feature_mode 마이그레이션 전 세션이 필터에서 제외되는 경우를 보정합니다.
         try {
-          data = await agentStateRequest({ action: "list_sessions", limit: REMOTE_SESSION_LIST_LIMIT, featureMode: "all", includeLegacy: true });
+          data = await agentStateRequest({ action: "list_sessions", limit: REMOTE_SESSION_LIST_LIMIT, featureMode: "all", includeLegacy: true }, { timeoutMs: REMOTE_SESSION_REQUEST_TIMEOUT_MS });
           remote = (Array.isArray(data.sessions) ? data.sessions : []).filter((session) => getConversationFeature({
             id: session.id || session.sessionId || "",
             title: session.title || "",
@@ -6554,10 +6570,10 @@
       renderRecentWorkList();
     } catch {
       // 서버 세션 저장이 아직 배포되지 않은 환경에서는 로컬 최근 작업만 사용합니다.
-      renderRecentWorkList();
+      recentRemoteEverLoaded = true;
     } finally {
       recentRemoteRefreshInProgress = false;
-      ensureRecentEmptyState(loadRecentWorkItems());
+      renderRecentWorkList();
     }
   }
 
@@ -6634,15 +6650,15 @@
     }
   }
 
-  async function agentStateRequest(payload) {
+  async function agentStateRequest(payload, options = {}) {
     const action = String(payload?.action || "");
     const activeToken = action === "refresh_session" ? sessionToken : await ensureValidSession({ silent: true });
     if (!activeToken) throw new Error("세션 갱신이 필요합니다.");
-    const res = await fetch(AGENT_API_URL, {
+    const res = await fetchWithTimeout(AGENT_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
       body: JSON.stringify(payload || {}),
-    });
+    }, Number(options.timeoutMs || 0));
     return readApiResponse(res);
   }
 
