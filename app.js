@@ -1880,22 +1880,18 @@
         align-self: stretch;
         justify-self: stretch;
         place-items: center;
-        padding: 0;
-        background:
-          radial-gradient(ellipse at 18% 16%, rgba(224, 237, 255, .86) 0 26%, transparent 48%),
-          linear-gradient(149deg, rgba(231, 240, 255, .78) 0 35%, transparent 35%),
-          linear-gradient(154deg, transparent 0 66%, rgba(218, 235, 255, .9) 66%),
-          #f8fbff;
+        padding: clamp(12px, 2.4vw, 22px);
+        background: #f8fbff url("ds-one-guide-intro-bg.png") center / cover no-repeat;
         border: 1px solid rgba(190, 210, 238, .92);
       }
       .ds-guide-intro-image {
-        width: auto;
+        width: min(96%, 520px);
         height: auto;
         max-width: 100%;
         max-height: 100%;
         display: block;
         object-fit: contain;
-        border-radius: inherit;
+        object-position: center;
       }
       .ds-guide-intro {
         position: relative;
@@ -5848,7 +5844,7 @@
     if (highlight === "intro") {
       return `
       <div class="ds-guide-screen ds-guide-screen-intro" aria-hidden="true">
-        <img class="ds-guide-intro-image" src="ds-one-guide-intro.png" alt="">
+        <img class="ds-guide-intro-image" src="ds-one-guide-intro-visual.png" alt="">
       </div>`;
     }
     return `
