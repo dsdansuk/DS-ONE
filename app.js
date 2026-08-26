@@ -917,6 +917,46 @@
         box-shadow: none;
         cursor: wait;
       }
+      .ds-response-cta {
+        width: min(760px, 100%);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .ds-response-cta button {
+        min-height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 9px 14px;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 900;
+        line-height: 1.2;
+        border: 0;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #2f6fed, #5f86f7);
+        box-shadow: 0 10px 22px rgba(47, 111, 237, .2);
+        cursor: pointer;
+      }
+      .ds-response-cta button:hover,
+      .ds-response-cta button:focus-visible {
+        background: linear-gradient(135deg, #245bd3, #4d77f1);
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(47, 111, 237, .16), 0 12px 24px rgba(47, 111, 237, .24);
+      }
+      .ds-response-cta svg {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
       .ds-agent-composer {
         width: min(860px, 100%);
         margin: 0 auto;
@@ -3434,6 +3474,14 @@
         void handleRpaRun(rpaRun);
         return;
       }
+      const knowledgeRedirect = event.target.closest("[data-knowledge-redirect]");
+      if (knowledgeRedirect) {
+        event.preventDefault();
+        const question = knowledgeRedirect.dataset.question || "";
+        applyFeatureMode("knowledge", { persist: true, silent: false });
+        setHomeInput(question);
+        return;
+      }
       const recommendedButton = event.target.closest(".ds-recommended-question");
       if (recommendedButton) {
         void handleKnowledgeRecommendedQuestion({
@@ -3740,7 +3788,8 @@
       if (requestFeature === "knowledge") persistSideTalkSessionFromResponse(data);
       const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
       const recommendedQuestions = requestFeature === "knowledge" ? getKnowledgeRecommendedQuestions(data, userText, answer) : [];
-      addMessage("bot", answer, { recommendedQuestions });
+      const knowledgeRedirect = getKnowledgeRedirectAction(data, userText);
+      addMessage("bot", answer, { recommendedQuestions, knowledgeRedirect });
       appendConversationMessage("assistant", answer);
       const titleConversationId = activeConversationId;
       void saveRemoteConversationMessage("assistant", answer, { route, task, feature: requestFeature })
@@ -3990,6 +4039,19 @@
       return `${index + 1}. ${title}${snippet ? ` - ${snippet}` : ""}`;
     });
     return `${answer}\n\n근거 문서\n${lines.join("\n")}`;
+  }
+
+  function getKnowledgeRedirectAction(data, fallbackQuestion = "") {
+    if (!data) return null;
+    const redirectFeature = String(data.redirectFeature || data.redirect_feature || "").trim();
+    const route = String(data.route || data.redirectRoute || data.redirect_route || "").trim();
+    const task = String(data.task || "").trim();
+    const shouldRedirect = redirectFeature === "knowledge" || route === "knowledge_redirect" || task === "knowledge_redirect";
+    if (!shouldRedirect) return null;
+    return {
+      label: String(data.redirectLabel || data.redirect_label || "사내 지식 문의로 이동").trim(),
+      question: String(data.redirectQuestion || data.redirect_question || data.question || fallbackQuestion || "").trim(),
+    };
   }
 
   function normalizeRecommendedQuestions(data) {
@@ -4454,6 +4516,7 @@
       stack.className = "ds-bot-message-stack";
       stack.appendChild(msg);
       appendRecommendedQuestions(stack, options.recommendedQuestions);
+      appendKnowledgeRedirectAction(stack, options.knowledgeRedirect);
       addCopyButton(stack, msg);
       row.appendChild(stack);
     } else {
@@ -4894,6 +4957,25 @@
     });
     actions.appendChild(button);
     stack.appendChild(actions);
+  }
+
+  function appendKnowledgeRedirectAction(parent, action) {
+    if (!parent || !action) return;
+    const label = String(action.label || "사내 지식 문의로 이동").trim();
+    const question = String(action.question || "").trim();
+    const wrap = document.createElement("div");
+    wrap.className = "ds-response-cta";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.knowledgeRedirect = "true";
+    button.dataset.question = question;
+    button.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-knowledge-search"></use></svg>
+      <span>${escapeHtml(label)}</span>
+    `;
+    button.setAttribute("aria-label", label);
+    wrap.appendChild(button);
+    parent.appendChild(wrap);
   }
 
   async function copyToClipboard(text) {
