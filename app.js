@@ -390,10 +390,10 @@
 
   function showIframeLauncher(profile) {
     const targetUrl = buildPlatformOpenUrl();
-    document.documentElement.style.width = "118px";
-    document.documentElement.style.height = "118px";
-    document.body.style.width = "118px";
-    document.body.style.height = "118px";
+    document.documentElement.style.width = "108px";
+    document.documentElement.style.height = "108px";
+    document.body.style.width = "108px";
+    document.body.style.height = "108px";
     document.body.style.minWidth = "0";
     document.body.style.margin = "0";
     document.body.style.overflow = "hidden";
@@ -413,7 +413,7 @@
         <span class="ds-one-btn-open" aria-hidden="true">↗</span>
       </button>
       <style>
-        #dsOneOpenButton{position:relative;width:118px;height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:15px 10px 12px;border:1px solid rgba(255,255,255,.38);border-radius:10px;color:#fff;background:linear-gradient(145deg,#3292ff 0%,#176de8 54%,#075ac7 100%);box-shadow:0 8px 16px rgba(0,74,164,.22),inset 0 1px 0 rgba(255,255,255,.25);cursor:pointer;overflow:hidden;font-family:Pretendard,'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}#dsOneOpenButton:before{content:"";position:absolute;inset:-42px auto auto -36px;width:94px;height:94px;border-radius:999px;background:rgba(255,255,255,.12)}#dsOneOpenButton:after{content:"";position:absolute;inset:auto -24px -34px auto;width:94px;height:94px;border-radius:999px;background:rgba(255,255,255,.08)}#dsOneOpenButton:hover{transform:translateY(-1px);filter:saturate(1.05);box-shadow:0 10px 20px rgba(0,74,164,.28),inset 0 1px 0 rgba(255,255,255,.3)}#dsOneOpenButton:active{transform:translateY(0)}.ds-one-btn-icon{position:relative;z-index:1;width:35px;height:35px;display:grid;place-items:center}.ds-one-btn-icon svg{width:35px;height:35px;display:block;fill:none;stroke:currentColor;stroke-width:4.2;stroke-linecap:round;stroke-linejoin:round}.ds-one-btn-text{position:relative;z-index:1;display:grid;gap:1px;text-align:center;line-height:1.03;text-shadow:0 2px 7px rgba(0,35,99,.22)}.ds-one-btn-text strong{font-size:18px;font-weight:900;letter-spacing:0}.ds-one-btn-text em{font-style:normal;font-size:15px;font-weight:850;letter-spacing:0}.ds-one-btn-open{position:absolute;right:8px;top:7px;z-index:1;font-size:13px;font-weight:900;line-height:1;opacity:.9}.ds-one-fallback{position:absolute;inset:0;display:grid;place-items:center;padding:10px;text-align:center;color:#fff;font-size:13px;font-weight:850;text-decoration:none;background:linear-gradient(145deg,#3292ff,#075ac7);border:1px solid rgba(255,255,255,.38);border-radius:10px}
+        #dsOneOpenButton{position:relative;width:108px;height:108px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px 8px 10px;border:1px solid rgba(255,255,255,.38);border-radius:8px;color:#fff;background:linear-gradient(145deg,#3292ff 0%,#176de8 54%,#075ac7 100%);box-shadow:0 8px 16px rgba(0,74,164,.22),inset 0 1px 0 rgba(255,255,255,.25);cursor:pointer;overflow:hidden;font-family:Pretendard,'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}#dsOneOpenButton:before{content:"";position:absolute;inset:-42px auto auto -36px;width:90px;height:90px;border-radius:999px;background:rgba(255,255,255,.12)}#dsOneOpenButton:after{content:"";position:absolute;inset:auto -24px -34px auto;width:90px;height:90px;border-radius:999px;background:rgba(255,255,255,.08)}#dsOneOpenButton:hover{transform:translateY(-1px);filter:saturate(1.05);box-shadow:0 10px 20px rgba(0,74,164,.28),inset 0 1px 0 rgba(255,255,255,.3)}#dsOneOpenButton:active{transform:translateY(0)}.ds-one-btn-icon{position:relative;z-index:1;width:32px;height:32px;display:grid;place-items:center}.ds-one-btn-icon svg{width:32px;height:32px;display:block;fill:none;stroke:currentColor;stroke-width:4.2;stroke-linecap:round;stroke-linejoin:round}.ds-one-btn-text{position:relative;z-index:1;display:grid;gap:1px;text-align:center;line-height:1.04;text-shadow:0 2px 7px rgba(0,35,99,.22)}.ds-one-btn-text strong{font-size:16px;font-weight:900;letter-spacing:0}.ds-one-btn-text em{font-style:normal;font-size:14px;font-weight:850;letter-spacing:0}.ds-one-btn-open{position:absolute;right:7px;top:6px;z-index:1;font-size:12px;font-weight:900;line-height:1;opacity:.9}.ds-one-fallback{position:absolute;inset:0;display:block;color:transparent;font-size:0;text-decoration:none;background:transparent;border:0;border-radius:8px;overflow:hidden}
       </style>
     `;
 
@@ -425,7 +425,8 @@
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.className = "ds-one-fallback";
-        link.textContent = "DS ONE 업무 AI 열기";
+        link.setAttribute("aria-label", "DS ONE 업무 AI 열기");
+        link.textContent = "";
         document.body.appendChild(link);
       }
     });
