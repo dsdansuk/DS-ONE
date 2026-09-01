@@ -3790,9 +3790,13 @@
       const recommendedQuestions = requestFeature === "knowledge" ? getKnowledgeRecommendedQuestions(data, userText, answer) : [];
       const knowledgeRedirect = getKnowledgeRedirectAction(data, userText);
       addMessage("bot", answer, { recommendedQuestions, knowledgeRedirect });
-      appendConversationMessage("assistant", answer, { knowledgeRedirect });
+      appendConversationMessage("assistant", answer, {
+        knowledgeRedirect,
+        metadata: recommendedQuestions.length ? { recommendedQuestions } : {},
+      });
       const titleConversationId = activeConversationId;
       const assistantMetadata = { route, task, feature: requestFeature };
+      if (recommendedQuestions.length) assistantMetadata.recommendedQuestions = recommendedQuestions;
       if (knowledgeRedirect) {
         assistantMetadata.responseAction = "knowledge_redirect";
         assistantMetadata.redirectFeature = "knowledge";
@@ -4079,6 +4083,20 @@
 
   function getSavedMessageRenderOptions(message, fallbackQuestion = "", contentText = "") {
     const metadata = message?.metadata && typeof message.metadata === "object" ? message.metadata : {};
+    const recommendedQuestions = normalizeRecommendedQuestions({
+      recommendedQuestions: message?.recommendedQuestions || message?.recommended_questions || metadata.recommendedQuestions || metadata.recommended_questions,
+    });
+    const options = {};
+    if (recommendedQuestions.length) options.recommendedQuestions = recommendedQuestions;
+    const savedFeature = normalizeFeatureMode(
+      message?.feature
+      || message?.featureMode
+      || message?.feature_mode
+      || metadata.feature
+      || metadata.featureMode
+      || metadata.feature_mode
+      || "",
+    );
     const knowledgeRedirect = normalizeKnowledgeRedirectAction(message?.knowledgeRedirect)
       || normalizeKnowledgeRedirectAction(metadata)
       || getKnowledgeRedirectAction({
@@ -4093,21 +4111,23 @@
       }, "");
     if (knowledgeRedirect) {
       if (!knowledgeRedirect.question && fallbackQuestion) knowledgeRedirect.question = fallbackQuestion;
-      return { knowledgeRedirect };
+      if (savedFeature !== "knowledge") options.knowledgeRedirect = knowledgeRedirect;
+      return options;
     }
+
+    if (savedFeature === "knowledge") return options;
 
     const text = normalizeText(contentText || message?.content || message?.text || "");
     const looksLikeRedirectAnswer = text.includes("사내 지식 문의")
       && (text.includes("아래 버튼") || text.includes("같은 질문") || text.includes("지식베이스 기준"));
-    if (!looksLikeRedirectAnswer) return {};
-    return {
-      knowledgeRedirect: {
-        type: "knowledge_redirect",
-        feature: "knowledge",
-        label: "사내 지식 문의로 이동",
-        question: String(fallbackQuestion || "").trim(),
-      },
+    if (!looksLikeRedirectAnswer) return options;
+    options.knowledgeRedirect = {
+      type: "knowledge_redirect",
+      feature: "knowledge",
+      label: "사내 지식 문의로 이동",
+      question: String(fallbackQuestion || "").trim(),
     };
+    return options;
   }
 
   function isKnowledgeRedirectMessage(message) {
@@ -4331,9 +4351,11 @@
         const answer = extractAnswerText(data) || "답변을 생성하지 못했습니다.";
         const recommendedQuestions = getKnowledgeRecommendedQuestions(data, userText, answer);
         addMessage("bot", answer, { recommendedQuestions });
-        appendConversationMessage("assistant", answer);
+        appendConversationMessage("assistant", answer, {
+          metadata: recommendedQuestions.length ? { recommendedQuestions } : {},
+        });
         const titleConversationId = activeConversationId;
-        void saveRemoteConversationMessage("assistant", answer, { route, task, feature: "knowledge" })
+        void saveRemoteConversationMessage("assistant", answer, { route, task, feature: "knowledge", recommendedQuestions })
           .then(() => maybeGenerateConversationTitle(titleConversationId, "knowledge"))
           .catch(() => {});
         saveLocalHistory(userText, answer);
@@ -6359,8 +6381,13 @@
     if (index < 0) return;
     const item = { ...items[index] };
     const messages = Array.isArray(item.messages) ? item.messages.slice(-MAX_STORED_CONVERSATION_MESSAGES) : [];
-    const nextMessage = { role, text: String(text || ""), at: now };
-    const metadata = options.metadata && typeof options.metadata === "object" ? { ...options.metadata } : {};
+    const clientMessageOrder = getNextConversationMessageOrder(messages);
+    const nextMessage = { role, text: String(text || ""), at: now, clientMessageOrder };
+    const metadata = {
+      clientCreatedAt: new Date(now).toISOString(),
+      clientMessageOrder,
+      ...(options.metadata && typeof options.metadata === "object" ? options.metadata : {}),
+    };
     const knowledgeRedirect = normalizeKnowledgeRedirectAction(options.knowledgeRedirect);
     if (knowledgeRedirect) {
       nextMessage.knowledgeRedirect = knowledgeRedirect;
@@ -6382,6 +6409,31 @@
     items.splice(index, 1);
     saveRecentWorkItems([item, ...items]);
     renderRecentWorkList();
+  }
+
+  function getNextConversationMessageOrder(messages) {
+    const orders = (Array.isArray(messages) ? messages : [])
+      .map((message) => Number(message?.clientMessageOrder || message?.metadata?.clientMessageOrder || message?.metadata?.client_message_order || 0))
+      .filter((value) => Number.isFinite(value));
+    return (orders.length ? Math.max(...orders) : 0) + 1;
+  }
+
+  function sortStoredConversationMessages(messages) {
+    return (Array.isArray(messages) ? messages : [])
+      .map((message, index) => ({
+        message,
+        index,
+        order: Number(message?.clientMessageOrder || message?.metadata?.clientMessageOrder || message?.metadata?.client_message_order || NaN),
+        time: Date.parse(String(message?.metadata?.clientCreatedAt || message?.metadata?.client_created_at || "")) || Number(message?.at || 0) || 0,
+        roleOrder: message?.role === "user" ? 0 : 1,
+      }))
+      .sort((a, b) => {
+        if (Number.isFinite(a.order) && Number.isFinite(b.order) && a.order !== b.order) return a.order - b.order;
+        if (a.time !== b.time) return a.time - b.time;
+        if (a.roleOrder !== b.roleOrder) return a.roleOrder - b.roleOrder;
+        return a.index - b.index;
+      })
+      .map((entry) => entry.message);
   }
 
   function getActiveConversation() {
@@ -6561,11 +6613,18 @@
           item.messages = messages.map((message) => {
             const role = message.role === "assistant" ? "assistant" : "user";
             const text = message.content || message.text || "";
-            const next = { role: message.role === "assistant" ? "assistant" : "user", text: message.content || message.text || "", at: Date.now() };
             const metadata = message?.metadata && typeof message.metadata === "object" ? message.metadata : null;
-            const knowledgeRedirect = role === "assistant" ? getSavedMessageRenderOptions(message, cacheLastUserText, text).knowledgeRedirect : null;
+            const renderOptions = role === "assistant" ? getSavedMessageRenderOptions(message, cacheLastUserText, text) : {};
+            const clientMessageOrder = Number(metadata?.clientMessageOrder || metadata?.client_message_order || NaN);
+            const clientCreatedAt = String(metadata?.clientCreatedAt || metadata?.client_created_at || "");
+            const at = Date.parse(clientCreatedAt) || Date.parse(String(message.created_at || message.createdAt || "")) || Date.now();
+            const next = { role, text, at };
+            if (Number.isFinite(clientMessageOrder)) next.clientMessageOrder = clientMessageOrder;
             if (metadata) next.metadata = metadata;
-            if (knowledgeRedirect) next.knowledgeRedirect = knowledgeRedirect;
+            if (renderOptions.recommendedQuestions?.length) {
+              next.metadata = { ...(next.metadata || {}), recommendedQuestions: renderOptions.recommendedQuestions };
+            }
+            if (renderOptions.knowledgeRedirect) next.knowledgeRedirect = renderOptions.knowledgeRedirect;
             if (role === "user") cacheLastUserText = String(text || "");
             return next;
           }).slice(-MAX_STORED_CONVERSATION_MESSAGES);
@@ -6597,7 +6656,7 @@
   }
 
   function renderLocalConversationMessages(item) {
-    const messages = Array.isArray(item?.messages) ? item.messages : [];
+    const messages = sortStoredConversationMessages(Array.isArray(item?.messages) ? item.messages : []);
     let lastUserText = "";
     messages.forEach((message) => {
       const role = message.role === "assistant" ? "bot" : "user";
@@ -6794,16 +6853,51 @@
     return await remoteSessionCreatePromise;
   }
 
+  function getStoredConversationMessage(conversationId, role, content) {
+    const item = loadRecentWorkItems().find((entry) => entry.id === conversationId);
+    const messages = Array.isArray(item?.messages) ? item.messages : [];
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message?.role !== role) continue;
+      if (String(message?.text || message?.content || "").trim() !== content) continue;
+      return message;
+    }
+    return null;
+  }
+
   async function saveRemoteConversationMessage(role, text, metadata = {}) {
     const content = String(text || "").trim();
     const conversationId = activeConversationId;
     if (!content || !sessionToken || !conversationId) return null;
     const featureMode = normalizeFeatureMode(metadata.feature || currentFeature);
     const conversationTask = metadata.task || getCurrentConversationTask();
+    const storedMessage = getStoredConversationMessage(conversationId, role, content);
+    const storedMetadata = storedMessage?.metadata && typeof storedMessage.metadata === "object" ? storedMessage.metadata : {};
+    const clientMessageOrder = Number(metadata.clientMessageOrder || storedMessage?.clientMessageOrder || storedMetadata.clientMessageOrder || storedMetadata.client_message_order || NaN);
+    const clientCreatedAt = String(
+      metadata.clientCreatedAt
+      || storedMetadata.clientCreatedAt
+      || storedMetadata.client_created_at
+      || (storedMessage?.at ? new Date(storedMessage.at).toISOString() : "")
+      || new Date().toISOString(),
+    );
     const sessionId = await ensureRemoteSessionForActiveConversation(content);
     if (!sessionId) return null;
     try {
-      const data = await agentStateRequest({ action: "save_message", sessionId, role, content, route: metadata.route || "", featureMode, metadata: { ...metadata, feature: featureMode } });
+      const data = await agentStateRequest({
+        action: "save_message",
+        sessionId,
+        role,
+        content,
+        route: metadata.route || "",
+        featureMode,
+        metadata: {
+          ...metadata,
+          feature: featureMode,
+          clientCreatedAt,
+          clientMessageOrder: Number.isFinite(clientMessageOrder) ? clientMessageOrder : Date.now(),
+        },
+      });
       if (data?.session?.id) {
         const current = loadRecentWorkItems(featureMode).find((entry) => entry.id === conversationId);
         const patch = {
