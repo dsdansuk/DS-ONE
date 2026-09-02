@@ -114,6 +114,13 @@
       font-weight: 800;
       letter-spacing: 0;
       padding-right: 8px;
+      cursor: pointer;
+      border-radius: 8px;
+    }
+
+    .brand-name:focus-visible {
+      outline: 2px solid rgba(49, 108, 244, 0.38);
+      outline-offset: 4px;
     }
 
     .brand-divider {

@@ -3410,13 +3410,26 @@
   function bindUiEvents() {
     bindFeatureSwitcherEvents();
     document.addEventListener("click", handleOnboardingTourActionCardClick, true);
+    const startSelectedFeatureNewConversation = () => {
+      startNewConversation({ showToast: true });
+      setMode("home");
+    };
+    const brandName = document.querySelector(".brand-name");
+    if (brandName) {
+      brandName.setAttribute("role", "button");
+      brandName.setAttribute("tabindex", "0");
+      brandName.setAttribute("title", "새 대화 시작");
+      brandName.addEventListener("click", startSelectedFeatureNewConversation);
+      brandName.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        startSelectedFeatureNewConversation();
+      });
+    }
     document.querySelectorAll(".menu-item").forEach((button) => {
       const label = button.textContent.trim();
       if (label.includes("새 대화")) {
-        button.addEventListener("click", () => {
-          startNewConversation({ showToast: true });
-          setMode("home");
-        });
+        button.addEventListener("click", startSelectedFeatureNewConversation);
       } else if (label.includes("채팅 검색")) {
         state.searchMenuButton = button;
         button.addEventListener("click", () => openChatSearchDialog());
