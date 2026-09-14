@@ -71,6 +71,10 @@
     transform 150ms ease;
 }
 
+.action-card[hidden] {
+  display: none !important;
+}
+
 .action-card + .action-card::before {
   display: none;
 }

@@ -1586,6 +1586,10 @@ body.is-knowledge-feature .product-switch-button[aria-expanded="true"] {
   padding: var(--action-card-padding);
 }
 
+.action-card[hidden] {
+  display: none !important;
+}
+
 .card-desc {
   min-height: 0;
   line-height: 1.42;
