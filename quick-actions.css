@@ -515,3 +515,10 @@ body.is-knowledge-feature .action-card .card-mode-icon-knowledge:not([hidden]) {
     max-width: 260px !important;
   }
 }
+
+.home-stage .action-card[hidden],
+.home-stage .action-card[aria-hidden="true"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
