@@ -3059,7 +3059,11 @@
         event.preventDefault();
         event.stopPropagation();
         setRpaProductModeActive(false);
-        applyFeatureMode(item.getAttribute("data-feature-mode") || "agent", { persist: true });
+        applyFeatureMode(item.getAttribute("data-feature-mode") || "agent", {
+          persist: true,
+          silent: true,
+          focusHome: false,
+        });
         menu.hidden = true;
         button.setAttribute("aria-expanded", "false");
       });
@@ -3116,7 +3120,7 @@
       if (!options.silent) showToast("사내 지식 문의는 첨부 파일 없이 지식베이스 기준으로 답변합니다.");
     }
     if (shouldResetWorkspace && options.resetConversation !== false) {
-      resetConversationForFeatureSwitch();
+      resetConversationForFeatureSwitch({ focusHome: options.focusHome !== false });
     } else if (shouldResetWorkspace) {
       renderRecentWorkList();
     }
@@ -3137,7 +3141,7 @@
     if (use) use.setAttribute("href", `#${profile.switchIcon || "i-agent-briefcase"}`);
   }
 
-  function resetConversationForFeatureSwitch() {
+  function resetConversationForFeatureSwitch(options = {}) {
     closeRecentContextMenu();
     activeConversationId = "";
     activeConversationHighlightQuery = "";
@@ -3155,7 +3159,7 @@
       resetTextareaVisualState(state.homePromptInput);
       syncHomePromptEmptyClass();
     }
-    setMode("home");
+    setMode("home", { focusHome: options.focusHome !== false });
     renderRecentWorkList();
     window.requestAnimationFrame(() => normalizeHomeComposerLayout());
   }
@@ -3572,7 +3576,15 @@
     return { task: "", attach: false, template: "" };
   }
 
-  function setMode(mode) {
+  function clearHomePromptFocus() {
+    const active = document.activeElement;
+    if (!active || typeof active.blur !== "function") return;
+    if (active === state.homePromptInput || state.promptCard?.contains(active)) {
+      active.blur();
+    }
+  }
+
+  function setMode(mode, options = {}) {
     if (mode !== "doc" && (rpaProductActive || currentTask === RPA_TASK)) {
       cancelRpaWorkspace();
       setRpaProductModeActive(false);
@@ -3602,7 +3614,11 @@
       normalizeHomeComposerLayout();
       window.requestAnimationFrame(() => {
         normalizeHomeComposerLayout();
-        state.homePromptInput?.focus();
+        if (options.focusHome === false) {
+          clearHomePromptFocus();
+        } else {
+          state.homePromptInput?.focus();
+        }
       });
       window.setTimeout(() => normalizeHomeComposerLayout(), 80);
     }
