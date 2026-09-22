@@ -71,6 +71,13 @@
     transform 150ms ease;
 }
 
+.action-card[hidden],
+.action-card[aria-hidden="true"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 .action-card + .action-card::before {
   display: none;
 }
